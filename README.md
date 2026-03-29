@@ -218,7 +218,9 @@ python3 -m venv /opt/zabbix-mcp/venv
 
 ## Connecting AI Clients
 
-The server uses the **Streamable HTTP** transport and listens on `http://127.0.0.1:8080/mcp` by default. Any MCP-compatible client can connect - Claude Desktop, Claude Code, VS Code (Copilot / Continue / Cline), JetBrains IDEs, and others.
+The server uses the **Streamable HTTP** transport and listens on `http://127.0.0.1:8080/mcp` by default.
+
+**[MCP](https://modelcontextprotocol.io)** (Model Context Protocol) is an open standard that lets AI assistants use external tools. Any MCP-compatible client can connect to this server - ChatGPT, VS Code, Claude, Codex, JetBrains, and others.
 
 The MCP client configuration is the same for all clients:
 
@@ -236,10 +238,12 @@ Where to put this config depends on the client:
 
 | Client | Config location |
 |---|---|
+| ChatGPT (initMAX widget) | MCP server settings in the widget configuration |
+| VS Code (Copilot / Continue / Cline) | `.vscode/mcp.json` or extension settings |
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
 | Claude Code | `.mcp.json` in project root or `~/.claude/settings.json` for global |
-| VS Code | `.vscode/mcp.json` or extension settings |
-| JetBrains | MCP server settings in the IDE |
+| OpenAI Codex | MCP server settings in the Codex configuration |
+| JetBrains IDEs | MCP server settings in the IDE |
 
 When `auth_token` is configured on the server, clients must include the bearer token in requests:
 
