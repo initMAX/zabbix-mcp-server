@@ -9,3 +9,4 @@ build/
 *.toml
 !config.example.toml
 !pyproject.toml
+social-preview.html

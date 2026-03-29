@@ -47,15 +47,21 @@
         Zabbix MCP Server
     </h1>
     <h4>
-        Complete Zabbix API coverage for any MCP-compatible AI assistant (219 tools)
+        Complete Zabbix API coverage for any MCP-compatible AI assistant (220 tools)
     </h4>
+    <br>
+    <a href="https://github.com/initMAX/zabbix-mcp-server/releases"><img alt="Version" src="https://img.shields.io/github/v/release/initMAX/zabbix-mcp-server?color=%231f65f4&label=version"></a>&nbsp;
+    <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>&nbsp;
+    <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">&nbsp;
+    <img alt="Tools" src="https://img.shields.io/badge/tools-220-green">&nbsp;
+    <img alt="Zabbix" src="https://img.shields.io/badge/zabbix-5.0%E2%80%947.4-red">
 </div>
 <br>
 <br>
 
 ## What is this?
 
-**MCP** ([Model Context Protocol](https://modelcontextprotocol.io)) is an open standard that lets AI assistants (Claude, VS Code Copilot, JetBrains AI, and others) use external tools. This server exposes the **entire Zabbix API** as MCP tools - allowing any compatible AI assistant to query hosts, check problems, manage templates, acknowledge events, and perform any other Zabbix operation.
+**[MCP](https://modelcontextprotocol.io)** (Model Context Protocol) is an open standard that lets AI assistants (ChatGPT, Claude, VS Code Copilot, JetBrains AI, Codex, and others) use external tools. This server exposes the **entire Zabbix API** as MCP tools — allowing any compatible AI assistant to query hosts, check problems, manage templates, acknowledge events, and perform any other Zabbix operation.
 
 The server runs as a standalone HTTP service. AI clients connect to it over the network.
 
@@ -276,6 +282,25 @@ When `auth_token` is configured on the server, clients must include the bearer t
 Authorization: Bearer your-secret-token-here
 ```
 
+## Example Prompts
+
+Once connected, you can ask your AI assistant things like:
+
+| Prompt | What it does |
+|---|---|
+| *"Show me all current problems"* | Calls `problem_get` to list active alerts |
+| *"Which hosts are down?"* | Calls `host_get` with status filter |
+| *"Acknowledge event 12345 with message 'investigating'"* | Calls `event_acknowledge` |
+| *"What triggers fired in the last hour?"* | Calls `trigger_get` with time filter and `only_true` |
+| *"List all hosts in group 'Linux servers'"* | Calls `hostgroup_get` then `host_get` with group filter |
+| *"Show me CPU usage history for host 'web-01'"* | Calls `host_get`, `item_get`, then `history_get` |
+| *"Put host 'db-01' into maintenance for 2 hours"* | Calls `maintenance_create` |
+| *"Export the template 'Template OS Linux'"* | Calls `configuration_export` |
+| *"How many items does host 'app-01' have?"* | Calls `item_get` with `countOutput` |
+| *"Check the health of the MCP server"* | Calls `health_check` |
+
+The AI chains multiple tools automatically when needed.
+
 ## Available Tools
 
 All tools accept an optional `server` parameter to target a specific Zabbix instance (defaults to the first configured server).
@@ -352,6 +377,16 @@ api_token = "..."          # API token (or "${ENV_VAR}" reference)
 read_only = true           # Block write operations (default: true)
 verify_ssl = true          # Verify TLS certificates (default: true)
 ```
+
+## Zabbix Compatibility
+
+| Zabbix Version | Status |
+|---|---|
+| 7.0 LTS, 7.2, 7.4 | Fully supported (API methods match this version) |
+| 6.0 LTS, 6.2, 6.4 | Supported (some newer API methods may return errors) |
+| 5.0 LTS, 5.2, 5.4 | Basic support (core methods work, newer features unavailable) |
+
+The server uses the standard Zabbix JSON-RPC API. Methods not available in your Zabbix version will return an error from the Zabbix server — the MCP server itself does not enforce version checks.
 
 ## Development
 
