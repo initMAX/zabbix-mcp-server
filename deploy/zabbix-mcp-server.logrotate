@@ -1,0 +1,10 @@
+/var/log/zabbix-mcp/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    create 0640 zabbix-mcp zabbix-mcp
+}

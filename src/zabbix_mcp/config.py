@@ -1,3 +1,20 @@
+#
+# Zabbix MCP Server
+# Copyright (C) 2026 initMAX s.r.o.
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+
 """Configuration loading and validation."""
 
 from __future__ import annotations
@@ -36,6 +53,7 @@ class ServerConfig:
     host: str = "127.0.0.1"
     port: int = 8080
     log_level: str = "info"
+    log_file: str | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +111,7 @@ def load_config(path: str | Path) -> AppConfig:
         host=server_raw.get("host", "127.0.0.1"),
         port=server_raw.get("port", 8080),
         log_level=server_raw.get("log_level", "info"),
+        log_file=server_raw.get("log_file"),
     )
 
     zabbix_raw = raw.get("zabbix", {})

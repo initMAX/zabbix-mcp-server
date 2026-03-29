@@ -12,6 +12,9 @@ port = 8080
 # Logging level: debug, info, warning, error
 log_level = "info"
 
+# Log file path (optional, logs always go to stderr too)
+# log_file = "/var/log/zabbix-mcp/server.log"
+
 # Define one or more Zabbix servers below.
 # The first server is used as the default when no server is specified in a tool call.
 

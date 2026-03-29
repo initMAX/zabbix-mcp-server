@@ -1,3 +1,20 @@
+#
+# Zabbix MCP Server
+# Copyright (C) 2026 initMAX s.r.o.
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Affero General Public License as published by the Free
+# Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+
 """CLI entry point for zabbix-mcp-server."""
 
 from __future__ import annotations
@@ -52,11 +69,16 @@ def main() -> None:
         sys.exit(1)
 
     log_level = getattr(logging, config.server.log_level.upper(), logging.INFO)
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        stream=sys.stderr,
-    )
+    log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)]
+    if config.server.log_file:
+        from pathlib import Path
+        log_path = Path(config.server.log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_path))
+
+    logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
 
     transport = args.transport or config.server.transport
     host = args.host or config.server.host

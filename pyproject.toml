@@ -7,14 +7,14 @@ name = "zabbix-mcp-server"
 version = "1.0.0"
 description = "Production-quality MCP server for the complete Zabbix API"
 readme = "README.md"
-license = "MIT"
+license = "AGPL-3.0-only"
 requires-python = ">=3.10"
-authors = [{ name = "Tomas Hermanek" }]
+authors = [{ name = "initMAX s.r.o." }]
 keywords = ["zabbix", "mcp", "model-context-protocol", "monitoring", "api"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: System Administrators",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -32,8 +32,8 @@ dependencies = [
 zabbix-mcp-server = "zabbix_mcp.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/tomashermanek/zabbix-mcp-server"
-Issues = "https://github.com/tomashermanek/zabbix-mcp-server/issues"
+Homepage = "https://github.com/initMAX/zabbix-mcp-server"
+Issues = "https://github.com/initMAX/zabbix-mcp-server/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zabbix_mcp"]
