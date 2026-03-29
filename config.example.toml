@@ -1,0 +1,31 @@
+# Zabbix MCP Server Configuration
+# Copy this file to config.toml and adjust values.
+
+[server]
+# Transport: "stdio" (for Claude Desktop/Code) or "http" (standalone HTTP server)
+transport = "stdio"
+
+# HTTP transport settings (ignored for stdio)
+host = "127.0.0.1"
+port = 8080
+
+# Logging level: debug, info, warning, error
+log_level = "info"
+
+# Define one or more Zabbix servers below.
+# The first server is used as the default when no server is specified in a tool call.
+
+[zabbix.production]
+url = "https://zabbix.example.com"
+# API token (recommended) - create in Zabbix: User settings > API tokens
+api_token = "your-api-token-here"
+# Or use an environment variable reference:
+# api_token = "${ZABBIX_PROD_TOKEN}"
+read_only = true
+verify_ssl = true
+
+# [zabbix.staging]
+# url = "https://zabbix-staging.example.com"
+# api_token = "${ZABBIX_STAGING_TOKEN}"
+# read_only = false
+# verify_ssl = false

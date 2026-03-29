@@ -1,0 +1,120 @@
+"""Multi-server Zabbix API client manager."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from zabbix_utils import ZabbixAPI
+from zabbix_utils.exceptions import ProcessingError
+
+from zabbix_mcp.config import AppConfig, ZabbixServerConfig
+
+logger = logging.getLogger("zabbix_mcp.client")
+
+
+class ReadOnlyError(Exception):
+    """Raised when a write operation is attempted on a read-only server."""
+
+
+class ClientManager:
+    """Manages connections to multiple Zabbix servers with lazy connect and auto-reconnect."""
+
+    def __init__(self, config: AppConfig) -> None:
+        self._config = config
+        self._clients: dict[str, ZabbixAPI] = {}
+
+    @property
+    def server_names(self) -> list[str]:
+        return list(self._config.zabbix_servers.keys())
+
+    @property
+    def default_server(self) -> str | None:
+        return self._config.default_server
+
+    def get_server_config(self, name: str) -> ZabbixServerConfig:
+        if name not in self._config.zabbix_servers:
+            available = ", ".join(self.server_names)
+            raise ValueError(
+                f"Unknown Zabbix server '{name}'. Available: {available}"
+            )
+        return self._config.zabbix_servers[name]
+
+    def _connect(self, name: str) -> ZabbixAPI:
+        """Create and authenticate a Zabbix API client."""
+        srv = self.get_server_config(name)
+        logger.info("Connecting to Zabbix server '%s' at %s", name, srv.url)
+
+        api = ZabbixAPI(url=srv.url, validate_certs=srv.verify_ssl)
+        api.login(token=srv.api_token)
+
+        version = api.api_version()
+        logger.info("Connected to '%s' — Zabbix %s", name, version)
+        return api
+
+    def _get_client(self, name: str) -> ZabbixAPI:
+        """Get or create a client for the given server."""
+        if name not in self._clients:
+            self._clients[name] = self._connect(name)
+        return self._clients[name]
+
+    def _reconnect(self, name: str) -> ZabbixAPI:
+        """Force reconnect to a server."""
+        logger.warning("Reconnecting to Zabbix server '%s'", name)
+        self._clients.pop(name, None)
+        client = self._connect(name)
+        self._clients[name] = client
+        return client
+
+    def resolve_server(self, server: str | None) -> str:
+        """Resolve server name, falling back to default."""
+        if server:
+            if server not in self._config.zabbix_servers:
+                available = ", ".join(self.server_names)
+                raise ValueError(
+                    f"Unknown Zabbix server '{server}'. Available: {available}"
+                )
+            return server
+        default = self.default_server
+        if default is None:
+            raise ValueError("No Zabbix servers configured")
+        return default
+
+    def call(self, server: str, method: str, params: dict[str, Any]) -> Any:
+        """Execute a Zabbix API call with auto-reconnect on auth failure."""
+        client = self._get_client(server)
+        try:
+            return self._do_call(client, method, params)
+        except ProcessingError as e:
+            error_msg = str(e).lower()
+            if "not authorised" in error_msg or "session" in error_msg or "re-login" in error_msg:
+                client = self._reconnect(server)
+                return self._do_call(client, method, params)
+            raise
+
+    def _do_call(self, client: ZabbixAPI, method: str, params: dict[str, Any]) -> Any:
+        """Execute the actual API call by traversing the method path."""
+        parts = method.split(".")
+        obj: Any = client
+        for part in parts:
+            obj = getattr(obj, part)
+        return obj(**params)
+
+    def check_write(self, server: str) -> None:
+        """Raise ReadOnlyError if the server is read-only."""
+        srv = self.get_server_config(server)
+        if srv.read_only:
+            raise ReadOnlyError(
+                f"Server '{server}' is configured as read-only. "
+                f"Set read_only = false in config to allow write operations."
+            )
+
+    def close(self) -> None:
+        """Logout and close all client connections."""
+        for name, client in self._clients.items():
+            try:
+                client.logout()
+                logger.info("Disconnected from '%s'", name)
+            except Exception:
+                logger.warning("Failed to logout from '%s'", name, exc_info=True)
+        self._clients.clear()
