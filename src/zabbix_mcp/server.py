@@ -202,7 +202,7 @@ def _register_tools(mcp: FastMCP, client_manager: ClientManager) -> int:
             try:
                 client = client_manager._get_client(name)
                 version = client.api_version()
-                results["zabbix_servers"][name] = {"status": "ok", "zabbix_version": version}
+                results["zabbix_servers"][name] = {"status": "ok", "zabbix_version": str(version)}
             except Exception as e:
                 results["zabbix_servers"][name] = {"status": "error", "error": str(e)}
         return json.dumps(results, indent=2)

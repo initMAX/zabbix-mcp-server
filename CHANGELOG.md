@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3 — 2026-03-29
+
+### Fixed
+
+- **`health_check` serialization error** — `api_version()` returns an `APIVersion` object which is not JSON-serializable; cast to `str` before `json.dumps`
+
 ## v1.2 — 2026-03-29
 
 ### Fixed
