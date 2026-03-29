@@ -206,6 +206,31 @@ tail -f /var/log/zabbix-mcp/server.log
 sudo journalctl -u zabbix-mcp-server -f
 ```
 
+### Docker
+
+```bash
+git clone https://github.com/initMAX/zabbix-mcp-server.git
+cd zabbix-mcp-server
+cp config.example.toml config.toml
+nano config.toml                        # fill in your Zabbix details
+docker compose up -d
+```
+
+The config file is mounted read-only into the container. Logs are stored in a Docker volume.
+
+**Upgrade:**
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+**Logs:**
+
+```bash
+docker compose logs -f
+```
+
 ### Manual Installation (pip)
 
 If you prefer to install manually without the deploy script:

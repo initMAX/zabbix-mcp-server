@@ -1,0 +1,34 @@
+#
+# Zabbix MCP Server
+# Copyright (C) 2026 initMAX s.r.o.
+#
+# Usage:
+#   cp config.example.toml config.toml   # edit with your Zabbix details
+#   docker compose up -d                 # start
+#   docker compose logs -f               # view logs
+#   docker compose down                  # stop
+#
+# Upgrade:
+#   git pull
+#   docker compose up -d --build
+#
+
+services:
+  zabbix-mcp-server:
+    build: .
+    container_name: zabbix-mcp-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./config.toml:/etc/zabbix-mcp/config.toml:ro
+      - logs:/var/log/zabbix-mcp
+    healthcheck:
+      test: ["CMD", "/opt/zabbix-mcp/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/mcp')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  logs:
