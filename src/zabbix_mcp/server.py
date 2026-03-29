@@ -255,6 +255,8 @@ def run_server(
 
     mcp = FastMCP(
         name="zabbix-mcp-server",
+        host=host,
+        port=port,
         instructions=(
             "Zabbix MCP Server provides full access to the Zabbix monitoring API. "
             "Use the tools to query hosts, problems, triggers, items, and all other "
@@ -270,7 +272,7 @@ def run_server(
 
     try:
         if transport == "http":
-            mcp.run(transport="streamable-http", host=host, port=port)
+            mcp.run(transport="streamable-http")
         else:
             mcp.run(transport="stdio")
     finally:
