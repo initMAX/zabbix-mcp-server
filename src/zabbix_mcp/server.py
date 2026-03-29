@@ -29,7 +29,7 @@ from mcp.server.auth.provider import AccessToken
 
 from zabbix_mcp.api import ALL_METHODS
 from zabbix_mcp.api.types import MethodDef, ParamDef
-from zabbix_mcp.client import ClientManager, ReadOnlyError
+from zabbix_mcp.client import ClientManager, RateLimitError, ReadOnlyError
 from zabbix_mcp.config import AppConfig
 
 logger = logging.getLogger("zabbix_mcp.server")
@@ -99,7 +99,7 @@ def _make_tool_handler(
                 text = text[:50000] + "\n\n... [truncated, use 'limit' parameter to reduce results]"
             return text
 
-        except ReadOnlyError as e:
+        except (ReadOnlyError, RateLimitError) as e:
             return f"Error: {e}"
         except ValueError as e:
             return f"Error: {e}"
@@ -184,6 +184,29 @@ def _register_tools(mcp: FastMCP, client_manager: ClientManager) -> int:
             return f"Error: {e}"
 
     mcp.add_tool(zabbix_raw_api_call)
+    count += 1
+
+    # Health check tool
+    async def health_check() -> str:
+        """Check the health of the MCP server and its connections to Zabbix servers.
+        Returns the status of each configured Zabbix server (version, connectivity)."""
+        from zabbix_mcp import __version__
+        results: dict[str, Any] = {
+            "mcp_server": "ok",
+            "version": __version__,
+            "tools": count,
+            "zabbix_servers": {},
+        }
+        for name in client_manager.server_names:
+            try:
+                client = client_manager._get_client(name)
+                version = client.api_version()
+                results["zabbix_servers"][name] = {"status": "ok", "zabbix_version": version}
+            except Exception as e:
+                results["zabbix_servers"][name] = {"status": "error", "error": str(e)}
+        return json.dumps(results, indent=2)
+
+    mcp.add_tool(health_check)
     count += 1
 
     return count

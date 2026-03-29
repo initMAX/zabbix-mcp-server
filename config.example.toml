@@ -54,6 +54,12 @@ log_file = "/var/log/zabbix-mcp/server.log"
 # Option 2 - token from environment variable (recommended for production):
 # auth_token = "${MCP_AUTH_TOKEN}"
 
+# Maximum number of Zabbix API calls per minute (sliding window).
+# Protects the Zabbix server from being overwhelmed by rapid AI requests.
+# Set to 0 to disable rate limiting.
+# Default: 60.
+rate_limit = 60
+
 # ---------------------------------------------------------------------------
 # Zabbix servers
 # ---------------------------------------------------------------------------

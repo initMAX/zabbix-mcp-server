@@ -20,6 +20,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from typing import Any
 
 from zabbix_utils import ZabbixAPI
@@ -34,12 +36,39 @@ class ReadOnlyError(Exception):
     """Raised when a write operation is attempted on a read-only server."""
 
 
+class RateLimitError(Exception):
+    """Raised when the rate limit is exceeded."""
+
+
+class _RateLimiter:
+    """Sliding window rate limiter (calls per minute)."""
+
+    def __init__(self, max_calls: int) -> None:
+        self._max_calls = max_calls
+        self._calls: list[float] = []
+        self._lock = threading.Lock()
+
+    def check(self) -> None:
+        if self._max_calls <= 0:
+            return
+        now = time.monotonic()
+        with self._lock:
+            self._calls = [t for t in self._calls if now - t < 60.0]
+            if len(self._calls) >= self._max_calls:
+                raise RateLimitError(
+                    f"Rate limit exceeded ({self._max_calls} calls/minute). "
+                    f"Try again shortly or increase rate_limit in config."
+                )
+            self._calls.append(now)
+
+
 class ClientManager:
     """Manages connections to multiple Zabbix servers with lazy connect and auto-reconnect."""
 
     def __init__(self, config: AppConfig) -> None:
         self._config = config
         self._clients: dict[str, ZabbixAPI] = {}
+        self._rate_limiter = _RateLimiter(config.server.rate_limit)
 
     @property
     def server_names(self) -> list[str]:
@@ -98,7 +127,8 @@ class ClientManager:
         return default
 
     def call(self, server: str, method: str, params: dict[str, Any]) -> Any:
-        """Execute a Zabbix API call with auto-reconnect on auth failure."""
+        """Execute a Zabbix API call with rate limiting and auto-reconnect."""
+        self._rate_limiter.check()
         client = self._get_client(server)
         try:
             return self._do_call(client, method, params)
