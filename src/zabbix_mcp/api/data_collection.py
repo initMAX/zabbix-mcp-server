@@ -319,7 +319,9 @@ _ITEM_METHODS: list[MethodDef] = [
             "Symbolic names for 'value_type': FLOAT, CHAR, LOG, UNSIGNED, TEXT, BINARY. "
             "Preprocessing steps also accept symbolic type names (e.g. JSONPATH, DISCARD_UNCHANGED_HEARTBEAT). "
             "For HTTP_AGENT items, 'authtype' accepts: NONE, BASIC, NTLM, KERBEROS, DIGEST; "
-            "'post_type' accepts: RAW, JSON."
+            "'post_type' accepts: RAW, JSON. "
+            "Value maps can be assigned by name: \"valuemap\": {\"name\": \"My Map\"} "
+            "(the server resolves the ID automatically)."
         ),
         read_only=False,
         params=CREATE_PARAMS,

@@ -1283,6 +1283,47 @@ class TestTimestampNormalization(unittest.TestCase):
         self.assertEqual(result["active_since"], "not-a-date")
 
 
+class TestResolveValuemapByName(unittest.TestCase):
+    """Test _resolve_valuemap_by_name edge cases (no live API)."""
+
+    def test_skip_non_item_methods(self):
+        from zabbix_mcp.server import _resolve_valuemap_by_name
+        params = {"valuemap": {"name": "test"}}
+        # Should return unchanged for non-item methods
+        result = _resolve_valuemap_by_name(params, "trigger.create", None, "s")
+        self.assertEqual(result, params)
+
+    def test_skip_when_no_valuemap(self):
+        from zabbix_mcp.server import _resolve_valuemap_by_name
+        params = {"name": "test", "valuemapid": "5"}
+        result = _resolve_valuemap_by_name(params, "item.create", None, "s")
+        self.assertEqual(result, params)
+
+    def test_skip_when_valuemapid_already_set(self):
+        from zabbix_mcp.server import _resolve_valuemap_by_name
+        params = {"valuemap": {"name": "test"}, "valuemapid": "5"}
+        result = _resolve_valuemap_by_name(params, "item.create", None, "s")
+        self.assertEqual(result, params)
+
+    def test_skip_non_dict_params(self):
+        from zabbix_mcp.server import _resolve_valuemap_by_name
+        result = _resolve_valuemap_by_name(["id1"], "item.create", None, "s")
+        self.assertEqual(result, ["id1"])
+
+    def test_skip_valuemap_without_name(self):
+        from zabbix_mcp.server import _resolve_valuemap_by_name
+        params = {"valuemap": {"valuemapid": "5"}}
+        result = _resolve_valuemap_by_name(params, "item.create", None, "s")
+        self.assertEqual(result, params)
+
+    def test_applies_to_item_methods(self):
+        """Verify all expected methods are in _VALUEMAP_METHODS."""
+        from zabbix_mcp.server import _VALUEMAP_METHODS
+        for method in ["item.create", "item.update",
+                       "itemprototype.create", "itemprototype.update"]:
+            self.assertIn(method, _VALUEMAP_METHODS)
+
+
 class TestBuildZabbixParams(unittest.TestCase):
     def test_delete_method_returns_list(self):
         md = MethodDef("host.delete", "host_delete", "d", read_only=False,

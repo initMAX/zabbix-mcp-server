@@ -4,6 +4,8 @@
 
 ### Added
 
+- **Valuemap assignment by name** — `item_create` / `item_update` / `itemprototype_create` / `itemprototype_update` now accept `"valuemap": {"name": "My Map"}` (same syntax as Zabbix YAML templates); the server resolves the valuemap ID automatically via `valuemap.get`, saving a manual lookup step
+
 - **Smart preprocessing error_handler** — the server now automatically manages `error_handler` and `error_handler_params` on preprocessing steps:
   - **Auto-fill**: steps that support error handling (JSONPATH, REGEX, MULTIPLIER, etc.) but are missing `error_handler` get `error_handler: 0` and `error_handler_params: ""` added automatically — prevents confusing Zabbix API errors about missing required fields
   - **Auto-strip**: steps that don't support error handling (DISCARD_UNCHANGED, DISCARD_UNCHANGED_HEARTBEAT) have `error_handler` and `error_handler_params` removed automatically — prevents "value must be empty" errors

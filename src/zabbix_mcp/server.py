@@ -741,6 +741,63 @@ def _build_zabbix_params(
     return params
 
 
+# API methods that support valuemap assignment by name.
+_VALUEMAP_METHODS: set[str] = {
+    "item.create", "item.update",
+    "itemprototype.create", "itemprototype.update",
+}
+
+
+def _resolve_valuemap_by_name(
+    params: Any,
+    api_method: str,
+    client_manager: ClientManager,
+    server_name: str,
+) -> Any:
+    """Resolve valuemap name to ID for item create/update methods.
+
+    Allows callers to use ``"valuemap": {"name": "My Map"}`` (same syntax
+    as Zabbix YAML templates) instead of ``"valuemapid": "123"``.  The
+    server looks up the valuemap by name and replaces it with the numeric ID.
+    """
+    if api_method not in _VALUEMAP_METHODS:
+        return params
+    if not isinstance(params, dict):
+        return params
+
+    vm = params.get("valuemap")
+    if not isinstance(vm, dict) or "name" not in vm:
+        return params
+
+    # Already has an explicit valuemapid — don't override
+    if "valuemapid" in params:
+        return params
+
+    vm_name = vm["name"]
+
+    # Look up valuemap by exact name match
+    matches = client_manager.call(server_name, "valuemap.get", {
+        "output": ["valuemapid"],
+        "filter": {"name": vm_name},
+        "limit": 2,
+    })
+
+    if not matches:
+        raise ValueError(
+            f"Valuemap '{vm_name}' not found. "
+            f"Create it first with valuemap_create or use 'valuemapid' directly."
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            f"Multiple valuemaps named '{vm_name}' found. "
+            f"Use 'valuemapid' to specify which one."
+        )
+
+    result = {**params, "valuemapid": matches[0]["valuemapid"]}
+    del result["valuemap"]
+    return result
+
+
 def _make_tool_handler(
     method_def: MethodDef,
     client_manager: ClientManager,
@@ -762,6 +819,9 @@ def _make_tool_handler(
 
             zabbix_version = client_manager.get_version(server_name)
             params = _build_zabbix_params(method_def, kwargs, zabbix_version)
+            params = _resolve_valuemap_by_name(
+                params, method_def.api_method, client_manager, server_name,
+            )
             result = client_manager.call(server_name, method_def.api_method, params)
 
             text = json.dumps(result, indent=2, default=str, ensure_ascii=False)
