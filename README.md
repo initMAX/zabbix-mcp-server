@@ -305,48 +305,28 @@ The AI chains multiple tools automatically when needed.
 
 All tools accept an optional `server` parameter to target a specific Zabbix instance (defaults to the first configured server).
 
-### Monitoring
-| Tool | Description |
-|---|---|
-| `problem_get` | Get active problems/alerts (primary alerting tool) |
-| `event_get` / `event_acknowledge` | Retrieve and acknowledge events |
-| `history_get` / `trend_get` | Query historical and trend data |
-| `dashboard_*` / `map_*` | Manage dashboards and network maps |
-
-### Data Collection
-| Tool | Description |
-|---|---|
-| `host_*` / `hostgroup_*` | Manage hosts and host groups |
-| `item_*` / `trigger_*` / `graph_*` | Manage items, triggers, graphs |
-| `template_*` / `templategroup_*` | Manage templates |
-| `maintenance_*` | Manage maintenance periods |
-| `discoveryrule_*` / `*prototype_*` | LLD rules and prototypes |
-| `configuration_export` / `_import` | Export/import Zabbix configuration |
-
-### Alerts
-| Tool | Description |
-|---|---|
-| `action_*` / `mediatype_*` | Manage actions and notification channels |
-| `alert_get` | Query sent alert history |
-| `script_execute` | Execute scripts on hosts |
-
-### Users & Access
-| Tool | Description |
-|---|---|
-| `user_*` / `usergroup_*` / `role_*` | Manage users, groups, RBAC roles |
-| `token_*` | Manage API tokens |
-
-### Administration
-| Tool | Description |
-|---|---|
-| `proxy_*` / `proxygroup_*` | Manage proxies |
-| `auditlog_get` | Query audit trail |
-| `settings_get` / `_update` | Global Zabbix settings |
-
-### Generic
-| Tool | Description |
-|---|---|
-| `zabbix_raw_api_call` | Call any Zabbix API method directly |
+| Category | Tool | Description |
+|---|---|---|
+| **Monitoring** | `problem_get` | Get active problems/alerts (primary alerting tool) |
+| | `event_get` / `event_acknowledge` | Retrieve and acknowledge events |
+| | `history_get` / `trend_get` | Query historical and trend data |
+| | `dashboard_*` / `map_*` | Manage dashboards and network maps |
+| **Data Collection** | `host_*` / `hostgroup_*` | Manage hosts and host groups |
+| | `item_*` / `trigger_*` / `graph_*` | Manage items, triggers, graphs |
+| | `template_*` / `templategroup_*` | Manage templates |
+| | `maintenance_*` | Manage maintenance periods |
+| | `discoveryrule_*` / `*prototype_*` | LLD rules and prototypes |
+| | `configuration_export` / `_import` | Export/import Zabbix configuration |
+| **Alerts** | `action_*` / `mediatype_*` | Manage actions and notification channels |
+| | `alert_get` | Query sent alert history |
+| | `script_execute` | Execute scripts on hosts |
+| **Users & Access** | `user_*` / `usergroup_*` / `role_*` | Manage users, groups, RBAC roles |
+| | `token_*` | Manage API tokens |
+| **Administration** | `proxy_*` / `proxygroup_*` | Manage proxies |
+| | `auditlog_get` | Query audit trail |
+| | `settings_get` / `_update` | Global Zabbix settings |
+| **Generic** | `zabbix_raw_api_call` | Call any Zabbix API method directly |
+| | `health_check` | Verify server status and Zabbix connectivity |
 
 ## Common Parameters (get methods)
 
