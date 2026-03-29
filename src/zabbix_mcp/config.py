@@ -54,6 +54,7 @@ class ServerConfig:
     port: int = 8080
     log_level: str = "info"
     log_file: str | None = None
+    auth_token: str | None = None
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,7 @@ def load_config(path: str | Path) -> AppConfig:
         port=server_raw.get("port", 8080),
         log_level=server_raw.get("log_level", "info"),
         log_file=server_raw.get("log_file"),
+        auth_token=_resolve_env_vars(server_raw["auth_token"]) if server_raw.get("auth_token") else None,
     )
 
     zabbix_raw = raw.get("zabbix", {})

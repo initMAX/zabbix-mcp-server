@@ -20,10 +20,12 @@
 import inspect
 import json
 import logging
+import time
 from typing import Annotated, Any, Optional
 
 from pydantic import Field
 from mcp.server.fastmcp import FastMCP
+from mcp.server.auth.provider import AccessToken
 
 from zabbix_mcp.api import ALL_METHODS
 from zabbix_mcp.api.types import MethodDef, ParamDef
@@ -187,6 +189,23 @@ def _register_tools(mcp: FastMCP, client_manager: ClientManager) -> int:
     return count
 
 
+class _BearerTokenVerifier:
+    """Simple bearer token verifier for HTTP transport authentication."""
+
+    def __init__(self, expected_token: str) -> None:
+        self._expected_token = expected_token
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token == self._expected_token:
+            return AccessToken(
+                token=token,
+                client_id="mcp-client",
+                scopes=["all"],
+                expires_at=int(time.time()) + 86400,
+            )
+        return None
+
+
 def run_server(
     config: AppConfig,
     *,
@@ -197,6 +216,14 @@ def run_server(
     """Create and run the MCP server."""
     client_manager = ClientManager(config)
 
+    # Set up bearer token auth for HTTP transport
+    auth_kwargs: dict[str, Any] = {}
+    if config.server.auth_token and transport == "http":
+        auth_kwargs["token_verifier"] = _BearerTokenVerifier(config.server.auth_token)
+        logger.info("Bearer token authentication enabled")
+    elif transport == "http" and not config.server.auth_token:
+        logger.warning("No auth_token configured - HTTP server is unauthenticated!")
+
     mcp = FastMCP(
         name="zabbix-mcp-server",
         instructions=(
@@ -206,6 +233,7 @@ def run_server(
             "and 'limit' parameters. Write operations (create/update/delete) are only "
             "allowed on servers not configured as read_only."
         ),
+        **auth_kwargs,
     )
 
     tool_count = _register_tools(mcp, client_manager)

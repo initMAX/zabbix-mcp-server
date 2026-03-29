@@ -134,6 +134,17 @@ read_only = true
 verify_ssl = true
 ```
 
+#### Authentication
+
+To protect the HTTP endpoint, set a bearer token:
+
+```toml
+[server]
+auth_token = "your-secret-token-here"
+```
+
+Clients must then include the token in requests. When `auth_token` is not set, the server accepts unauthenticated connections (only safe when bound to `127.0.0.1`).
+
 #### Multiple servers
 
 ```toml
@@ -324,7 +335,8 @@ transport = "http"         # "http" (recommended) or "stdio"
 host = "127.0.0.1"        # HTTP bind address
 port = 8080               # HTTP port
 log_level = "info"         # debug, info, warning, error
-# log_file = "/var/log/zabbix-mcp/server.log"
+log_file = "/var/log/zabbix-mcp/server.log"
+# auth_token = "..."      # Bearer token for HTTP auth (or "${ENV_VAR}")
 
 [zabbix.<name>]            # Repeat for each server
 url = "https://..."        # Zabbix frontend URL
