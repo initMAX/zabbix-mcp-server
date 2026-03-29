@@ -69,6 +69,19 @@ The server runs as a standalone HTTP service. AI clients connect to it over the 
 - **Production-ready** - systemd service, logrotate, security hardening
 - **Generic fallback** - `zabbix_raw_api_call` tool for any API method not explicitly defined
 
+## Quick Start
+
+```bash
+git clone https://github.com/initMAX/zabbix-mcp-server.git
+cd zabbix-mcp-server
+sudo ./deploy/install.sh
+sudo nano /etc/zabbix-mcp/config.toml   # fill in your Zabbix URL + API token
+sudo systemctl start zabbix-mcp-server
+sudo systemctl enable zabbix-mcp-server
+```
+
+Done. The server is running on `http://127.0.0.1:8080/mcp`.
+
 ## Installation
 
 ### Requirements
@@ -85,11 +98,13 @@ cd zabbix-mcp-server
 sudo ./deploy/install.sh
 ```
 
-This will:
-1. Create a system user `zabbix-mcp`
-2. Install the server into `/opt/zabbix-mcp/venv`
-3. Copy config to `/etc/zabbix-mcp/config.toml`
-4. Set up a systemd service and logrotate
+The install script will:
+1. Create a dedicated system user `zabbix-mcp` (no login shell)
+2. Create a Python virtual environment in `/opt/zabbix-mcp/venv`
+3. Install the server and all dependencies
+4. Copy the example config to `/etc/zabbix-mcp/config.toml`
+5. Install a systemd service unit (`zabbix-mcp-server`)
+6. Set up logrotate for `/var/log/zabbix-mcp/*.log` (daily, 30 days retention)
 
 ### Configure
 
@@ -169,6 +184,16 @@ tail -f /var/log/zabbix-mcp/server.log
 
 # Via journalctl
 sudo journalctl -u zabbix-mcp-server -f
+```
+
+### Manual Installation (pip)
+
+If you prefer to install manually without the deploy script:
+
+```bash
+python3 -m venv /opt/zabbix-mcp/venv
+/opt/zabbix-mcp/venv/bin/pip install /path/to/zabbix-mcp-server
+/opt/zabbix-mcp/venv/bin/zabbix-mcp-server --config /path/to/config.toml
 ```
 
 ## Connecting AI Clients
