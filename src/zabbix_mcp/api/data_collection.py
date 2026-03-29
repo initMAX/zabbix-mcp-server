@@ -64,7 +64,8 @@ _HOST_METHODS: list[MethodDef] = [
         description=(
             "Create a new host. At minimum you must supply 'host' (technical name) and 'groups' "
             "(array of host group IDs). You can also attach templates, interfaces, macros, and tags "
-            "in the same call."
+            "in the same call. "
+            "Interface 'type' accepts symbolic names: AGENT, SNMP, IPMI, JMX."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -223,8 +224,9 @@ _HOSTINTERFACE_METHODS: list[MethodDef] = [
         api_method="hostinterface.create",
         tool_name="hostinterface_create",
         description=(
-            "Create a new host interface. Requires 'hostid', 'type' (1=agent, 2=SNMP, 3=IPMI, 4=JMX), "
-            "'main' (0/1), 'useip' (0/1), 'ip', 'dns', and 'port'."
+            "Create a new host interface. Requires 'hostid', 'type', 'main' (0/1), "
+            "'useip' (0/1), 'ip', 'dns', and 'port'. "
+            "Symbolic names accepted for 'type': AGENT, SNMP, IPMI, JMX."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -232,7 +234,10 @@ _HOSTINTERFACE_METHODS: list[MethodDef] = [
     MethodDef(
         api_method="hostinterface.update",
         tool_name="hostinterface_update",
-        description="Update an existing host interface. The 'interfaceid' field is required.",
+        description=(
+            "Update an existing host interface. The 'interfaceid' field is required. "
+            "Symbolic names accepted for 'type': AGENT, SNMP, IPMI, JMX."
+        ),
         read_only=False,
         params=UPDATE_PARAMS,
     ),
@@ -307,7 +312,14 @@ _ITEM_METHODS: list[MethodDef] = [
         description=(
             "Create a new item. Requires 'hostid', 'name', 'key_' (item key), 'type' (collection method), "
             "and 'value_type' (data type). The item is bound to the host and collects data according to "
-            "its type and interval."
+            "its type and interval. "
+            "Symbolic names accepted for 'type': ZABBIX_PASSIVE, TRAPPER, SIMPLE_CHECK, INTERNAL, "
+            "ZABBIX_ACTIVE, WEB_ITEM, EXTERNAL_CHECK, DATABASE_MONITOR, IPMI, SSH, TELNET, CALCULATED, "
+            "JMX, SNMP_TRAP, DEPENDENT, HTTP_AGENT, SNMP_AGENT, SCRIPT, BROWSER. "
+            "Symbolic names for 'value_type': FLOAT, CHAR, LOG, UNSIGNED, TEXT, BINARY. "
+            "Preprocessing steps also accept symbolic type names (e.g. JSONPATH, DISCARD_UNCHANGED_HEARTBEAT). "
+            "For HTTP_AGENT items, 'authtype' accepts: NONE, BASIC, NTLM, KERBEROS, DIGEST; "
+            "'post_type' accepts: RAW, JSON."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -315,7 +327,11 @@ _ITEM_METHODS: list[MethodDef] = [
     MethodDef(
         api_method="item.update",
         tool_name="item_update",
-        description="Update an existing item. The 'itemid' field is required.",
+        description=(
+            "Update an existing item. The 'itemid' field is required. "
+            "Symbolic names accepted for 'type', 'value_type', 'authtype', 'post_type', "
+            "and preprocessing step types — same as item_create."
+        ),
         read_only=False,
         params=UPDATE_PARAMS,
     ),
@@ -364,7 +380,9 @@ _TRIGGER_METHODS: list[MethodDef] = [
         description=(
             "Create a new trigger. Requires 'description' (name) and 'expression' that references "
             "items. Example expression: 'last(/myhost/system.cpu.load) > 5'. Optionally set "
-            "'priority' (severity 0-5) and 'status' (0=enabled, 1=disabled)."
+            "'priority' and 'status' (0=enabled, 1=disabled). "
+            "Symbolic names accepted for 'priority': NOT_CLASSIFIED, INFORMATION, WARNING, "
+            "AVERAGE, HIGH, DISASTER."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -372,7 +390,10 @@ _TRIGGER_METHODS: list[MethodDef] = [
     MethodDef(
         api_method="trigger.update",
         tool_name="trigger_update",
-        description="Update an existing trigger. The 'triggerid' field is required.",
+        description=(
+            "Update an existing trigger. The 'triggerid' field is required. "
+            "Symbolic names accepted for 'priority' — same as trigger_create."
+        ),
         read_only=False,
         params=UPDATE_PARAMS,
     ),
@@ -635,7 +656,10 @@ _DISCOVERYRULE_METHODS: list[MethodDef] = [
         tool_name="discoveryrule_create",
         description=(
             "Create a new LLD rule. Requires 'hostid', 'name', 'key_', and 'type'. The rule will "
-            "periodically discover entities and create real objects from prototypes."
+            "periodically discover entities and create real objects from prototypes. "
+            "Symbolic names accepted for 'type': ZABBIX_PASSIVE, TRAPPER, SIMPLE_CHECK, INTERNAL, "
+            "ZABBIX_ACTIVE, EXTERNAL_CHECK, DATABASE_MONITOR, IPMI, SSH, TELNET, "
+            "HTTP_AGENT, SNMP_AGENT, SCRIPT, DEPENDENT."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -683,7 +707,8 @@ _ITEMPROTOTYPE_METHODS: list[MethodDef] = [
         tool_name="itemprototype_create",
         description=(
             "Create a new item prototype. Requires 'hostid', 'ruleid' (the parent LLD rule), "
-            "'name', 'key_', 'type', and 'value_type'. The key must contain LLD macros like {#FSNAME}."
+            "'name', 'key_', 'type', and 'value_type'. The key must contain LLD macros like {#FSNAME}. "
+            "Symbolic names accepted for 'type' and 'value_type' — same as item_create."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -691,7 +716,10 @@ _ITEMPROTOTYPE_METHODS: list[MethodDef] = [
     MethodDef(
         api_method="itemprototype.update",
         tool_name="itemprototype_update",
-        description="Update an existing item prototype. The 'itemid' field is required.",
+        description=(
+            "Update an existing item prototype. The 'itemid' field is required. "
+            "Symbolic names accepted for 'type' and 'value_type' — same as item_create."
+        ),
         read_only=False,
         params=UPDATE_PARAMS,
     ),
@@ -731,7 +759,9 @@ _TRIGGERPROTOTYPE_METHODS: list[MethodDef] = [
         tool_name="triggerprototype_create",
         description=(
             "Create a new trigger prototype. Requires 'description' and 'expression' referencing "
-            "item prototypes with LLD macros."
+            "item prototypes with LLD macros. "
+            "Symbolic names accepted for 'priority': NOT_CLASSIFIED, INFORMATION, WARNING, "
+            "AVERAGE, HIGH, DISASTER."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -739,7 +769,10 @@ _TRIGGERPROTOTYPE_METHODS: list[MethodDef] = [
     MethodDef(
         api_method="triggerprototype.update",
         tool_name="triggerprototype_update",
-        description="Update an existing trigger prototype. The 'triggerid' field is required.",
+        description=(
+            "Update an existing trigger prototype. The 'triggerid' field is required. "
+            "Symbolic names accepted for 'priority' — same as trigger_create."
+        ),
         read_only=False,
         params=UPDATE_PARAMS,
     ),
@@ -869,7 +902,8 @@ _DISCOVERYRULEPROTOTYPE_METHODS: list[MethodDef] = [
         tool_name="discoveryruleprototype_create",
         description=(
             "Create a new LLD rule prototype (Zabbix 7.4+). Requires 'hostid', 'name', 'key_', "
-            "and 'type'. The key must include LLD macros from the parent discovery rule."
+            "and 'type'. The key must include LLD macros from the parent discovery rule. "
+            "Symbolic names accepted for 'type' — same as discoveryrule_create."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -917,7 +951,7 @@ _USERMACRO_METHODS: list[MethodDef] = [
         tool_name="usermacro_create",
         description=(
             "Create a host-level user macro. Requires 'hostid', 'macro' (e.g. '{$MY_MACRO}'), "
-            "and 'value'. Use 'type' to set secret (1) or vault (2) macros."
+            "and 'value'. Symbolic names accepted for 'type': TEXT, SECRET, VAULT."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -1052,7 +1086,8 @@ _MAINTENANCE_METHODS: list[MethodDef] = [
         tool_name="maintenance_create",
         description=(
             "Create a new maintenance period. Requires 'name', 'active_since', 'active_till', "
-            "'timeperiods', and either 'groupids' or 'hostids' to define which hosts are affected."
+            "'timeperiods', and either 'groupids' or 'hostids' to define which hosts are affected. "
+            "Symbolic names accepted for 'maintenance_type': DATA_COLLECTION (with data), NO_DATA (without data)."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -1142,7 +1177,9 @@ _DRULE_METHODS: list[MethodDef] = [
         tool_name="drule_create",
         description=(
             "Create a new network discovery rule. Requires 'name', 'iprange' (e.g. '192.168.1.1-255'), "
-            "and 'dchecks' (array of discovery check objects defining what to scan for)."
+            "and 'dchecks' (array of discovery check objects defining what to scan for). "
+            "Symbolic names accepted for dcheck 'type': SSH, LDAP, SMTP, FTP, HTTP, POP, NNTP, "
+            "IMAP, TCP, ZABBIX_AGENT, SNMPV1, SNMPV2C, ICMP, SNMPV3, HTTPS, TELNET."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -1259,7 +1296,8 @@ _HTTPTEST_METHODS: list[MethodDef] = [
         description=(
             "Create a new web scenario. Requires 'hostid', 'name', and 'steps' (array of HTTP "
             "step objects with 'name', 'url', and 'no' (step order)). Steps can verify status "
-            "codes and response content."
+            "codes and response content. "
+            "Symbolic names accepted for 'authentication': NONE, BASIC, NTLM, KERBEROS, DIGEST."
         ),
         read_only=False,
         params=CREATE_PARAMS,

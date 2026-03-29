@@ -23,8 +23,9 @@ from zabbix_mcp.api.types import ParamDef
 COMMON_GET_PARAMS: list[ParamDef] = [
     ParamDef(
         "output", "str",
-        "Fields to return: 'extend' for all fields, 'count' for count only, "
-        "or comma-separated field names (e.g. 'hostid,name,status')",
+        "Fields to return: 'extend' for all fields (default), 'count' for count only, "
+        "or comma-separated field names (e.g. 'hostid,name,status'). "
+        "Defaults to 'extend' if omitted.",
     ),
     ParamDef(
         "filter", "dict",
@@ -60,6 +61,14 @@ COMMON_GET_PARAMS: list[ParamDef] = [
     ParamDef(
         "countOutput", "bool",
         "Return the count of matching results instead of the actual data.",
+    ),
+    ParamDef(
+        "extra_params", "dict",
+        "Additional API parameters not covered by the typed fields above. "
+        "Merged into the request as-is. Use this for selectXxx parameters "
+        "(e.g. {\"selectPreprocessing\": \"extend\", \"selectTags\": \"extend\", "
+        "\"selectInterfaces\": \"extend\", \"selectHosts\": [\"hostid\", \"name\"]}) "
+        "or any other Zabbix API parameter.",
     ),
 ]
 

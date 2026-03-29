@@ -87,7 +87,9 @@ _ACTION_METHODS: list[MethodDef] = [
             "one operation. The params dict should include 'filter' (conditions), "
             "'operations' (what to do when the event occurs), and optionally "
             "'recovery_operations' and 'update_operations'. Set 'status' to 0 "
-            "(enabled) or 1 (disabled)."
+            "(enabled) or 1 (disabled). "
+            "Symbolic names accepted for 'eventsource': TRIGGER, DISCOVERY, "
+            "AUTOREGISTRATION, INTERNAL, SERVICE."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -196,10 +198,11 @@ _MEDIATYPE_METHODS: list[MethodDef] = [
         tool_name="mediatype_create",
         description=(
             "Create a new media type (notification channel). Required fields depend "
-            "on the type: 'name' and 'type' are always required. type=0 (Email) "
-            "needs smtp_server, smtp_email; type=1 (Script) needs exec_path; "
-            "type=2 (SMS) needs gsm_modem; type=4 (Webhook) needs script and "
-            "optionally parameters. Set status to 0 (enabled) or 1 (disabled)."
+            "on the type: 'name' and 'type' are always required. "
+            "Symbolic names accepted for 'type': EMAIL, SCRIPT, SMS, WEBHOOK. "
+            "EMAIL needs smtp_server, smtp_email; SCRIPT needs exec_path; "
+            "SMS needs gsm_modem; WEBHOOK needs script and optionally parameters. "
+            "Set status to 0 (enabled) or 1 (disabled)."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -269,12 +272,11 @@ _SCRIPT_METHODS: list[MethodDef] = [
         api_method="script.create",
         tool_name="script_create",
         description=(
-            "Create a new global script. Required fields: 'name', 'type' (0=custom "
-            "script, 1=IPMI, 2=SSH, 3=Telnet, 5=webhook), 'command' (the script "
-            "body or command to execute), and 'scope' (1=action operation, "
-            "2=manual host action, 4=manual event action). Optionally set "
-            "'execute_on' for custom scripts: 1=Zabbix agent, 2=Zabbix server, "
-            "3=Zabbix server (proxy)."
+            "Create a new global script. Required fields: 'name', 'type', 'command' "
+            "(the script body or command to execute), and 'scope'. "
+            "Symbolic names accepted for 'type': SCRIPT, IPMI, SSH, TELNET, WEBHOOK, URL. "
+            "Symbolic names for 'scope': ACTION_OPERATION, MANUAL_HOST, MANUAL_EVENT. "
+            "Symbolic names for 'execute_on' (custom scripts): AGENT, SERVER, SERVER_PROXY."
         ),
         read_only=False,
         params=CREATE_PARAMS,

@@ -402,10 +402,10 @@ _ROLE_METHODS: list[MethodDef] = [
         api_method="role.create",
         tool_name="role_create",
         description=(
-            "Create a new user role. Required fields: 'name' and 'type' "
-            "(1=User, 2=Admin, 3=Super admin, 4=Guest). Provide 'rules' to "
-            "customize UI element access, API method permissions, and allowed "
-            "actions. The type sets the baseline permission level; rules refine it."
+            "Create a new user role. Required fields: 'name' and 'type'. "
+            "Symbolic names accepted for 'type': USER, ADMIN, SUPER_ADMIN, GUEST. "
+            "Provide 'rules' to customize UI element access, API method permissions, "
+            "and allowed actions. The type sets the baseline permission level; rules refine it."
         ),
         read_only=False,
         params=CREATE_PARAMS,

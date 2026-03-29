@@ -386,8 +386,9 @@ _CONNECTOR_METHODS: list[MethodDef] = [
         tool_name="connector_create",
         description=(
             "Create a new event connector. Required fields: 'name', 'url' "
-            "(endpoint to send events to), and 'data_type' (0=item values, "
-            "1=events). Optional: 'protocol' (0=Zabbix Streaming Protocol), "
+            "(endpoint to send data to), and 'data_type'. "
+            "Symbolic names accepted for 'data_type': ITEM_VALUES, EVENTS. "
+            "Optional: 'protocol' (0=Zabbix Streaming Protocol), "
             "'max_records', 'max_senders', 'timeout', authentication settings, "
             "and tag-based filtering rules."
         ),
@@ -531,10 +532,11 @@ _PROXY_METHODS: list[MethodDef] = [
         api_method="proxy.create",
         tool_name="proxy_create",
         description=(
-            "Create a new proxy. Required fields: 'name' and 'operating_mode' "
-            "(0=active proxy that connects to server, 1=passive proxy that "
-            "server connects to). For passive proxies, provide 'address' and "
-            "'port'. Optional: 'tls_connect' and 'tls_accept' for encryption, "
+            "Create a new proxy. Required fields: 'name' and 'operating_mode'. "
+            "Symbolic names accepted for 'operating_mode': ACTIVE (proxy connects "
+            "to server), PASSIVE (server connects to proxy). "
+            "For passive proxies, provide 'address' and 'port'. "
+            "Optional: 'tls_connect' and 'tls_accept' for encryption, "
             "'proxy_groupid' for proxy group membership, 'hosts' to assign "
             "hosts at creation time."
         ),
@@ -548,7 +550,8 @@ _PROXY_METHODS: list[MethodDef] = [
             "Update an existing proxy. The params dict must include 'proxyid'. "
             "Commonly used to reassign hosts, change TLS settings, update the "
             "proxy address, or move the proxy to a different proxy group. "
-            "Note: changing 'hosts' replaces the entire host assignment list."
+            "Note: changing 'hosts' replaces the entire host assignment list. "
+            "Symbolic names accepted for 'operating_mode': ACTIVE, PASSIVE."
         ),
         read_only=False,
         params=UPDATE_PARAMS,

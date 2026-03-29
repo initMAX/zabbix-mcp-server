@@ -21,6 +21,7 @@ import inspect
 import json
 import logging
 import time
+from datetime import datetime, timezone
 from typing import Annotated, Any, Optional
 
 from pydantic import Field
@@ -44,6 +45,456 @@ _PYTHON_TYPES: dict[str, type] = {
     "list": list,
     "dict": dict,
 }
+
+
+# ---------------------------------------------------------------------------
+# Symbolic name → numeric ID mappings for Zabbix API enum fields.
+# Source: Zabbix source (ui/include/defines.inc.php) and API documentation.
+# ---------------------------------------------------------------------------
+
+# Item preprocessing step types (preprocessing[].type)
+_PREPROCESSING_TYPES: dict[str, int] = {
+    "MULTIPLIER": 1,
+    "RTRIM": 2,
+    "LTRIM": 3,
+    "TRIM": 4,
+    "REGEX": 5,
+    "BOOL_TO_DECIMAL": 6,
+    "OCTAL_TO_DECIMAL": 7,
+    "HEX_TO_DECIMAL": 8,
+    "SIMPLE_CHANGE": 9,
+    "CHANGE_PER_SECOND": 10,
+    "XMLPATH": 11,
+    "JSONPATH": 12,
+    "IN_RANGE": 13,
+    "MATCHES_REGEX": 14,
+    "NOT_MATCHES_REGEX": 15,
+    "CHECK_JSON_ERROR": 16,
+    "CHECK_XML_ERROR": 17,
+    "CHECK_REGEX_ERROR": 18,
+    "DISCARD_UNCHANGED": 19,
+    "DISCARD_UNCHANGED_HEARTBEAT": 20,
+    "JAVASCRIPT": 21,
+    "PROMETHEUS_PATTERN": 22,
+    "PROMETHEUS_TO_JSON": 23,
+    "CSV_TO_JSON": 24,
+    "STR_REPLACE": 25,
+    "CHECK_NOT_SUPPORTED": 26,
+    "XML_TO_JSON": 27,
+    "SNMP_WALK_VALUE": 28,
+    "SNMP_WALK_TO_JSON": 29,
+    "SNMP_GET_VALUE": 30,
+}
+
+# Preprocessing error handler (preprocessing[].error_handler)
+_PREPROCESSING_ERROR_HANDLERS: dict[str, int] = {
+    "DEFAULT": 0,
+    "DISCARD_VALUE": 1,
+    "SET_VALUE": 2,
+    "SET_ERROR": 3,
+}
+
+# Item / item prototype collection type (type)
+_ITEM_TYPES: dict[str, int] = {
+    "ZABBIX_PASSIVE": 0,
+    "TRAPPER": 2,
+    "SIMPLE_CHECK": 3,
+    "INTERNAL": 5,
+    "ZABBIX_ACTIVE": 7,
+    "WEB_ITEM": 9,
+    "EXTERNAL_CHECK": 10,
+    "DATABASE_MONITOR": 11,
+    "IPMI": 12,
+    "SSH": 13,
+    "TELNET": 14,
+    "CALCULATED": 15,
+    "JMX": 16,
+    "SNMP_TRAP": 17,
+    "DEPENDENT": 18,
+    "HTTP_AGENT": 19,
+    "SNMP_AGENT": 20,
+    "SCRIPT": 21,
+    "BROWSER": 22,
+}
+
+# Item / item prototype value type (value_type)
+_VALUE_TYPES: dict[str, int] = {
+    "FLOAT": 0,
+    "CHAR": 1,
+    "LOG": 2,
+    "UNSIGNED": 3,
+    "TEXT": 4,
+    "BINARY": 5,
+}
+
+# Trigger severity / priority (priority)
+_SEVERITY_LEVELS: dict[str, int] = {
+    "NOT_CLASSIFIED": 0,
+    "INFORMATION": 1,
+    "WARNING": 2,
+    "AVERAGE": 3,
+    "HIGH": 4,
+    "DISASTER": 5,
+}
+
+# Host interface type (type)
+_INTERFACE_TYPES: dict[str, int] = {
+    "AGENT": 1,
+    "SNMP": 2,
+    "IPMI": 3,
+    "JMX": 4,
+}
+
+# Media type transport (type)
+_MEDIATYPE_TYPES: dict[str, int] = {
+    "EMAIL": 0,
+    "SCRIPT": 1,
+    "SMS": 2,
+    "WEBHOOK": 4,
+}
+
+# Script type (type)
+_SCRIPT_TYPES: dict[str, int] = {
+    "SCRIPT": 0,
+    "IPMI": 1,
+    "SSH": 2,
+    "TELNET": 3,
+    "WEBHOOK": 5,
+    "URL": 6,
+}
+
+# Script scope (scope)
+_SCRIPT_SCOPES: dict[str, int] = {
+    "ACTION_OPERATION": 1,
+    "MANUAL_HOST": 2,
+    "MANUAL_EVENT": 4,
+}
+
+# Script execute_on (execute_on)
+_SCRIPT_EXECUTE_ON: dict[str, int] = {
+    "AGENT": 0,
+    "SERVER": 1,
+    "SERVER_PROXY": 2,
+}
+
+# Action / event source (eventsource)
+_EVENT_SOURCES: dict[str, int] = {
+    "TRIGGER": 0,
+    "DISCOVERY": 1,
+    "AUTOREGISTRATION": 2,
+    "INTERNAL": 3,
+    "SERVICE": 4,
+}
+
+# HTTP agent item authentication type (authtype)
+_AUTHTYPES: dict[str, int] = {
+    "NONE": 0,
+    "BASIC": 1,
+    "NTLM": 2,
+    "KERBEROS": 3,
+    "DIGEST": 4,
+}
+
+# HTTP agent item request body type (post_type)
+_POST_TYPES: dict[str, int] = {
+    "RAW": 0,
+    "JSON": 2,
+}
+
+# Proxy operating mode (operating_mode)
+_PROXY_OPERATING_MODES: dict[str, int] = {
+    "ACTIVE": 0,
+    "PASSIVE": 1,
+}
+
+# User macro type (type)
+_USERMACRO_TYPES: dict[str, int] = {
+    "TEXT": 0,
+    "SECRET": 1,
+    "VAULT": 2,
+}
+
+# Connector data type (data_type)
+_CONNECTOR_DATA_TYPES: dict[str, int] = {
+    "ITEM_VALUES": 0,
+    "EVENTS": 1,
+}
+
+# User role type (type)
+_ROLE_TYPES: dict[str, int] = {
+    "USER": 1,
+    "ADMIN": 2,
+    "SUPER_ADMIN": 3,
+    "GUEST": 4,
+}
+
+# Discovery check type (dchecks[].type in drule.create/update)
+_DCHECK_TYPES: dict[str, int] = {
+    "SSH": 0,
+    "LDAP": 1,
+    "SMTP": 2,
+    "FTP": 3,
+    "HTTP": 4,
+    "POP": 5,
+    "NNTP": 6,
+    "IMAP": 7,
+    "TCP": 8,
+    "ZABBIX_AGENT": 9,
+    "SNMPV1": 10,
+    "SNMPV2C": 11,
+    "ICMP": 12,
+    "SNMPV3": 13,
+    "HTTPS": 14,
+    "TELNET": 15,
+}
+
+# Maintenance type (maintenance_type)
+_MAINTENANCE_TYPES: dict[str, int] = {
+    "DATA_COLLECTION": 0,
+    "NO_DATA": 1,
+}
+
+# Registry: API method prefix → {field_name: mapping}
+# Used by _normalize_enum_fields to resolve symbolic names in top-level params.
+_ENUM_FIELDS: dict[str, dict[str, dict[str, int]]] = {
+    "item.": {"type": _ITEM_TYPES, "value_type": _VALUE_TYPES, "authtype": _AUTHTYPES, "post_type": _POST_TYPES},
+    "itemprototype.": {"type": _ITEM_TYPES, "value_type": _VALUE_TYPES, "authtype": _AUTHTYPES, "post_type": _POST_TYPES},
+    "discoveryrule.": {"type": _ITEM_TYPES},
+    "discoveryruleprototype.": {"type": _ITEM_TYPES},
+    "trigger.": {"priority": _SEVERITY_LEVELS},
+    "triggerprototype.": {"priority": _SEVERITY_LEVELS},
+    "hostinterface.": {"type": _INTERFACE_TYPES},
+    "mediatype.": {"type": _MEDIATYPE_TYPES},
+    "script.": {"type": _SCRIPT_TYPES, "scope": _SCRIPT_SCOPES, "execute_on": _SCRIPT_EXECUTE_ON},
+    "action.": {"eventsource": _EVENT_SOURCES},
+    "proxy.": {"operating_mode": _PROXY_OPERATING_MODES},
+    "usermacro.": {"type": _USERMACRO_TYPES},
+    "connector.": {"data_type": _CONNECTOR_DATA_TYPES},
+    "role.": {"type": _ROLE_TYPES},
+    "httptest.": {"authentication": _AUTHTYPES},
+    "maintenance.": {"maintenance_type": _MAINTENANCE_TYPES},
+}
+
+# Fields that Zabbix API expects as arrays of objects.
+# LLMs often send a single dict instead of a list — we auto-wrap it.
+_ARRAY_FIELDS: set[str] = {
+    "groups", "host_groups", "template_groups",
+    "templates", "tags", "interfaces", "macros",
+    "timeperiods", "steps", "operations",
+    "recovery_operations", "update_operations",
+    "preprocessing", "dchecks",
+}
+
+
+# Fields that contain Unix timestamps.  LLMs often send ISO 8601 strings
+# (e.g. "2026-04-01 08:00:00") instead of ints — we auto-convert them.
+_TIMESTAMP_FIELDS: set[str] = {
+    "active_since", "active_till",
+    "time_from", "time_till",
+    "expires_at", "clock",
+}
+
+# Common ISO 8601 formats that LLMs produce.
+_TIMESTAMP_FORMATS: list[str] = [
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%d",
+]
+
+
+def _try_parse_timestamp(value: str) -> int | None:
+    """Try to parse an ISO 8601 string into a Unix timestamp.
+
+    Returns the integer timestamp on success, ``None`` if the string
+    does not match any known format.
+    """
+    for fmt in _TIMESTAMP_FORMATS:
+        try:
+            dt = datetime.strptime(value, fmt)
+            # If no timezone info, assume UTC
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return int(dt.timestamp())
+        except ValueError:
+            continue
+    return None
+
+
+def _normalize_timestamps(params: dict[str, Any]) -> dict[str, Any]:
+    """Convert ISO 8601 datetime strings to Unix timestamps in known fields.
+
+    Only touches fields listed in ``_TIMESTAMP_FIELDS``.  Integer values
+    and numeric strings pass through unchanged.
+    """
+    changed = False
+    result = params
+    for field in _TIMESTAMP_FIELDS:
+        if field not in params:
+            continue
+        raw = params[field]
+        if isinstance(raw, int):
+            continue
+        if isinstance(raw, str):
+            if raw.isdigit():
+                continue
+            ts = _try_parse_timestamp(raw)
+            if ts is not None:
+                if not changed:
+                    result = {**params}
+                    changed = True
+                result[field] = ts
+    return result
+
+
+def _resolve_enum_value(raw: Any, mapping: dict[str, int]) -> Any:
+    """Resolve a single value against a mapping.
+
+    Returns the numeric ID if *raw* is a recognised symbolic name,
+    otherwise returns *raw* unchanged (int, numeric string, or unknown
+    name — let the Zabbix API validate).
+    """
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str):
+        if raw.isdigit():
+            return raw
+        resolved = mapping.get(raw.upper())
+        if resolved is not None:
+            return resolved
+    return raw
+
+
+def _normalize_preprocessing(params: dict[str, Any]) -> dict[str, Any]:
+    """Translate symbolic preprocessing type and error_handler names to numeric IDs.
+
+    Allows callers to use e.g. ``"type": "JSONPATH"`` instead of
+    ``"type": 12`` and ``"error_handler": "DISCARD_VALUE"`` instead of
+    ``"error_handler": 1``.  Numeric values (int or numeric string) pass
+    through unchanged.  Unknown symbolic names are left as-is so the
+    Zabbix API returns a clear validation error.
+    """
+    if "preprocessing" not in params or not isinstance(params["preprocessing"], list):
+        return params
+
+    steps = params["preprocessing"]
+    changed = False
+
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        # Resolve type
+        if "type" in step:
+            new_val = _resolve_enum_value(step["type"], _PREPROCESSING_TYPES)
+            if new_val is not step["type"]:
+                step["type"] = new_val
+                changed = True
+        # Resolve error_handler
+        if "error_handler" in step:
+            new_val = _resolve_enum_value(step["error_handler"], _PREPROCESSING_ERROR_HANDLERS)
+            if new_val is not step["error_handler"]:
+                step["error_handler"] = new_val
+                changed = True
+
+    if changed:
+        return {**params, "preprocessing": steps}
+    return params
+
+
+def _normalize_nested_interfaces(params: dict[str, Any]) -> dict[str, Any]:
+    """Translate symbolic type names inside nested interfaces arrays.
+
+    Handles the ``interfaces`` field in host.create/update params, where
+    each interface dict has a ``type`` field (AGENT, SNMP, IPMI, JMX).
+    """
+    if "interfaces" not in params or not isinstance(params["interfaces"], list):
+        return params
+
+    changed = False
+    for iface in params["interfaces"]:
+        if not isinstance(iface, dict) or "type" not in iface:
+            continue
+        new_val = _resolve_enum_value(iface["type"], _INTERFACE_TYPES)
+        if new_val is not iface["type"]:
+            iface["type"] = new_val
+            changed = True
+
+    if changed:
+        return {**params, "interfaces": params["interfaces"]}
+    return params
+
+
+def _normalize_nested_dchecks(params: dict[str, Any]) -> dict[str, Any]:
+    """Translate symbolic type names inside nested dchecks arrays.
+
+    Handles the ``dchecks`` field in drule.create/update params, where
+    each dcheck dict has a ``type`` field (SSH, LDAP, HTTP, ICMP, etc.).
+    """
+    if "dchecks" not in params or not isinstance(params["dchecks"], list):
+        return params
+
+    changed = False
+    for check in params["dchecks"]:
+        if not isinstance(check, dict) or "type" not in check:
+            continue
+        new_val = _resolve_enum_value(check["type"], _DCHECK_TYPES)
+        if new_val is not check["type"]:
+            check["type"] = new_val
+            changed = True
+
+    if changed:
+        return {**params, "dchecks": params["dchecks"]}
+    return params
+
+
+def _auto_wrap_arrays(params: dict[str, Any]) -> dict[str, Any]:
+    """Wrap single dicts into arrays for fields that expect lists.
+
+    LLMs often send e.g. ``"groups": {"groupid": "1"}`` instead of
+    ``"groups": [{"groupid": "1"}]``.  Detects known array fields and
+    wraps a bare dict in a list.
+    """
+    changed = False
+    result = params
+    for field in _ARRAY_FIELDS:
+        if field in params and isinstance(params[field], dict):
+            if not changed:
+                result = {**params}
+                changed = True
+            result[field] = [params[field]]
+    return result
+
+
+def _normalize_enum_fields(params: dict[str, Any], api_method: str) -> dict[str, Any]:
+    """Translate symbolic enum names in top-level params fields to numeric IDs.
+
+    Uses the ``_ENUM_FIELDS`` registry to determine which fields to
+    normalise based on the API method being called.
+    """
+    # Find matching field mappings by method prefix
+    field_mappings: dict[str, dict[str, int]] = {}
+    for prefix, mappings in _ENUM_FIELDS.items():
+        if api_method.startswith(prefix):
+            field_mappings = mappings
+            break
+
+    if not field_mappings:
+        return params
+
+    changed = False
+    result = params
+    for field_name, mapping in field_mappings.items():
+        if field_name in params:
+            new_val = _resolve_enum_value(params[field_name], mapping)
+            if new_val is not params[field_name]:
+                if not changed:
+                    result = {**params}
+                    changed = True
+                result[field_name] = new_val
+
+    return result
 
 
 def _snake_to_camel(name: str) -> str:
@@ -133,11 +584,20 @@ def _build_zabbix_params(
         params = args["params"]
         if method_def.api_method in ("configuration.import", "configuration.importcompare"):
             params = _normalize_import_rules(params, zabbix_version)
+        if isinstance(params, dict):
+            params = _auto_wrap_arrays(params)
+            params = _normalize_preprocessing(params)
+            params = _normalize_enum_fields(params, method_def.api_method)
+            params = _normalize_nested_interfaces(params)
+            params = _normalize_nested_dchecks(params)
+            params = _normalize_timestamps(params)
         return params
 
     # For get methods: build params dict from individual arguments
     params: dict[str, Any] = {}
     for param_def in method_def.params:
+        if param_def.name == "extra_params":
+            continue  # handled below
         if param_def.name in args:
             value = args[param_def.name]
             # Split comma-separated output fields
@@ -148,6 +608,19 @@ def _build_zabbix_params(
             if param_def.name == "sortfield" and isinstance(value, str) and "," in value:
                 value = [f.strip() for f in value.split(",")]
             params[param_def.name] = value
+
+    # Default output to "extend" so LLMs get full objects, not just IDs
+    if method_def.read_only and "output" not in params and "countOutput" not in params:
+        params["output"] = "extend"
+
+    # Convert ISO timestamps in get params (e.g. time_from, time_till)
+    params = _normalize_timestamps(params)
+
+    # Merge extra_params (selectXxx, etc.) — typed params take precedence
+    if "extra_params" in args and isinstance(args["extra_params"], dict):
+        for k, v in args["extra_params"].items():
+            params.setdefault(k, v)
+
     return params
 
 
