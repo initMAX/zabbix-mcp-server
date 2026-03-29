@@ -20,8 +20,10 @@
 import inspect
 import json
 import logging
+import re
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Any, Optional
 
 from pydantic import Field
@@ -91,7 +93,16 @@ _PREPROCESSING_ERROR_HANDLERS: dict[str, int] = {
     "DEFAULT": 0,
     "DISCARD_VALUE": 1,
     "SET_VALUE": 2,
+    "CUSTOM_VALUE": 2,
     "SET_ERROR": 3,
+    "CUSTOM_ERROR": 3,
+}
+
+# Preprocessing types that do NOT support error_handler / error_handler_params.
+# Sending these fields on these types causes Zabbix API errors.
+_PREPROC_NO_ERROR_HANDLER: set[int] = {
+    19,  # DISCARD_UNCHANGED
+    20,  # DISCARD_UNCHANGED_HEARTBEAT
 }
 
 # Item / item prototype collection type (type)
@@ -368,13 +379,16 @@ def _resolve_enum_value(raw: Any, mapping: dict[str, int]) -> Any:
 
 
 def _normalize_preprocessing(params: dict[str, Any]) -> dict[str, Any]:
-    """Translate symbolic preprocessing type and error_handler names to numeric IDs.
+    """Normalize preprocessing steps: translate symbolic names and fix error_handler.
 
-    Allows callers to use e.g. ``"type": "JSONPATH"`` instead of
-    ``"type": 12`` and ``"error_handler": "DISCARD_VALUE"`` instead of
-    ``"error_handler": 1``.  Numeric values (int or numeric string) pass
-    through unchanged.  Unknown symbolic names are left as-is so the
-    Zabbix API returns a clear validation error.
+    1. Translates symbolic type names (``"JSONPATH"`` → ``12``).
+    2. Translates symbolic error_handler names (``"DISCARD_VALUE"`` → ``1``).
+    3. Auto-fills ``error_handler: 0`` and ``error_handler_params: ""`` on
+       steps that support error handling but are missing these fields.
+       Without this, Zabbix API returns confusing errors.
+    4. Auto-strips ``error_handler`` and ``error_handler_params`` from steps
+       that don't support them (DISCARD_UNCHANGED, DISCARD_UNCHANGED_HEARTBEAT).
+       Without this, Zabbix API rejects the request with "value must be empty".
     """
     if "preprocessing" not in params or not isinstance(params["preprocessing"], list):
         return params
@@ -385,18 +399,44 @@ def _normalize_preprocessing(params: dict[str, Any]) -> dict[str, Any]:
     for step in steps:
         if not isinstance(step, dict):
             continue
-        # Resolve type
+
+        # Resolve symbolic type name
         if "type" in step:
             new_val = _resolve_enum_value(step["type"], _PREPROCESSING_TYPES)
             if new_val is not step["type"]:
                 step["type"] = new_val
                 changed = True
-        # Resolve error_handler
+
+        # Resolve symbolic error_handler name
         if "error_handler" in step:
             new_val = _resolve_enum_value(step["error_handler"], _PREPROCESSING_ERROR_HANDLERS)
             if new_val is not step["error_handler"]:
                 step["error_handler"] = new_val
                 changed = True
+
+        # Determine the resolved type (int) for error_handler logic
+        step_type = step.get("type")
+        if isinstance(step_type, str) and step_type.isdigit():
+            step_type = int(step_type)
+
+        if isinstance(step_type, int):
+            if step_type in _PREPROC_NO_ERROR_HANDLER:
+                # Strip error_handler fields from types that don't support them
+                if "error_handler" in step:
+                    del step["error_handler"]
+                    changed = True
+                if "error_handler_params" in step:
+                    del step["error_handler_params"]
+                    changed = True
+            else:
+                # Auto-fill default error_handler on types that require it
+                if "error_handler" not in step:
+                    step["error_handler"] = 0
+                    step.setdefault("error_handler_params", "")
+                    changed = True
+                elif "error_handler_params" not in step:
+                    step["error_handler_params"] = ""
+                    changed = True
 
     if changed:
         return {**params, "preprocessing": steps}
@@ -497,6 +537,81 @@ def _normalize_enum_fields(params: dict[str, Any], api_method: str) -> dict[str,
     return result
 
 
+# Regex for valid UUIDv4 format
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _resolve_source_file(params: dict[str, Any]) -> dict[str, Any]:
+    """Read file content for configuration.import when ``source_file`` is used.
+
+    LLMs find it impractical to send large YAML/JSON templates as inline
+    strings.  This allows ``"source_file": "/path/to/template.yaml"``
+    as an alternative to ``"source": "<huge YAML string>"``.
+    """
+    if "source_file" not in params or "source" in params:
+        return params
+
+    path = Path(params["source_file"])
+    if not path.is_file():
+        raise ValueError(f"source_file not found: {path}")
+
+    content = path.read_text(encoding="utf-8")
+    result = {**params, "source": content}
+    del result["source_file"]
+
+    # Auto-detect format from extension if not specified
+    if "format" not in result:
+        ext = path.suffix.lower()
+        if ext in (".yaml", ".yml"):
+            result["format"] = "yaml"
+        elif ext in (".xml",):
+            result["format"] = "xml"
+        elif ext in (".json",):
+            result["format"] = "json"
+
+    return result
+
+
+def _validate_import_uuids(params: dict[str, Any]) -> None:
+    """Validate UUID format in configuration.import source before sending.
+
+    Scans the source string for ``uuid:`` fields and checks they are
+    valid UUIDv4.  Raises ``ValueError`` with a clear message if any
+    invalid UUIDs are found, saving the user from cryptic Zabbix errors.
+    """
+    source = params.get("source", "")
+    if not isinstance(source, str) or not source:
+        return
+
+    # Find uuid: lines in YAML/JSON source
+    invalid: list[str] = []
+    for line in source.splitlines():
+        stripped = line.strip()
+        # Match YAML: "uuid: <value>" or JSON: "\"uuid\": \"<value>\""
+        if stripped.startswith("uuid:"):
+            value = stripped[5:].strip().strip("'\"")
+            if value and not _UUID_RE.match(value):
+                invalid.append(value)
+        elif '"uuid"' in stripped or "'uuid'" in stripped:
+            # JSON-style: try to extract the value
+            parts = stripped.split(":", 1)
+            if len(parts) == 2:
+                value = parts[1].strip().strip(",").strip().strip("'\"")
+                if value and not _UUID_RE.match(value):
+                    invalid.append(value)
+
+    if invalid:
+        examples = ", ".join(invalid[:3])
+        raise ValueError(
+            f"Invalid UUID(s) in import source: {examples}. "
+            f"UUIDs must be valid v4 format (e.g. '550e8400-e29b-41d4-a716-446655440000'). "
+            f"Generate with: python -c \"import uuid; print(uuid.uuid4())\""
+        )
+
+
 def _snake_to_camel(name: str) -> str:
     """Convert snake_case to camelCase (e.g. 'discovery_rules' -> 'discoveryRules')."""
     parts = name.split("_")
@@ -583,6 +698,8 @@ def _build_zabbix_params(
     if "params" in args:
         params = args["params"]
         if method_def.api_method in ("configuration.import", "configuration.importcompare"):
+            params = _resolve_source_file(params)
+            _validate_import_uuids(params)
             params = _normalize_import_rules(params, zabbix_version)
         if isinstance(params, dict):
             params = _auto_wrap_arrays(params)

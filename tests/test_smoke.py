@@ -42,7 +42,9 @@ from zabbix_mcp.server import (
     _normalize_preprocessing,
     _normalize_timestamps,
     _register_tools,
+    _resolve_source_file,
     _snake_to_camel,
+    _validate_import_uuids,
 )
 from zabbix_mcp.api import ALL_METHODS
 from zabbix_mcp.api.types import MethodDef, ParamDef
@@ -475,6 +477,169 @@ class TestPreprocessingNormalization(unittest.TestCase):
             "preprocessing": [{"type": "DISCARD_UNCHANGED_HEARTBEAT", "params": "3600"}],
         }})
         self.assertEqual(result["preprocessing"][0]["type"], 20)
+
+    # --- error_handler aliases ---
+    def test_error_handler_custom_value(self):
+        params = {"preprocessing": [
+            {"type": 12, "error_handler": "CUSTOM_VALUE", "error_handler_params": "0"},
+        ]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 2)
+
+    def test_error_handler_custom_error(self):
+        params = {"preprocessing": [
+            {"type": 12, "error_handler": "CUSTOM_ERROR", "error_handler_params": "Err"},
+        ]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 3)
+
+    # --- auto-fill error_handler ---
+    def test_auto_fill_error_handler_on_jsonpath(self):
+        """JSONPATH step missing error_handler → auto-fill with 0."""
+        params = {"preprocessing": [{"type": 12, "params": "$.value"}]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 0)
+        self.assertEqual(result["preprocessing"][0]["error_handler_params"], "")
+
+    def test_auto_fill_error_handler_on_regex(self):
+        params = {"preprocessing": [{"type": 5, "params": "(.*)\\s+(.*)"}]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 0)
+        self.assertEqual(result["preprocessing"][0]["error_handler_params"], "")
+
+    def test_auto_fill_error_handler_params_only(self):
+        """error_handler set but error_handler_params missing → auto-fill params."""
+        params = {"preprocessing": [{"type": 12, "params": "$.x", "error_handler": 1}]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 1)
+        self.assertEqual(result["preprocessing"][0]["error_handler_params"], "")
+
+    def test_no_auto_fill_when_both_present(self):
+        """Both already present → don't change."""
+        params = {"preprocessing": [
+            {"type": 12, "params": "$.x", "error_handler": 2, "error_handler_params": "0"},
+        ]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 2)
+        self.assertEqual(result["preprocessing"][0]["error_handler_params"], "0")
+
+    # --- auto-strip error_handler from DISCARD steps ---
+    def test_strip_error_handler_from_discard_unchanged(self):
+        params = {"preprocessing": [
+            {"type": 19, "params": "", "error_handler": 0, "error_handler_params": ""},
+        ]}
+        result = _normalize_preprocessing(params)
+        self.assertNotIn("error_handler", result["preprocessing"][0])
+        self.assertNotIn("error_handler_params", result["preprocessing"][0])
+
+    def test_strip_error_handler_from_discard_heartbeat(self):
+        params = {"preprocessing": [
+            {"type": "DISCARD_UNCHANGED_HEARTBEAT", "params": "3600",
+             "error_handler": "0", "error_handler_params": ""},
+        ]}
+        result = _normalize_preprocessing(params)
+        self.assertEqual(result["preprocessing"][0]["type"], 20)
+        self.assertNotIn("error_handler", result["preprocessing"][0])
+        self.assertNotIn("error_handler_params", result["preprocessing"][0])
+
+    def test_no_strip_from_other_types(self):
+        """Non-DISCARD type with error_handler → keep it."""
+        params = {"preprocessing": [
+            {"type": 12, "params": "$.x", "error_handler": 0, "error_handler_params": ""},
+        ]}
+        result = _normalize_preprocessing(params)
+        self.assertIn("error_handler", result["preprocessing"][0])
+
+    def test_discard_without_error_handler_ok(self):
+        """DISCARD step without error_handler → nothing to strip, no auto-fill."""
+        params = {"preprocessing": [{"type": 20, "params": "3600"}]}
+        result = _normalize_preprocessing(params)
+        self.assertNotIn("error_handler", result["preprocessing"][0])
+        self.assertNotIn("error_handler_params", result["preprocessing"][0])
+
+    def test_mixed_steps_auto_fill_and_strip(self):
+        """Pipeline with JSONPATH + DISCARD: auto-fill on first, strip on second."""
+        params = {"preprocessing": [
+            {"type": "JSONPATH", "params": "$.value"},
+            {"type": "DISCARD_UNCHANGED_HEARTBEAT", "params": "600",
+             "error_handler": 0, "error_handler_params": ""},
+        ]}
+        result = _normalize_preprocessing(params)
+        # JSONPATH: auto-filled
+        self.assertEqual(result["preprocessing"][0]["error_handler"], 0)
+        self.assertEqual(result["preprocessing"][0]["error_handler_params"], "")
+        # DISCARD: stripped
+        self.assertNotIn("error_handler", result["preprocessing"][1])
+        self.assertNotIn("error_handler_params", result["preprocessing"][1])
+
+
+class TestSourceFile(unittest.TestCase):
+    def test_resolve_source_file(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("zabbix_export:\n  version: '7.0'\n")
+            f.flush()
+            params = {"source_file": f.name, "rules": {}}
+            result = _resolve_source_file(params)
+        os.unlink(f.name)
+        self.assertIn("source", result)
+        self.assertNotIn("source_file", result)
+        self.assertIn("zabbix_export", result["source"])
+        self.assertEqual(result["format"], "yaml")
+
+    def test_resolve_source_file_xml(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
+            f.write("<zabbix_export><version>7.0</version></zabbix_export>")
+            f.flush()
+            params = {"source_file": f.name}
+            result = _resolve_source_file(params)
+        os.unlink(f.name)
+        self.assertEqual(result["format"], "xml")
+
+    def test_source_takes_precedence(self):
+        """If both source and source_file are present, source wins."""
+        params = {"source": "existing", "source_file": "/some/path"}
+        result = _resolve_source_file(params)
+        self.assertEqual(result["source"], "existing")
+
+    def test_missing_file_raises(self):
+        params = {"source_file": "/nonexistent/file.yaml"}
+        with self.assertRaises(ValueError):
+            _resolve_source_file(params)
+
+    def test_format_not_overridden(self):
+        """Explicit format is preserved even with yaml extension."""
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            f.write("data")
+            f.flush()
+            params = {"source_file": f.name, "format": "json"}
+            result = _resolve_source_file(params)
+        os.unlink(f.name)
+        self.assertEqual(result["format"], "json")
+
+
+class TestUuidValidation(unittest.TestCase):
+    def test_valid_uuids_pass(self):
+        source = "uuid: 550e8400-e29b-41d4-a716-446655440000\nuuid: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d\n"
+        _validate_import_uuids({"source": source})  # should not raise
+
+    def test_invalid_uuid_raises(self):
+        source = "uuid: not-a-valid-uuid\n"
+        with self.assertRaises(ValueError) as ctx:
+            _validate_import_uuids({"source": source})
+        self.assertIn("not-a-valid-uuid", str(ctx.exception))
+
+    def test_no_source_passes(self):
+        _validate_import_uuids({})  # should not raise
+
+    def test_empty_source_passes(self):
+        _validate_import_uuids({"source": ""})  # should not raise
+
+    def test_valid_uuid_without_dashes(self):
+        source = "uuid: 550e8400e29b41d4a716446655440000\n"
+        _validate_import_uuids({"source": source})  # should not raise
 
 
 class TestEnumFieldNormalization(unittest.TestCase):
