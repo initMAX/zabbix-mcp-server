@@ -26,6 +26,7 @@ from typing import Annotated, Any, Optional
 from pydantic import Field
 from mcp.server.fastmcp import FastMCP
 from mcp.server.auth.provider import AccessToken
+from mcp.server.auth.settings import AuthSettings
 
 from zabbix_mcp.api import ALL_METHODS
 from zabbix_mcp.api.types import MethodDef, ParamDef
@@ -242,7 +243,12 @@ def run_server(
     # Set up bearer token auth for HTTP transport
     auth_kwargs: dict[str, Any] = {}
     if config.server.auth_token and transport == "http":
+        server_url = f"http://{host}:{port}"
         auth_kwargs["token_verifier"] = _BearerTokenVerifier(config.server.auth_token)
+        auth_kwargs["auth"] = AuthSettings(
+            issuer_url=server_url,
+            resource_server_url=server_url,
+        )
         logger.info("Bearer token authentication enabled")
     elif transport == "http" and not config.server.auth_token:
         logger.warning("No auth_token configured - HTTP server is unauthenticated!")
