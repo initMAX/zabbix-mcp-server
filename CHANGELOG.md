@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.8 — 2026-03-29
+
+### Added
+
+- **Smart preprocessing error_handler** — the server now automatically manages `error_handler` and `error_handler_params` on preprocessing steps:
+  - **Auto-fill**: steps that support error handling (JSONPATH, REGEX, MULTIPLIER, etc.) but are missing `error_handler` get `error_handler: 0` and `error_handler_params: ""` added automatically — prevents confusing Zabbix API errors about missing required fields
+  - **Auto-strip**: steps that don't support error handling (DISCARD_UNCHANGED, DISCARD_UNCHANGED_HEARTBEAT) have `error_handler` and `error_handler_params` removed automatically — prevents "value must be empty" errors
+- **`source_file` for configuration.import** — accept a file path (e.g. `"source_file": "/path/to/template.yaml"`) instead of an inline `source` string; the server reads the file and auto-detects format from extension (.yaml/.yml/.xml/.json)
+- **UUID validation for configuration.import** — scans `uuid:` fields in import source and validates UUIDv4 format before sending to Zabbix API; returns a clear error message instead of cryptic Zabbix failures
+- **Error handler symbolic name aliases** — `CUSTOM_VALUE` (alias for SET_VALUE/2) and `CUSTOM_ERROR` (alias for SET_ERROR/3) now accepted alongside the existing names
+
 ## v1.7 — 2026-03-29
 
 ### Added
