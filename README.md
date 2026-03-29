@@ -47,44 +47,63 @@
         Zabbix MCP Server
     </h1>
     <h4>
-        Production-quality MCP server providing complete coverage of the Zabbix API (219 tools)
+        Complete Zabbix API coverage for any MCP-compatible AI assistant (219 tools)
     </h4>
 </div>
 <br>
 <br>
 
+## What is this?
+
+**MCP** ([Model Context Protocol](https://modelcontextprotocol.io)) is an open standard that lets AI assistants (Claude, VS Code Copilot, JetBrains AI, and others) use external tools. This server exposes the **entire Zabbix API** as MCP tools - allowing any compatible AI assistant to query hosts, check problems, manage templates, acknowledge events, and perform any other Zabbix operation.
+
+The server runs as a standalone HTTP service. AI clients connect to it over the network.
+
 ## Features
 
-- **Complete API coverage** - Every Zabbix API method (hosts, problems, triggers, templates, users, and 48 more groups) exposed as individual MCP tools
-- **Multi-server support** - Configure multiple Zabbix instances (production, staging, etc.) with separate tokens and settings
-- **Easy configuration** - Single TOML config file, no scattered env vars
-- **Two transports** - stdio (for Claude Desktop / Claude Code) and HTTP (standalone server on a port)
+- **Complete API coverage** - All 57 Zabbix API groups (219 tools): hosts, problems, triggers, templates, users, dashboards, and more
+- **Multi-server support** - Connect to multiple Zabbix instances (production, staging, ...) with separate tokens
+- **Single config file** - One TOML file, no scattered environment variables
 - **Read-only mode** - Per-server write protection to prevent accidental changes
 - **Auto-reconnect** - Transparent re-authentication on session expiry
+- **Production-ready** - systemd service, logrotate, security hardening
 - **Generic fallback** - `zabbix_raw_api_call` tool for any API method not explicitly defined
-- **Clean install** - `pip install` / `uvx` / `pipx` - no repo cloning needed
 
-## Quick Start
+## Installation
 
-### 1. Install
+### Requirements
+
+- Linux server with Python 3.10+
+- Network access to your Zabbix server(s)
+- Zabbix API token ([User settings > API tokens](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/user_settings/api_tokens))
+
+### Install
 
 ```bash
-pip install zabbix-mcp-server
+git clone https://github.com/initMAX/zabbix-mcp-server.git
+cd zabbix-mcp-server
+sudo ./deploy/install.sh
 ```
 
-Or run without installing:
+This will:
+1. Create a system user `zabbix-mcp`
+2. Install the server into `/opt/zabbix-mcp/venv`
+3. Copy config to `/etc/zabbix-mcp/config.toml`
+4. Set up a systemd service and logrotate
+
+### Configure
+
+Edit the config file with your Zabbix server details:
 
 ```bash
-uvx zabbix-mcp-server --config config.toml
+sudo nano /etc/zabbix-mcp/config.toml
 ```
-
-### 2. Configure
-
-Create a `config.toml`:
 
 ```toml
 [server]
-transport = "stdio"
+transport = "http"
+host = "127.0.0.1"
+port = 8080
 
 [zabbix.production]
 url = "https://zabbix.example.com"
@@ -92,8 +111,6 @@ api_token = "your-api-token"
 read_only = true
 verify_ssl = true
 ```
-
-Get an API token in Zabbix: **User settings > API tokens > Create API token**.
 
 #### Multiple servers
 
@@ -111,51 +128,62 @@ read_only = false
 
 #### Environment variable references
 
+Tokens can reference environment variables to avoid storing secrets in the config file:
+
 ```toml
 [zabbix.production]
 url = "https://zabbix.example.com"
 api_token = "${ZABBIX_API_TOKEN}"
 ```
 
-### 3. Run
-
-**stdio mode** (for Claude Desktop / Claude Code / VS Code / JetBrains):
+### Start
 
 ```bash
-zabbix-mcp-server --config config.toml
+sudo systemctl start zabbix-mcp-server
+sudo systemctl enable zabbix-mcp-server
 ```
 
-**HTTP mode** (standalone server):
+Verify the server is running:
 
 ```bash
-zabbix-mcp-server --config config.toml --transport http --port 8080
+sudo systemctl status zabbix-mcp-server
 ```
 
-## MCP Client Integration
+### Update
+
+Pull the latest version and run the update command:
+
+```bash
+cd zabbix-mcp-server
+git pull
+sudo ./deploy/install.sh update
+```
+
+This upgrades the package, updates the systemd unit and logrotate config, and restarts the service automatically.
+
+### Logs
+
+```bash
+# Live log stream
+tail -f /var/log/zabbix-mcp/server.log
+
+# Via journalctl
+sudo journalctl -u zabbix-mcp-server -f
+```
+
+## Connecting AI Clients
+
+The server listens on `http://127.0.0.1:8080/mcp` by default. Point any MCP-compatible client to this URL.
 
 ### Claude Desktop
 
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
   "mcpServers": {
     "zabbix": {
-      "command": "zabbix-mcp-server",
-      "args": ["--config", "/path/to/config.toml"]
-    }
-  }
-}
-```
-
-Or with `uvx` (no install needed):
-
-```json
-{
-  "mcpServers": {
-    "zabbix": {
-      "command": "uvx",
-      "args": ["zabbix-mcp-server", "--config", "/path/to/config.toml"]
+      "url": "http://your-server:8080/mcp"
     }
   }
 }
@@ -163,14 +191,11 @@ Or with `uvx` (no install needed):
 
 ### Claude Code
 
-Add to your Claude Code settings (`.mcp.json` in the project root, or `~/.claude/settings.json` for global):
-
 ```json
 {
   "mcpServers": {
     "zabbix": {
-      "command": "zabbix-mcp-server",
-      "args": ["--config", "/path/to/config.toml"]
+      "url": "http://your-server:8080/mcp"
     }
   }
 }
@@ -178,128 +203,38 @@ Add to your Claude Code settings (`.mcp.json` in the project root, or `~/.claude
 
 ### VS Code (Copilot / Continue / Cline)
 
-Add to your VS Code MCP configuration (`.vscode/mcp.json` or the relevant extension settings):
+Add to `.vscode/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "zabbix": {
-      "command": "zabbix-mcp-server",
-      "args": ["--config", "/path/to/config.toml"]
+      "url": "http://your-server:8080/mcp"
     }
   }
 }
-```
-
-For HTTP mode, point the extension to:
-
-```
-URL: http://localhost:8080/mcp
 ```
 
 ### JetBrains IDEs
 
-Add to your JetBrains MCP configuration:
+Add to the MCP server configuration:
 
 ```json
 {
   "mcpServers": {
     "zabbix": {
-      "command": "zabbix-mcp-server",
-      "args": ["--config", "/path/to/config.toml"]
+      "url": "http://your-server:8080/mcp"
     }
   }
 }
 ```
 
-For HTTP mode, point the IDE to:
+### Any MCP Client
+
+Any client that supports the MCP Streamable HTTP transport can connect to:
 
 ```
-URL: http://localhost:8080/mcp
-```
-
-### Generic MCP Client
-
-Any MCP-compatible client can connect using one of two transports:
-
-**stdio** - launch the server as a subprocess:
-
-```json
-{
-  "mcpServers": {
-    "zabbix": {
-      "command": "zabbix-mcp-server",
-      "args": ["--config", "/path/to/config.toml"]
-    }
-  }
-}
-```
-
-**HTTP** - connect to a running server:
-
-```
-URL: http://localhost:8080/mcp
-```
-
-Start the HTTP server with:
-
-```bash
-zabbix-mcp-server --config config.toml --transport http --port 8080
-```
-
-## Deployment
-
-### Linux Server Deployment with systemd
-
-For production environments, run the MCP server as a systemd service.
-
-#### Install
-
-Use the provided install script to install the server system-wide:
-
-```bash
-sudo ./install.sh
-```
-
-The install script will:
-- Install `zabbix-mcp-server` into a dedicated Python virtual environment
-- Place the configuration file at `/etc/zabbix-mcp-server/config.toml`
-- Create a systemd service unit
-- Set up logrotate
-
-#### systemd Service
-
-After installation, manage the service with standard systemd commands:
-
-```bash
-# Start the service
-sudo systemctl start zabbix-mcp-server
-
-# Enable on boot
-sudo systemctl enable zabbix-mcp-server
-
-# Check status
-sudo systemctl status zabbix-mcp-server
-
-# Restart after config changes
-sudo systemctl restart zabbix-mcp-server
-```
-
-#### Logrotate
-
-The install script configures logrotate automatically. Logs are rotated daily with 14 days of retention. The logrotate configuration is placed at `/etc/logrotate.d/zabbix-mcp-server`.
-
-#### Checking Logs
-
-```bash
-# Follow live logs
-sudo journalctl -u zabbix-mcp-server -f
-
-# View recent logs
-sudo journalctl -u zabbix-mcp-server --since "1 hour ago"
-
-# View logs from the log file (if file logging is configured)
-sudo tail -f /var/log/zabbix-mcp-server/zabbix-mcp-server.log
+http://your-server:8080/mcp
 ```
 
 ## Available Tools
@@ -310,61 +245,46 @@ All tools accept an optional `server` parameter to target a specific Zabbix inst
 | Tool | Description |
 |---|---|
 | `problem_get` | Get active problems/alerts (primary alerting tool) |
-| `event_get` | Retrieve events |
-| `event_acknowledge` | Acknowledge, close, or comment on events |
-| `history_get` | Query historical metric data |
-| `trend_get` | Query trend (aggregated) data |
-| `dashboard_get/create/update/delete` | Manage dashboards |
-| `map_get/create/update/delete` | Manage network maps |
-| ... | |
+| `event_get` / `event_acknowledge` | Retrieve and acknowledge events |
+| `history_get` / `trend_get` | Query historical and trend data |
+| `dashboard_*` / `map_*` | Manage dashboards and network maps |
 
 ### Data Collection
 | Tool | Description |
 |---|---|
-| `host_get/create/update/delete` | Manage monitored hosts |
-| `hostgroup_get/create/update/delete` | Manage host groups |
-| `item_get/create/update/delete` | Manage data collection items |
-| `trigger_get/create/update/delete` | Manage triggers |
-| `template_get/create/update/delete` | Manage templates |
-| `maintenance_get/create/update/delete` | Manage maintenance periods |
-| `configuration_export/import` | Export/import Zabbix configuration |
-| ... | |
+| `host_*` / `hostgroup_*` | Manage hosts and host groups |
+| `item_*` / `trigger_*` / `graph_*` | Manage items, triggers, graphs |
+| `template_*` / `templategroup_*` | Manage templates |
+| `maintenance_*` | Manage maintenance periods |
+| `discoveryrule_*` / `*prototype_*` | LLD rules and prototypes |
+| `configuration_export` / `_import` | Export/import Zabbix configuration |
 
 ### Alerts
 | Tool | Description |
 |---|---|
-| `action_get/create/update/delete` | Manage alert actions |
+| `action_*` / `mediatype_*` | Manage actions and notification channels |
 | `alert_get` | Query sent alert history |
-| `mediatype_get/create/update/delete` | Manage notification channels |
 | `script_execute` | Execute scripts on hosts |
-| ... | |
 
 ### Users & Access
 | Tool | Description |
 |---|---|
-| `user_get/create/update/delete` | Manage users |
-| `usergroup_get/create/update/delete` | Manage user groups |
-| `role_get/create/update/delete` | Manage RBAC roles |
-| `token_get/create/generate/delete` | Manage API tokens |
-| ... | |
+| `user_*` / `usergroup_*` / `role_*` | Manage users, groups, RBAC roles |
+| `token_*` | Manage API tokens |
 
 ### Administration
 | Tool | Description |
 |---|---|
-| `proxy_get/create/update/delete` | Manage proxies |
+| `proxy_*` / `proxygroup_*` | Manage proxies |
 | `auditlog_get` | Query audit trail |
-| `settings_get/update` | Global Zabbix settings |
-| `housekeeping_get/update` | Data retention settings |
-| ... | |
+| `settings_get` / `_update` | Global Zabbix settings |
 
 ### Generic
 | Tool | Description |
 |---|---|
 | `zabbix_raw_api_call` | Call any Zabbix API method directly |
 
-## Common tool parameters (get methods)
-
-All `*_get` tools share these parameters:
+## Common Parameters (get methods)
 
 | Parameter | Description |
 |---|---|
@@ -373,18 +293,18 @@ All `*_get` tools share these parameters:
 | `filter` | Exact match: `{"status": 0}` |
 | `search` | Pattern match: `{"name": "web"}` |
 | `limit` | Max results |
-| `sortfield` | Sort by field |
-| `sortorder` | `ASC` or `DESC` |
+| `sortfield` / `sortorder` | Sort by field, `ASC` or `DESC` |
 | `countOutput` | Return count instead of data |
 
 ## Configuration Reference
 
 ```toml
 [server]
-transport = "stdio"       # "stdio" or "http"
+transport = "http"         # "http" (recommended) or "stdio"
 host = "127.0.0.1"        # HTTP bind address
 port = 8080               # HTTP port
 log_level = "info"         # debug, info, warning, error
+# log_file = "/var/log/zabbix-mcp/server.log"
 
 [zabbix.<name>]            # Repeat for each server
 url = "https://..."        # Zabbix frontend URL
@@ -396,7 +316,7 @@ verify_ssl = true          # Verify TLS certificates (default: true)
 ## Development
 
 ```bash
-git clone https://github.com/initmax/zabbix-mcp-server.git
+git clone https://github.com/initMAX/zabbix-mcp-server.git
 cd zabbix-mcp-server
 python3 -m venv .venv
 source .venv/bin/activate
@@ -411,7 +331,7 @@ npx @modelcontextprotocol/inspector zabbix-mcp-server --config config.toml
 
 ## License
 
-AGPL-3.0
+AGPL-3.0 - see [LICENSE](LICENSE).
 
 <!-- *********************************************************************************************************************************** -->
 <!-- *** FOOTER ************************************************************************************************************************ -->
