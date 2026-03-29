@@ -9,26 +9,23 @@
         </span>
     </h3>
     <h3>
-        <a href="https://www.initmax.com/">
-            <img alt="initMAX.com" src="https://img.shields.io/badge/initMAX.com-%20?color=%231f65f4">
-        </a>&nbsp;
         <a href="https://www.linkedin.com/company/initmax/">
-            <img alt="LinkedIn" src="https://img.shields.io/badge/%20-%20?style=social&logo=linkedin">
-        </a>&nbsp;
+            <img alt="LinkedIn" src="./.readme/logo/linkedin.png">
+        </a>&nbsp;&nbsp;&nbsp;
         <a href="https://www.youtube.com/@initmax1">
-            <img alt="YouTube" src="https://img.shields.io/badge/%20-web?style=social&logo=youtube">
-        </a>&nbsp;
+            <img alt="YouTube" src="./.readme/logo/youtube.png">
+        </a>&nbsp;&nbsp;&nbsp;
         <a href="https://www.facebook.com/initmax">
-            <img alt="Facebook" src="https://img.shields.io/badge/%20-%20?style=social&logo=facebook">
-        </a>&nbsp;
+            <img alt="Facebook" src="./.readme/logo/facebook.png">
+        </a>&nbsp;&nbsp;&nbsp;
         <a href="https://www.instagram.com/initmax/">
-            <img alt="Instagram" src="https://img.shields.io/badge/%20-%20?style=social&logo=instagram">
-        </a>&nbsp;
-        <a href="https://twitter.com/initmax">
-            <img alt="X" src="https://img.shields.io/badge/%20-%20?style=social&logo=x">
-        </a>&nbsp;
+            <img alt="Instagram" src="./.readme/logo/instagram.png">
+        </a>&nbsp;&nbsp;&nbsp;
+        <a href="https://x.com/initmax">
+            <img alt="X" src="./.readme/logo/x.png">
+        </a>&nbsp;&nbsp;&nbsp;
         <a href="https://github.com/initmax">
-            <img alt="GitHub" src="https://img.shields.io/badge/%20-%20?style=social&logo=github">
+            <img alt="GitHub" src="./.readme/logo/github.png">
         </a>
     </h3>
     <h3>
@@ -366,33 +363,36 @@ AGPL-3.0 - see [LICENSE](LICENSE).
 ---
 <div align="center">
     <h4>
-        <a href="https://www.initmax.com/">
-            <img alt="initMAX.com" src="https://img.shields.io/badge/initMAX.com-%20?color=%231f65f4">
-        </a>&nbsp;&nbsp;
-        <a href="tel:+420800244442">
-            <img alt="Phone" src="https://img.shields.io/badge/+420%20800%20244%20442-%20?color=%231f65f4">
-        </a>&nbsp;&nbsp;
-        <a href="mailto:info@initmax.com">
-            <img alt="Email" src="https://img.shields.io/badge/info@initmax.com-%20?color=%231f65f4">
+        <a href="https://www.initmax.com/" style="display: inline-flex; align-items: center; gap: 5px; color: inherit; text-decoration: none;">
+            <img alt="initMAX" src="./.readme/logo/initMAX_symbol_cerne.svg" height="24">
+            initMAX.com
+        </a>&nbsp;&nbsp;&nbsp;
+        <a href="tel:+420800244442" style="display: inline-flex; align-items: center; gap: 5px; color: inherit; text-decoration: none;">
+            <img alt="Phone" src="./.readme/logo/phone.svg" height="24">
+            +420 800 244 442
+        </a>&nbsp;&nbsp;&nbsp;
+        <a href="mailto:info@initmax.com" style="display: inline-flex; align-items: center; gap: 5px; color: inherit; text-decoration: none;">
+            <img alt="Email" src="./.readme/logo/mail.svg" height="24">
+            info@initmax.com
         </a>
         <br><br>
         <a href="https://www.linkedin.com/company/initmax/">
-            <img alt="LinkedIn" src="https://img.shields.io/badge/%20-%20?style=social&logo=linkedin">
+            <img alt="LinkedIn" src="./.readme/logo/linkedin.png">
         </a>&nbsp;
         <a href="https://www.youtube.com/@initmax1">
-            <img alt="YouTube" src="https://img.shields.io/badge/%20-web?style=social&logo=youtube">
+            <img alt="YouTube" src="./.readme/logo/youtube.png">
         </a>&nbsp;
         <a href="https://www.facebook.com/initmax">
-            <img alt="Facebook" src="https://img.shields.io/badge/%20-%20?style=social&logo=facebook">
+            <img alt="Facebook" src="./.readme/logo/facebook.png">
         </a>&nbsp;
         <a href="https://www.instagram.com/initmax/">
-            <img alt="Instagram" src="https://img.shields.io/badge/%20-%20?style=social&logo=instagram">
+            <img alt="Instagram" src="./.readme/logo/instagram.png">
         </a>&nbsp;
-        <a href="https://twitter.com/initmax">
-            <img alt="X" src="https://img.shields.io/badge/%20-%20?style=social&logo=x">
+        <a href="https://x.com/initmax">
+            <img alt="X" src="./.readme/logo/x.png">
         </a>&nbsp;
         <a href="https://github.com/initmax">
-            <img alt="GitHub" src="https://img.shields.io/badge/%20-%20?style=social&logo=github">
+            <img alt="GitHub" src="./.readme/logo/github.png">
         </a>
         <br><br><br>
         <a>
