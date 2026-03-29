@@ -348,12 +348,13 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
-<tr><td rowspan="6"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended) or <code>"stdio"</code></td></tr>
+<tr><td rowspan="7"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended) or <code>"stdio"</code></td></tr>
 <tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
 <tr><td><code>port</code></td><td>HTTP port (default: <code>8080</code>)</td></tr>
 <tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, or <code>error</code></td></tr>
 <tr><td><code>log_file</code></td><td>Path to log file (in addition to stderr)</td></tr>
 <tr><td><code>auth_token</code></td><td>Bearer token for HTTP authentication (supports <code>${ENV_VAR}</code>)</td></tr>
+<tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute — protects Zabbix from flooding (default: <code>60</code>, set to <code>0</code> to disable)</td></tr>
 <tr><td rowspan="4"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL</td></tr>
 <tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
