@@ -47,8 +47,12 @@ log_file = "/var/log/zabbix-mcp/server.log"
 #   Authorization: Bearer <token>
 # When not set, the HTTP server accepts unauthenticated connections
 # (only safe when bound to 127.0.0.1).
-# You can reference an environment variable: "${MCP_AUTH_TOKEN}"
+#
+# Option 1 - token directly in config:
 # auth_token = "your-secret-token-here"
+#
+# Option 2 - token from environment variable (recommended for production):
+# auth_token = "${MCP_AUTH_TOKEN}"
 
 # ---------------------------------------------------------------------------
 # Zabbix servers

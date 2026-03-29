@@ -121,6 +121,8 @@ Edit the config file with your Zabbix server details:
 sudo nano /etc/zabbix-mcp/config.toml
 ```
 
+Minimal configuration - just fill in your Zabbix URL and API token:
+
 ```toml
 [server]
 transport = "http"
@@ -134,18 +136,37 @@ read_only = true
 verify_ssl = true
 ```
 
+All available options with detailed descriptions are documented in [`config.example.toml`](config.example.toml).
+
 #### Authentication
 
-To protect the HTTP endpoint, set a bearer token:
+The HTTP endpoint can be protected with a bearer token. There are two ways to configure it:
+
+**Option 1** - token directly in config:
 
 ```toml
 [server]
 auth_token = "your-secret-token-here"
 ```
 
-Clients must then include the token in requests. When `auth_token` is not set, the server accepts unauthenticated connections (only safe when bound to `127.0.0.1`).
+**Option 2** - token from environment variable (recommended for production):
 
-#### Multiple servers
+```toml
+[server]
+auth_token = "${MCP_AUTH_TOKEN}"
+```
+
+When `auth_token` is set, all clients must include it in the `Authorization` header:
+
+```
+Authorization: Bearer your-secret-token-here
+```
+
+When `auth_token` is not set, the server accepts unauthenticated connections. This is only safe when the server is bound to `127.0.0.1` (default).
+
+#### Multiple Zabbix servers
+
+You can connect to multiple Zabbix instances. Each tool has a `server` parameter to select which one to use (defaults to the first defined):
 
 ```toml
 [zabbix.production]
@@ -157,16 +178,6 @@ read_only = true
 url = "https://zabbix-staging.example.com"
 api_token = "staging-token"
 read_only = false
-```
-
-#### Environment variable references
-
-Tokens can reference environment variables to avoid storing secrets in the config file:
-
-```toml
-[zabbix.production]
-url = "https://zabbix.example.com"
-api_token = "${ZABBIX_API_TOKEN}"
 ```
 
 ### Start
@@ -204,7 +215,20 @@ python3 -m venv /opt/zabbix-mcp/venv
 
 ## Connecting AI Clients
 
-The server listens on `http://127.0.0.1:8080/mcp` by default. Point any MCP-compatible client to this URL.
+The server uses the **Streamable HTTP** transport and listens on `http://127.0.0.1:8080/mcp` by default.
+
+**Without authentication:**
+
+```
+URL: http://your-server:8080/mcp
+```
+
+**With authentication** (when `auth_token` is configured):
+
+```
+URL:    http://your-server:8080/mcp
+Header: Authorization: Bearer your-secret-token-here
+```
 
 ### Claude Desktop
 
