@@ -61,6 +61,8 @@
 
 ## What is this?
 
+[![SafeSkill 91/100](https://img.shields.io/badge/SafeSkill-91%2F100_Verified%20Safe-brightgreen)](https://safeskill.dev/scan/initmax-zabbix-mcp-server)
+
 **[MCP](https://modelcontextprotocol.io)** (Model Context Protocol) is an open standard that lets AI assistants (ChatGPT, Claude, VS Code Copilot, JetBrains AI, Codex, and others) use external tools. This server exposes the **entire Zabbix API** as MCP tools — allowing any compatible AI assistant to query hosts, check problems, manage templates, acknowledge events, and perform any other Zabbix operation.
 
 The server runs as a standalone HTTP service. AI clients connect to it over the network.
