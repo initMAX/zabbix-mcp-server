@@ -305,66 +305,69 @@ The AI chains multiple tools automatically when needed.
 
 All tools accept an optional `server` parameter to target a specific Zabbix instance (defaults to the first configured server).
 
-| Category | Tool | Description |
-|---|---|---|
-| **Monitoring** | `problem_get` | Get active problems/alerts (primary alerting tool) |
-| | `event_get` / `event_acknowledge` | Retrieve and acknowledge events |
-| | `history_get` / `trend_get` | Query historical and trend data |
-| | `dashboard_*` / `map_*` | Manage dashboards and network maps |
-| **Data Collection** | `host_*` / `hostgroup_*` | Manage hosts and host groups |
-| | `item_*` / `trigger_*` / `graph_*` | Manage items, triggers, graphs |
-| | `template_*` / `templategroup_*` | Manage templates |
-| | `maintenance_*` | Manage maintenance periods |
-| | `discoveryrule_*` / `*prototype_*` | LLD rules and prototypes |
-| | `configuration_export` / `_import` | Export/import Zabbix configuration |
-| **Alerts** | `action_*` / `mediatype_*` | Manage actions and notification channels |
-| | `alert_get` | Query sent alert history |
-| | `script_execute` | Execute scripts on hosts |
-| **Users & Access** | `user_*` / `usergroup_*` / `role_*` | Manage users, groups, RBAC roles |
-| | `token_*` | Manage API tokens |
-| **Administration** | `proxy_*` / `proxygroup_*` | Manage proxies |
-| | `auditlog_get` | Query audit trail |
-| | `settings_get` / `_update` | Global Zabbix settings |
-| **Generic** | `zabbix_raw_api_call` | Call any Zabbix API method directly |
-| | `health_check` | Verify server status and Zabbix connectivity |
+<table>
+<tr><th width="160">Category</th><th width="340">Tool</th><th>Description</th></tr>
+<tr><td rowspan="4"><strong>Monitoring</strong></td><td><code>problem_get</code></td><td>Get active problems and alerts — the primary tool for checking what is wrong right now</td></tr>
+<tr><td><code>event_get</code> / <code>event_acknowledge</code></td><td>Retrieve events and acknowledge, close, or comment on them</td></tr>
+<tr><td><code>history_get</code> / <code>trend_get</code></td><td>Query raw historical metric data or aggregated trends for capacity planning</td></tr>
+<tr><td><code>dashboard_*</code> / <code>map_*</code></td><td>Create, update, and manage dashboards and network maps</td></tr>
+<tr><td rowspan="6"><strong>Data Collection</strong></td><td><code>host_*</code> / <code>hostgroup_*</code></td><td>Manage monitored hosts, host groups, and their membership</td></tr>
+<tr><td><code>item_*</code> / <code>trigger_*</code> / <code>graph_*</code></td><td>Manage data collection items, trigger expressions, and graphs</td></tr>
+<tr><td><code>template_*</code> / <code>templategroup_*</code></td><td>Manage monitoring templates and template groups</td></tr>
+<tr><td><code>maintenance_*</code></td><td>Schedule and manage maintenance periods to suppress alerts</td></tr>
+<tr><td><code>discoveryrule_*</code> / <code>*prototype_*</code></td><td>Low-level discovery rules and item/trigger/graph prototypes</td></tr>
+<tr><td><code>configuration_export</code> / <code>_import</code></td><td>Export or import full Zabbix configuration (YAML, XML, JSON)</td></tr>
+<tr><td rowspan="3"><strong>Alerts</strong></td><td><code>action_*</code> / <code>mediatype_*</code></td><td>Configure automated alert actions and notification channels (email, Slack, webhook, ...)</td></tr>
+<tr><td><code>alert_get</code></td><td>Query the history of sent notifications and remote commands</td></tr>
+<tr><td><code>script_execute</code></td><td>Execute global scripts on hosts (SSH, IPMI, custom commands)</td></tr>
+<tr><td rowspan="2"><strong>Users &amp; Access</strong></td><td><code>user_*</code> / <code>usergroup_*</code> / <code>role_*</code></td><td>Manage user accounts, permission groups, and RBAC roles</td></tr>
+<tr><td><code>token_*</code></td><td>Create, list, and manage API tokens for service accounts</td></tr>
+<tr><td rowspan="3"><strong>Administration</strong></td><td><code>proxy_*</code> / <code>proxygroup_*</code></td><td>Manage Zabbix proxies and proxy groups for distributed monitoring</td></tr>
+<tr><td><code>auditlog_get</code></td><td>Query the audit trail of all configuration changes and logins</td></tr>
+<tr><td><code>settings_get</code> / <code>_update</code></td><td>View and modify global Zabbix server settings</td></tr>
+<tr><td rowspan="2"><strong>Generic</strong></td><td><code>zabbix_raw_api_call</code></td><td>Call any Zabbix API method directly by name — use for methods not covered above</td></tr>
+<tr><td><code>health_check</code></td><td>Verify MCP server status and connectivity to all configured Zabbix servers</td></tr>
+</table>
 
 ## Common Parameters (get methods)
 
-| Parameter | Description |
-|---|---|
-| `server` | Target Zabbix server (defaults to first configured) |
-| `output` | Fields to return: `extend` (all), or comma-separated names |
-| `filter` | Exact match: `{"status": 0}` |
-| `search` | Pattern match: `{"name": "web"}` |
-| `limit` | Max results |
-| `sortfield` / `sortorder` | Sort by field, `ASC` or `DESC` |
-| `countOutput` | Return count instead of data |
+<table>
+<tr><th width="220">Parameter</th><th>Description</th></tr>
+<tr><td><code>server</code></td><td>Target Zabbix server name — defaults to the first configured server when omitted</td></tr>
+<tr><td><code>output</code></td><td>Fields to return: <code>extend</code> returns all fields, or pass comma-separated field names (e.g. <code>hostid,name,status</code>)</td></tr>
+<tr><td><code>filter</code></td><td>Exact match filter as JSON object — e.g. <code>{"status": 0}</code> returns only enabled objects</td></tr>
+<tr><td><code>search</code></td><td>Pattern match filter as JSON object — e.g. <code>{"name": "web"}</code> finds all objects containing "web" in the name</td></tr>
+<tr><td><code>limit</code></td><td>Maximum number of results to return — use to avoid large responses</td></tr>
+<tr><td><code>sortfield</code> / <code>sortorder</code></td><td>Sort results by a field name in <code>ASC</code> (ascending) or <code>DESC</code> (descending) order</td></tr>
+<tr><td><code>countOutput</code></td><td>Return the count of matching objects instead of the actual data — useful for statistics</td></tr>
+</table>
 
 ## Configuration Reference
 
-```toml
-[server]
-transport = "http"         # "http" (recommended) or "stdio"
-host = "127.0.0.1"        # HTTP bind address
-port = 8080               # HTTP port
-log_level = "info"         # debug, info, warning, error
-log_file = "/var/log/zabbix-mcp/server.log"
-# auth_token = "..."      # Bearer token for HTTP auth (or "${ENV_VAR}")
+All available options with detailed descriptions are in [`config.example.toml`](config.example.toml). Quick overview:
 
-[zabbix.<name>]            # Repeat for each server
-url = "https://..."        # Zabbix frontend URL
-api_token = "..."          # API token (or "${ENV_VAR}" reference)
-read_only = true           # Block write operations (default: true)
-verify_ssl = true          # Verify TLS certificates (default: true)
-```
+<table>
+<tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
+<tr><td rowspan="6"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended) or <code>"stdio"</code></td></tr>
+<tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
+<tr><td><code>port</code></td><td>HTTP port (default: <code>8080</code>)</td></tr>
+<tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, or <code>error</code></td></tr>
+<tr><td><code>log_file</code></td><td>Path to log file (in addition to stderr)</td></tr>
+<tr><td><code>auth_token</code></td><td>Bearer token for HTTP authentication (supports <code>${ENV_VAR}</code>)</td></tr>
+<tr><td rowspan="4"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL</td></tr>
+<tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
+<tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
+<tr><td><code>verify_ssl</code></td><td>Verify TLS certificates (default: <code>true</code>)</td></tr>
+</table>
 
 ## Zabbix Compatibility
 
-| Zabbix Version | Status |
-|---|---|
-| 7.0 LTS, 7.2, 7.4 | Fully supported (API methods match this version) |
-| 6.0 LTS, 6.2, 6.4 | Supported (some newer API methods may return errors) |
-| 5.0 LTS, 5.2, 5.4 | Basic support (core methods work, newer features unavailable) |
+<table>
+<tr><th width="220">Zabbix Version</th><th width="120">Status</th><th>Notes</th></tr>
+<tr><td>7.0 LTS, 7.2, 7.4</td><td>Fully supported</td><td>All API methods match this version — complete feature coverage</td></tr>
+<tr><td>6.0 LTS, 6.2, 6.4</td><td>Supported</td><td>Core methods work, some newer API methods (e.g. proxy groups, MFA) may return errors</td></tr>
+<tr><td>5.0 LTS, 5.2, 5.4</td><td>Basic support</td><td>Core monitoring and data collection work, newer features unavailable</td></tr>
+</table>
 
 The server uses the standard Zabbix JSON-RPC API. Methods not available in your Zabbix version will return an error from the Zabbix server — the MCP server itself does not enforce version checks.
 
