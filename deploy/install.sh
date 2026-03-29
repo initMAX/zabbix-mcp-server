@@ -82,7 +82,11 @@ ReadWritePaths=/var/log/zabbix-mcp
 [Install]
 WantedBy=multi-user.target
 UNIT
-    systemctl daemon-reload
+    if command -v systemctl &>/dev/null; then
+        systemctl daemon-reload
+    else
+        warn "systemctl not found - skipping daemon-reload (no systemd on this system)."
+    fi
 }
 
 # --------------------------------------------------------------------------- #
@@ -210,12 +214,16 @@ do_update() {
     install_logrotate
 
     # Restart service if running
-    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        info "Restarting $SERVICE_NAME..."
-        systemctl restart "$SERVICE_NAME"
-        ok "Service restarted."
+    if command -v systemctl &>/dev/null; then
+        if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+            info "Restarting $SERVICE_NAME..."
+            systemctl restart "$SERVICE_NAME"
+            ok "Service restarted."
+        else
+            warn "Service is not running. Start with: sudo systemctl start $SERVICE_NAME"
+        fi
     else
-        warn "Service is not running. Start with: sudo systemctl start $SERVICE_NAME"
+        warn "systemctl not found - restart the server manually."
     fi
 
     echo
