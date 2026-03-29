@@ -209,6 +209,12 @@ do_update() {
     # Update package
     install_package
 
+    # Config is NOT overwritten — notify about new options
+    if [[ -f "$CONFIG_DIR/config.toml" ]]; then
+        ok "Config preserved at $CONFIG_DIR/config.toml (not overwritten)."
+        info "Check config.example.toml for any new parameters added in this version."
+    fi
+
     # Update systemd + logrotate (in case they changed)
     install_systemd_unit
     install_logrotate
