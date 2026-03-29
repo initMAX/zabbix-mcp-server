@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.2 — 2026-03-29
+
+### Fixed
+
+- **Auth startup crash** — FastMCP requires `AuthSettings` alongside `token_verifier`, added missing `issuer_url` and `resource_server_url`
+- **`host`/`port` not applied** — parameters were passed to `FastMCP.run()` instead of the constructor, causing them to be ignored
+- **systemd unit overriding config** — removed hardcoded `--transport`, `--host`, `--port` flags from the unit file; all settings now come from `config.toml`
+- **Log file permissions** — install script already set correct ownership, but running the server as root before the first systemd start could create `server.log` owned by root; documented in troubleshooting
+- **Upgrade notice** — update command now confirms config was preserved and hints to check `config.example.toml` for new parameters
+- **Duplicate log lines** — logging handlers were being added twice (stderr + file both duplicated)
+
 ## v1.1 — 2026-03-29
 
 ### Added
