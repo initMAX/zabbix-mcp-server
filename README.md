@@ -106,6 +106,16 @@ The install script will:
 5. Install a systemd service unit (`zabbix-mcp-server`)
 6. Set up logrotate for `/var/log/zabbix-mcp/*.log` (daily, 30 days retention)
 
+### Upgrade
+
+```bash
+cd zabbix-mcp-server
+git pull
+sudo ./deploy/install.sh update
+```
+
+The update command will upgrade the package to the latest version, refresh the systemd unit and logrotate config, and restart the service if it is running.
+
 ### Configure
 
 Edit the config file with your Zabbix server details:
@@ -163,18 +173,6 @@ Verify the server is running:
 ```bash
 sudo systemctl status zabbix-mcp-server
 ```
-
-### Update
-
-Pull the latest version and run the update command:
-
-```bash
-cd zabbix-mcp-server
-git pull
-sudo ./deploy/install.sh update
-```
-
-This upgrades the package, updates the systemd unit and logrotate config, and restarts the service automatically.
 
 ### Logs
 

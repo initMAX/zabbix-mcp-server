@@ -17,31 +17,69 @@
 # Copy this file to config.toml and adjust values.
 
 [server]
-# Transport: "http" (recommended, standalone server) or "stdio" (for local MCP clients)
+
+# Transport protocol for MCP communication.
+#   "http"  - Recommended. Runs a standalone HTTP server that MCP clients
+#             connect to via URL (e.g. http://127.0.0.1:8080/mcp).
+#   "stdio" - Communicates over stdin/stdout. Used when an MCP client
+#             launches the server as a subprocess (e.g. Claude Desktop local mode).
 transport = "http"
 
-# HTTP transport settings
+# IP address to bind the HTTP server to.
+#   "127.0.0.1" - Listen on localhost only (default, recommended for security).
+#   "0.0.0.0"   - Listen on all interfaces (use when clients connect from other hosts).
 host = "127.0.0.1"
+
+# TCP port for the HTTP server.
 port = 8080
 
-# Logging level: debug, info, warning, error
+# Logging level: "debug", "info", "warning", "error".
+#   "debug" logs every API call and its parameters - useful for troubleshooting.
+#   "info"  logs connections, disconnections, and startup info (default).
 log_level = "info"
 
-# Log file path (optional, logs always go to stderr too)
+# Path to a log file. When set, logs are written to this file IN ADDITION to stderr.
+# The parent directory must exist (the install script creates /var/log/zabbix-mcp/).
 # log_file = "/var/log/zabbix-mcp/server.log"
 
-# Define one or more Zabbix servers below.
-# The first server is used as the default when no server is specified in a tool call.
+# ---------------------------------------------------------------------------
+# Zabbix servers
+# ---------------------------------------------------------------------------
+# Define one or more Zabbix servers below. Each section name under [zabbix.*]
+# becomes the server identifier used in the "server" parameter of every tool.
+#
+# The FIRST server defined here is used as the default when no "server"
+# parameter is specified in a tool call.
 
 [zabbix.production]
+
+# Full URL of the Zabbix frontend (without /api_jsonrpc.php - added automatically).
 url = "https://zabbix.example.com"
-# API token (recommended) - create in Zabbix: User settings > API tokens
+
+# API token for authentication.
+# Create one in Zabbix: User settings > API tokens > Create API token.
+# Tokens inherit the permissions of the user they belong to.
 api_token = "your-api-token-here"
-# Or use an environment variable reference:
+
+# You can reference an environment variable instead of storing the token in plain text:
 # api_token = "${ZABBIX_PROD_TOKEN}"
+
+# Read-only mode. When true, all write operations (create, update, delete, execute)
+# are blocked for this server. Set to false to allow modifications.
+# Default: true (safe by default).
 read_only = true
+
+# TLS certificate verification. Set to false only for self-signed certificates
+# or test environments. Should always be true in production.
+# Default: true.
 verify_ssl = true
 
+# ---------------------------------------------------------------------------
+# Example: additional server
+# ---------------------------------------------------------------------------
+# Uncomment and configure to add a second Zabbix instance.
+# Tools can target it by passing server = "staging".
+#
 # [zabbix.staging]
 # url = "https://zabbix-staging.example.com"
 # api_token = "${ZABBIX_STAGING_TOKEN}"
