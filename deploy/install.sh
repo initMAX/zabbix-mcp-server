@@ -60,10 +60,7 @@ User=zabbix-mcp
 Group=zabbix-mcp
 
 ExecStart=/opt/zabbix-mcp/venv/bin/zabbix-mcp-server \
-    --config /etc/zabbix-mcp/config.toml \
-    --transport http \
-    --host 127.0.0.1 \
-    --port 8080
+    --config /etc/zabbix-mcp/config.toml
 
 Restart=on-failure
 RestartSec=5
