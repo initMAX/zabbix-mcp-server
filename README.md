@@ -96,7 +96,7 @@ Done. The server is running on `http://127.0.0.1:8080/mcp`.
 
 - Linux server with Python 3.10+
 - Network access to your Zabbix server(s)
-- Zabbix API token ([User settings > API tokens](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/user_settings/api_tokens))
+- Zabbix API token ([User settings > API tokens](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens))
 
 ### Install
 
