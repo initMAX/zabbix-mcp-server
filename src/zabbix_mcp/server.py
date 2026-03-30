@@ -1138,6 +1138,22 @@ def run_server(
     else:
         logger.info("Registered %d tools", tool_count)
 
+    # HTTP health endpoint (unauthenticated, suitable for Docker/load-balancer checks)
+    if transport in ("http", "sse"):
+        from starlette.requests import Request
+        from starlette.responses import JSONResponse
+
+        @mcp.custom_route("/health", methods=["GET"])
+        async def http_health(request: Request) -> JSONResponse:
+            from zabbix_mcp import __version__
+
+            results: dict[str, Any] = {
+                "status": "ok",
+                "version": __version__,
+                "tools": tool_count,
+            }
+            return JSONResponse(results)
+
     try:
         if transport == "http":
             mcp.run(transport="streamable-http")

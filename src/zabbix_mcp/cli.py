@@ -86,7 +86,7 @@ def main() -> None:
 
     server_names = ", ".join(config.zabbix_servers.keys())
     logger.info("Starting Zabbix MCP Server v%s", __version__)
-    logger.info("Transport: %s", transport)
+    logger.info("Transport: %s | Listening on: %s:%d", transport, host, port)
     logger.info("Zabbix servers: %s", server_names)
 
     run_server(config, transport=transport, host=host, port=port)

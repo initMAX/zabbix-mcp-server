@@ -224,7 +224,7 @@ nano config.toml                        # fill in your Zabbix details
 docker compose up -d
 ```
 
-The config file is mounted read-only into the container. Logs are stored in a Docker volume.
+The config file is mounted read-only into the container. Logs are stored in a Docker volume. Inside the container, `host` and `port` from `config.toml` are overridden (`0.0.0.0:8080`) for Docker compatibility. To expose on a different host port, change only the left side of the `ports:` mapping in `docker-compose.yml` (e.g. `"8883:8080"`).
 
 **Upgrade:**
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.10 — Unreleased
+
+### Added
+
+- **`/health` HTTP endpoint** — unauthenticated `GET /health` endpoint returning server status, version, and tool count as JSON; suitable for Docker healthchecks, load balancers, and uptime monitoring
+- **Permission hardening guide** — new section in `config.example.toml` explaining how to combine `tools`, `read_only`, and Zabbix User Roles for fine-grained access control; includes a reference of read vs write operation suffixes
+
+### Fixed
+
+- **Docker healthcheck** — replaced `GET /mcp` (returned 406 Not Acceptable) with `GET /health`; the MCP endpoint only accepts POST, so the previous healthcheck always failed
+- **Docker networking** — container now explicitly binds to `0.0.0.0` inside Docker via `--host` override, fixing connectivity issues when `host` in `config.toml` was set to `127.0.0.1` (container loopback, unreachable from host)
+
+### Improved
+
+- **Startup log** — transport, host, and port are now logged on a single line for easier troubleshooting
+
 ## v1.9 — 2026-03-30
 
 ### Added

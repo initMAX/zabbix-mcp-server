@@ -18,13 +18,18 @@ services:
     build: .
     container_name: zabbix-mcp-server
     restart: unless-stopped
+    # Inside the container, the server always listens on 0.0.0.0:8080
+    # (host and port from config.toml are overridden for Docker compatibility).
+    command: ["--config", "/etc/zabbix-mcp/config.toml", "--host", "0.0.0.0", "--port", "8080"]
+    # To expose on a different host port, change only the left side below
+    # (e.g. "8883:8080"). To listen on all host interfaces, use "0.0.0.0:8080:8080".
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./config.toml:/etc/zabbix-mcp/config.toml:ro
       - logs:/var/log/zabbix-mcp
     healthcheck:
-      test: ["CMD", "/opt/zabbix-mcp/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/mcp')"]
+      test: ["CMD", "/opt/zabbix-mcp/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
       interval: 30s
       timeout: 5s
       retries: 3
