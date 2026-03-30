@@ -350,7 +350,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
-<tr><td rowspan="9"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
+<tr><td rowspan="8"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
 <tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
 <tr><td><code>port</code></td><td>HTTP port (default: <code>8080</code>)</td></tr>
 <tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, or <code>error</code></td></tr>
