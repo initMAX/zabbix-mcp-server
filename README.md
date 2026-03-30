@@ -65,10 +65,14 @@ The server runs as a standalone HTTP service. AI clients connect to it over the 
 
 ## Features
 
-- **Complete API coverage** - All 57 Zabbix API groups (219 tools): hosts, problems, triggers, templates, users, dashboards, and more
+- **Complete API coverage** - All 57 Zabbix API groups (220 tools): hosts, problems, triggers, templates, users, dashboards, and more
 - **Multi-server support** - Connect to multiple Zabbix instances (production, staging, ...) with separate tokens
+- **HTTP + SSE transports** - Streamable HTTP (recommended) and SSE for clients like n8n that lack session management
+- **Tool filtering** - Limit exposed tools by category (`monitoring`, `alerts`, `users`, etc.) to stay under LLM tool limits
+- **LLM-friendly normalizations** - Symbolic enum names, auto-fill defaults, preprocessing cleanup, timestamp conversion
 - **Single config file** - One TOML file, no scattered environment variables
 - **Read-only mode** - Per-server write protection to prevent accidental changes
+- **Rate limiting** - Per-client call budget (300/min default) to protect Zabbix from flooding
 - **Auto-reconnect** - Transparent re-authentication on session expiry
 - **Production-ready** - systemd service, logrotate, security hardening
 - **Generic fallback** - `zabbix_raw_api_call` tool for any API method not explicitly defined
@@ -247,7 +251,7 @@ python3 -m venv /opt/zabbix-mcp/venv
 
 ## Connecting AI Clients
 
-The server uses the **Streamable HTTP** transport and listens on `http://127.0.0.1:8080/mcp` by default.
+The server uses the **Streamable HTTP** transport by default and listens on `http://127.0.0.1:8080/mcp`. SSE transport is also available (`http://127.0.0.1:8080/sse`) for clients that do not support Streamable HTTP session management.
 
 **[MCP](https://modelcontextprotocol.io)** (Model Context Protocol) is an open standard that lets AI assistants use external tools. Any MCP-compatible client can connect to this server - ChatGPT, VS Code, Claude, Codex, JetBrains, and others.
 
@@ -346,13 +350,14 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
-<tr><td rowspan="7"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended) or <code>"stdio"</code></td></tr>
+<tr><td rowspan="9"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
 <tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
 <tr><td><code>port</code></td><td>HTTP port (default: <code>8080</code>)</td></tr>
 <tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, or <code>error</code></td></tr>
 <tr><td><code>log_file</code></td><td>Path to log file (in addition to stderr)</td></tr>
-<tr><td><code>auth_token</code></td><td>Bearer token for HTTP authentication (supports <code>${ENV_VAR}</code>)</td></tr>
-<tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute — protects Zabbix from flooding (default: <code>60</code>, set to <code>0</code> to disable)</td></tr>
+<tr><td><code>auth_token</code></td><td>Bearer token for HTTP/SSE authentication (supports <code>${ENV_VAR}</code>)</td></tr>
+<tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute per client (default: <code>300</code>, set to <code>0</code> to disable)</td></tr>
+<tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix — e.g. <code>["monitoring", "alerts"]</code> (default: all ~220 tools)</td></tr>
 <tr><td rowspan="4"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL</td></tr>
 <tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>

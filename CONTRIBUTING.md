@@ -15,7 +15,7 @@ pip install -e .
 ## Running Tests
 
 ```bash
-python -m unittest tests.test_smoke -v
+python -m pytest tests/test_smoke.py -v
 ```
 
 ## Project Structure
