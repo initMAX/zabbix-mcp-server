@@ -80,10 +80,21 @@ rate_limit = 300
 # to the MCP client.
 #
 # Note: the tools filter is prefix-based, so "host" registers ALL host_*
-# tools (get, create, update, delete) together. For method-level control,
-# use Zabbix User Roles (Administration > User roles > API methods) to define
-# an allow/deny list on the API token's user. Zabbix will reject unauthorized
-# calls regardless of MCP server settings.
+# tools (get, create, update, delete) together. The read_only flag then
+# controls which of those are allowed based on the operation type:
+#
+#   Read operations (allowed when read_only = true):
+#     *_get, *_export, *_checkauthentication
+#
+#   Write operations (blocked when read_only = true):
+#     *_create, *_update, *_delete, *_massadd, *_massremove, *_massupdate,
+#     *_import, *_execute, *_acknowledge, *_push, *_clear, *_propagate,
+#     *_generate, *_provision, *_unblock, *_resettotp, *_replacehostinterfaces
+#
+# For method-level control beyond this, use Zabbix User Roles
+# (Administration > User roles > API methods) to define an allow/deny list
+# on the API token's user. Zabbix will reject unauthorized calls regardless
+# of MCP server settings.
 #
 # Recommended approach for production: combine all three layers:
 #   1. tools     - limit registered tools to relevant prefixes (reduces noise)
