@@ -64,6 +64,32 @@ log_file = "/var/log/zabbix-mcp/server.log"
 # Default: 300.
 rate_limit = 300
 
+# ---------------------------------------------------------------------------
+# Permission hardening
+# ---------------------------------------------------------------------------
+# The tools filter and read_only flag can be combined to achieve fine-grained
+# write permissions. For example, to allow only monitoring reads and
+# maintenance writes:
+#
+#   tools = ["monitoring", "maintenance"]
+#   read_only = false   # on the server section below
+#
+# This registers all monitoring tools (host_get, problem_get, ...) plus
+# maintenance tools (maintenance_create, maintenance_update, ...), while
+# tools like host_create, host_delete, or template_delete are never exposed
+# to the MCP client.
+#
+# Note: the tools filter is prefix-based, so "host" registers ALL host_*
+# tools (get, create, update, delete) together. For method-level control,
+# use Zabbix User Roles (Administration > User roles > API methods) to define
+# an allow/deny list on the API token's user. Zabbix will reject unauthorized
+# calls regardless of MCP server settings.
+#
+# Recommended approach for production: combine all three layers:
+#   1. tools     - limit registered tools to relevant prefixes (reduces noise)
+#   2. read_only - block all writes on servers that should be read-only
+#   3. Zabbix User Roles - enforce method-level access control at the API level
+
 # Filter which tool groups are exposed via MCP.
 # When not set or commented out, all ~220 tools are registered (default).
 # This is useful when your LLM has a tool limit (e.g. OpenAI max 128 tools).
