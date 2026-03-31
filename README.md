@@ -391,6 +391,12 @@ Test with MCP Inspector:
 npx @modelcontextprotocol/inspector zabbix-mcp-server --config config.toml
 ```
 
+## Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [Zabbix AI Skills](https://github.com/initMAX/zabbix-ai-skills) | 35 ready-to-use AI workflows for Zabbix — maintenance windows, host onboarding, template upgrades, audits, and more |
+
 ## License
 
 AGPL-3.0 - see [LICENSE](LICENSE).
