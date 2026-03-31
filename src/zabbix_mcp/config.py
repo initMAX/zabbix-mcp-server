@@ -43,6 +43,7 @@ class ZabbixServerConfig:
     api_token: str
     read_only: bool = True
     verify_ssl: bool = True
+    skip_version_check: bool = False
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,7 @@ class ServerConfig:
     auth_token: str | None = None
     rate_limit: int = 300
     tools: list[str] | None = None
+    disabled_tools: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -158,6 +160,13 @@ def load_config(path: str | Path) -> AppConfig:
             raise ConfigError("'tools' must be a list of tool group names")
         tools_filter = _expand_tool_groups([str(t) for t in tools_raw])
 
+    disabled_tools_raw = server_raw.get("disabled_tools")
+    disabled_tools_filter: list[str] | None = None
+    if disabled_tools_raw is not None:
+        if not isinstance(disabled_tools_raw, list):
+            raise ConfigError("'disabled_tools' must be a list of tool group names")
+        disabled_tools_filter = _expand_tool_groups([str(t) for t in disabled_tools_raw])
+
     server_config = ServerConfig(
         transport=transport,
         host=server_raw.get("host", "127.0.0.1"),
@@ -167,6 +176,7 @@ def load_config(path: str | Path) -> AppConfig:
         auth_token=_resolve_env_vars(server_raw["auth_token"]) if server_raw.get("auth_token") else None,
         rate_limit=server_raw.get("rate_limit", 60),
         tools=tools_filter,
+        disabled_tools=disabled_tools_filter,
     )
 
     zabbix_raw = raw.get("zabbix", {})
@@ -196,6 +206,7 @@ def load_config(path: str | Path) -> AppConfig:
             api_token=api_token,
             read_only=srv.get("read_only", True),
             verify_ssl=srv.get("verify_ssl", True),
+            skip_version_check=srv.get("skip_version_check", False),
         )
 
     return AppConfig(server=server_config, zabbix_servers=zabbix_servers)

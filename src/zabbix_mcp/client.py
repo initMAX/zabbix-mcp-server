@@ -104,7 +104,7 @@ class ClientManager:
         srv = self.get_server_config(name)
         logger.info("Connecting to Zabbix server '%s' at %s", name, srv.url)
 
-        api = ZabbixAPI(url=srv.url, validate_certs=srv.verify_ssl)
+        api = ZabbixAPI(url=srv.url, validate_certs=srv.verify_ssl, skip_version_check=srv.skip_version_check)
         api.login(token=srv.api_token)
 
         version = api.api_version()

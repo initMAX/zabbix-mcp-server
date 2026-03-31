@@ -1,9 +1,11 @@
 # Changelog
 
-## v1.10 — Unreleased
+## v1.10 — 2026-03-31
 
 ### Added
 
+- **`skip_version_check` config option** — new per-server setting to bypass `zabbix-utils` API version compatibility check; enables connecting to Zabbix versions newer than what the library has been tested with (e.g. Zabbix 8.0)
+- **`disabled_tools` config option** — denylist counterpart to `tools`; exclude specific tool groups or prefixes from registration using the same category names (e.g. `disabled_tools = ["users", "administration"]`); applied after the allowlist when both are set
 - **`/health` HTTP endpoint** — unauthenticated `GET /health` endpoint returning server status, version, and tool count as JSON; suitable for Docker healthchecks, load balancers, and uptime monitoring
 - **Permission hardening guide** — new section in `config.example.toml` explaining how to combine `tools`, `read_only`, and Zabbix User Roles for fine-grained access control; includes a reference of read vs write operation suffixes
 

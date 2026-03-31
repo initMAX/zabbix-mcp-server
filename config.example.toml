@@ -187,6 +187,15 @@ rate_limit = 300
 #   tools = ["host", "problem", "trigger", "template"]
 #   tools = ["monitoring", "template", "action", "dashboard"]
 
+# Exclude specific tool groups from registration (denylist).
+# Uses the same category names and prefixes as the "tools" option above.
+# Applied after the allowlist — if both are set, a tool must pass both filters.
+# When not set, no tools are excluded (default).
+#
+# Examples:
+#   disabled_tools = ["users", "administration"]
+#   disabled_tools = ["script", "configuration"]
+
 # ---------------------------------------------------------------------------
 # Zabbix servers
 # ---------------------------------------------------------------------------
@@ -219,6 +228,11 @@ read_only = true
 # Default: true.
 verify_ssl = true
 
+# Skip Zabbix API version compatibility check. Enable this when connecting
+# to a Zabbix version newer than what zabbix-utils has been tested with.
+# Default: false.
+# skip_version_check = false
+
 # ---------------------------------------------------------------------------
 # Example: additional server
 # ---------------------------------------------------------------------------
@@ -230,3 +244,4 @@ verify_ssl = true
 # api_token = "${ZABBIX_STAGING_TOKEN}"
 # read_only = false
 # verify_ssl = false
+# skip_version_check = false

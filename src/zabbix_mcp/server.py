@@ -1005,6 +1005,7 @@ def _register_tools(
     mcp: FastMCP,
     client_manager: ClientManager,
     tools_filter: list[str] | None = None,
+    disabled_tools: list[str] | None = None,
 ) -> int:
     """Register Zabbix API methods as MCP tools. Returns tool count.
 
@@ -1012,14 +1013,20 @@ def _register_tools(
     Otherwise only tools whose prefix matches an entry in the list are
     registered (e.g. ``["host", "problem"]`` registers ``host_get``,
     ``host_create``, ``problem_get``, etc.).
+
+    When *disabled_tools* is set, tools whose prefix matches an entry
+    are excluded. This is applied after the allowlist filter.
     """
     server_names = client_manager.server_names
     count = 0
 
     for method_def in ALL_METHODS:
+        prefix = method_def.tool_name.rsplit("_", 1)[0]
         if tools_filter is not None:
-            prefix = method_def.tool_name.rsplit("_", 1)[0]
             if prefix not in tools_filter:
+                continue
+        if disabled_tools is not None:
+            if prefix in disabled_tools:
                 continue
         handler = _make_tool_handler(method_def, client_manager, server_names)
         mcp.add_tool(handler, name=method_def.tool_name, description=method_def.description)
@@ -1132,9 +1139,14 @@ def run_server(
         **auth_kwargs,
     )
 
-    tool_count = _register_tools(mcp, client_manager, config.server.tools)
-    if config.server.tools:
-        logger.info("Registered %d tools (filtered: %s)", tool_count, ", ".join(config.server.tools))
+    tool_count = _register_tools(mcp, client_manager, config.server.tools, config.server.disabled_tools)
+    if config.server.tools or config.server.disabled_tools:
+        parts = []
+        if config.server.tools:
+            parts.append(f"allowed: {', '.join(config.server.tools)}")
+        if config.server.disabled_tools:
+            parts.append(f"disabled: {', '.join(config.server.disabled_tools)}")
+        logger.info("Registered %d tools (%s)", tool_count, "; ".join(parts))
     else:
         logger.info("Registered %d tools", tool_count)
 
