@@ -4,6 +4,7 @@
 
 ### Added
 
+- **Compact output mode** — get methods now return only key fields by default (e.g. `hostid`, `name`, `status` for `host_get`) instead of all fields, significantly reducing token usage in LLM conversations; the LLM can always override by passing `output: "extend"` or specific field names; compact field sets defined for 51 get methods across all API categories; methods without compact definitions (history, trend, singletons) fall back to `"extend"` as before; new config option `compact_output` (default: `true`) — set to `false` to restore pre-1.13 behavior
 - **Docker `.env`-based port and host configuration** — `MCP_PORT` and `MCP_HOST` in `.env` now control both the container-internal port and the Docker host binding; previously `MCP_PORT` only affected the host side while the container was hardcoded to `8080`; `.env.example` added as a reference template; `port` in `config.toml` is ignored when running via Docker (overridden by `MCP_PORT`)
 
 ## v1.12 — 2026-04-02

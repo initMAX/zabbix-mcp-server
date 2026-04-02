@@ -69,6 +69,7 @@ The server runs as a standalone HTTP service. AI clients connect to it over the 
 - **Multi-server support** - Connect to multiple Zabbix instances (production, staging, ...) with separate tokens
 - **HTTP + SSE transports** - Streamable HTTP (recommended) and SSE for clients like n8n that lack session management
 - **Tool filtering** - Limit exposed tools by category (`monitoring`, `alerts`, `users`, etc.) to stay under LLM tool limits
+- **Compact output mode** - Get methods return only key fields by default, reducing token usage; LLM can request `extend` for full details
 - **LLM-friendly normalizations** - Symbolic enum names, auto-fill defaults, preprocessing cleanup, timestamp conversion
 - **Single config file** - One TOML file, no scattered environment variables
 - **Read-only mode** - Per-server write protection to prevent accidental changes
@@ -392,7 +393,7 @@ All tools accept an optional `server` parameter to target a specific Zabbix inst
 <table>
 <tr><th width="220">Parameter</th><th>Description</th></tr>
 <tr><td><code>server</code></td><td>Target Zabbix server name — defaults to the first configured server when omitted</td></tr>
-<tr><td><code>output</code></td><td>Fields to return: <code>extend</code> returns all fields, or pass comma-separated field names (e.g. <code>hostid,name,status</code>)</td></tr>
+<tr><td><code>output</code></td><td>Fields to return — by default returns a compact set of key fields; pass <code>extend</code> for all fields, or comma-separated field names (e.g. <code>hostid,name,status</code>)</td></tr>
 <tr><td><code>filter</code></td><td>Exact match filter as JSON object — e.g. <code>{"status": 0}</code> returns only enabled objects</td></tr>
 <tr><td><code>search</code></td><td>Pattern match filter as JSON object — e.g. <code>{"name": "web"}</code> finds all objects containing "web" in the name</td></tr>
 <tr><td><code>limit</code></td><td>Maximum number of results to return — use to avoid large responses</td></tr>
@@ -406,7 +407,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
-<tr><td rowspan="13"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
+<tr><td rowspan="14"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
 <tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
 <tr><td><code>port</code></td><td>HTTP port, 1–65535 (default: <code>8080</code>)</td></tr>
 <tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, <code>error</code>, or <code>critical</code></td></tr>
@@ -419,6 +420,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 <tr><td><code>cors_origins</code></td><td>List of allowed CORS origins (default: disabled)</td></tr>
 <tr><td><code>allowed_hosts</code></td><td>IP allowlist — IPs and CIDR ranges (e.g. <code>["10.0.0.0/24"]</code>)</td></tr>
 <tr><td><code>allowed_import_dirs</code></td><td>Directories for <code>source_file</code> imports (default: disabled)</td></tr>
+<tr><td><code>compact_output</code></td><td>Return only key fields from get methods (default: <code>true</code>); set to <code>false</code> to always return all fields</td></tr>
 <tr><td rowspan="5"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL (must start with <code>http://</code> or <code>https://</code>)</td></tr>
 <tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
