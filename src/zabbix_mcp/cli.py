@@ -72,32 +72,32 @@ def main() -> None:
     log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     formatter = logging.Formatter(log_format)
 
-    # Configure only our logger to avoid duplicate lines from root logger
-    app_logger = logging.getLogger("zabbix_mcp")
-    app_logger.setLevel(log_level)
-    app_logger.handlers.clear()
-    app_logger.propagate = False
-
-    stderr_handler = logging.StreamHandler(sys.stderr)
-    stderr_handler.setFormatter(formatter)
-    app_logger.addHandler(stderr_handler)
-
+    # Build handler list: when log_file is set, write ONLY to file (not stderr)
+    # to avoid duplicates when systemd also redirects stderr to the same file.
+    # When log_file is not set, write to stderr only.
+    handlers: list[logging.Handler] = []
     if config.server.log_file:
         from pathlib import Path
         log_path = Path(config.server.log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(formatter)
-        app_logger.addHandler(file_handler)
+        handlers.append(logging.FileHandler(log_path))
+    else:
+        handlers.append(logging.StreamHandler(sys.stderr))
 
-    # Also configure the mcp library logger to use our format (single handler)
-    mcp_logger = logging.getLogger("mcp")
-    mcp_logger.setLevel(log_level)
-    mcp_logger.handlers.clear()
-    mcp_logger.propagate = False
-    mcp_logger.addHandler(stderr_handler)
-    if config.server.log_file:
-        mcp_logger.addHandler(file_handler)
+    for h in handlers:
+        h.setFormatter(formatter)
+
+    # Configure app logger — no propagation to root to prevent duplicates
+    for logger_name in ("zabbix_mcp", "mcp"):
+        named_logger = logging.getLogger(logger_name)
+        named_logger.setLevel(log_level)
+        named_logger.handlers.clear()
+        named_logger.propagate = False
+        for h in handlers:
+            named_logger.addHandler(h)
+
+    # Silence root logger to prevent any stray duplicates
+    logging.root.handlers.clear()
 
     transport = args.transport or config.server.transport
     host = args.host or config.server.host
