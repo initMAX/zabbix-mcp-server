@@ -33,16 +33,17 @@ transport = "http"
 #   "0.0.0.0"   - Listen on all interfaces (use when clients connect from other hosts).
 host = "127.0.0.1"
 
-# TCP port for the HTTP server.
+# TCP port for the HTTP server (1–65535).
 port = 8080
 
-# Logging level: "debug", "info", "warning", "error".
+# Logging level: "debug", "info", "warning", "error", "critical".
 #   "debug" logs every API call and its parameters - useful for troubleshooting.
 #   "info"  logs connections, disconnections, and startup info (default).
 log_level = "info"
 
-# Path to a log file. When set, logs are written to this file IN ADDITION to stderr.
+# Path to a log file. When set, logs are written to this file INSTEAD of stderr.
 # The parent directory must exist (the install script creates /var/log/zabbix-mcp/).
+# Allowed locations: /var/log/*, /tmp/*, or under the user's home directory.
 log_file = "/var/log/zabbix-mcp/server.log"
 
 # Bearer token for HTTP transport authentication.
@@ -246,10 +247,11 @@ rate_limit = 300
 
 [zabbix.production]
 
-# Full URL of the Zabbix frontend (without /api_jsonrpc.php - added automatically).
+# Full URL of the Zabbix frontend (must start with http:// or https://).
+# The /api_jsonrpc.php path is added automatically by the API client.
 url = "https://zabbix.example.com"
 
-# API token for authentication.
+# API token for authentication. Must not be empty.
 # Create one in Zabbix: User settings > API tokens > Create API token.
 # Tokens inherit the permissions of the user they belong to.
 api_token = "your-api-token-here"

@@ -350,18 +350,24 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
-<tr><td rowspan="8"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
+<tr><td rowspan="13"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
 <tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
-<tr><td><code>port</code></td><td>HTTP port (default: <code>8080</code>)</td></tr>
-<tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, or <code>error</code></td></tr>
-<tr><td><code>log_file</code></td><td>Path to log file (in addition to stderr)</td></tr>
+<tr><td><code>port</code></td><td>HTTP port, 1–65535 (default: <code>8080</code>)</td></tr>
+<tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, <code>error</code>, or <code>critical</code></td></tr>
+<tr><td><code>log_file</code></td><td>Path to log file — must be under <code>/var/log</code>, <code>/tmp</code>, or home directory</td></tr>
 <tr><td><code>auth_token</code></td><td>Bearer token for HTTP/SSE authentication (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute per client (default: <code>300</code>, set to <code>0</code> to disable)</td></tr>
 <tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix — e.g. <code>["monitoring", "alerts"]</code> (default: all ~220 tools)</td></tr>
-<tr><td rowspan="4"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL</td></tr>
+<tr><td><code>disabled_tools</code></td><td>Denylist counterpart to <code>tools</code> — exclude specific tool groups or prefixes</td></tr>
+<tr><td><code>tls_cert_file</code> / <code>tls_key_file</code></td><td>Enable native HTTPS — paths to TLS certificate and private key</td></tr>
+<tr><td><code>cors_origins</code></td><td>List of allowed CORS origins (default: disabled)</td></tr>
+<tr><td><code>allowed_hosts</code></td><td>IP allowlist — IPs and CIDR ranges (e.g. <code>["10.0.0.0/24"]</code>)</td></tr>
+<tr><td><code>allowed_import_dirs</code></td><td>Directories for <code>source_file</code> imports (default: disabled)</td></tr>
+<tr><td rowspan="5"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL (must start with <code>http://</code> or <code>https://</code>)</td></tr>
 <tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
 <tr><td><code>verify_ssl</code></td><td>Verify TLS certificates (default: <code>true</code>)</td></tr>
+<tr><td><code>skip_version_check</code></td><td>Skip zabbix-utils version compatibility check (default: <code>false</code>)</td></tr>
 </table>
 
 ## Zabbix Compatibility
