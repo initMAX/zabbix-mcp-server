@@ -1345,12 +1345,6 @@ def run_server(
         async def http_health(request: Request) -> JSONResponse:
             return JSONResponse({"status": "ok"})
 
-        @mcp.custom_route("/mcp", methods=["GET"])
-        async def mcp_get_hint(request: Request) -> JSONResponse:
-            return JSONResponse(
-                {"error": "GET not supported. Use POST /mcp with an MCP client."},
-                status_code=405,
-            )
 
     try:
         if transport in ("http", "sse"):
