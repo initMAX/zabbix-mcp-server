@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zabbix-mcp-server"
-version = "1.11"
+version = "1.12"
 description = "Production-quality MCP server for the complete Zabbix API"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -33,6 +33,7 @@ zabbix-mcp-server = "zabbix_mcp.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/initMAX/zabbix-mcp-server"
+Repository = "https://github.com/initMAX/zabbix-mcp-server"
 Issues = "https://github.com/initMAX/zabbix-mcp-server/issues"
 
 [tool.hatch.build.targets.wheel]

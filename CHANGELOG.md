@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.12 — (unreleased)
+
+### Security
+
+- **`zabbix_raw_api_call` switched from write-suffix blacklist to read-only whitelist** — previously, the raw API call tool blocked write operations by matching a hardcoded list of write suffixes (`.create`, `.update`, `.delete`, etc.); any new Zabbix API method with an unlisted suffix would bypass `read_only` enforcement; now uses a two-layer whitelist: first checks against known read-only methods from tool definitions (`ALL_METHODS`), then falls back to a conservative suffix whitelist (`.get`, `.export`, etc.); unknown methods are blocked by default on read-only servers
+- **`source_file` symlink check reordered** — symlink detection now runs before `Path.resolve()` to prevent following symlinks before rejecting them
+- **Config validation hardened** — `log_level`, `port` (1–65535), Zabbix server `url` (must start with `http://` or `https://`), and empty `api_token` after env var resolution are now validated at config load time instead of failing at runtime
+- **Removed `log_file` path restriction** — the previous `/var/log`, `/tmp`, home directory limitation was unnecessarily restrictive; administrators can now log to any writable path
+
+### Fixed
+
+- **Blocking I/O in async handlers** — all Zabbix API calls (`client_manager.call`, `get_version`, `check_connection`) are now wrapped in `asyncio.to_thread()` to avoid blocking the event loop on HTTP/SSE transports with concurrent clients
+- **`int()` crash in delay auto-fill** — if an unrecognized item type string survived enum normalization, `int(params["type"])` would raise `ValueError`; now caught gracefully
+- **Hardcoded `user.checkAuthentication` exception** — default `output: extend` was skipped via a hardcoded method name check; now dynamically checks whether the method's parameter list includes an `output` parameter
+- **Integration test `test_health.py`** — removed assertions for `version` and `tools` fields that were dropped from the `health_check` tool in v1.11
+- **`_normalize_nested_interfaces` / `_normalize_nested_dchecks`** — removed unnecessary shallow copy of params dict on mutation (interfaces/dchecks are mutated in-place)
+
+### Added
+
+- **Zabbix 8.0 support** — added `JSON` value type (`value_type=6`) to enum mappings for item create/update; updated tool descriptions to list JSON as valid value type; Zabbix 8.0 added to compatibility table as experimental (`skip_version_check = true` required)
+- **SLA API** — added `sla.get`, `sla.create`, `sla.update`, `sla.delete`, and `sla.getsli` tools for managing Service Level Agreements and retrieving SLI (Service Level Indicator) data (Zabbix 6.0+); total tool count: 225 across 58 API groups
+
+### Improved
+
+- **Parameter sanitization from production logs** — LLMs copying fields from YAML templates caused recurring Zabbix API rejections; the server now auto-strips: `description` from trigger dependencies, `formulaid` from discovery rule filter conditions, `vendor` from template.update, and clears `error_handler_params` when `error_handler` is DEFAULT (0)
+- **Uvicorn access logs suppressed** — uvicorn's built-in access log format (`INFO: 10.0.0.1:port - "POST /mcp..."`) was mixing with the app's structured log format, making log parsing difficult; disabled in favor of the app's own request logging
+- **`ClientManager.check_connection()`** — new public method for health checks, replacing direct access to private `_get_client()`
+- **Dockerfile** — removed redundant `pip install pip`; added `HEALTHCHECK` instruction for container orchestration
+- **`pyproject.toml`** — added `Repository` URL to project metadata
+
 ## v1.11 — 2026-04-02
 
 ### Security

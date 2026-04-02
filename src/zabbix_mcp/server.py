@@ -17,6 +17,7 @@
 
 """MCP server setup, lifespan management, and dynamic tool registration."""
 
+import asyncio
 import hmac
 import inspect
 import json
@@ -137,6 +138,7 @@ _VALUE_TYPES: dict[str, int] = {
     "UNSIGNED": 3,
     "TEXT": 4,
     "BINARY": 5,
+    "JSON": 6,       # Zabbix 8.0+
 }
 
 # Trigger severity / priority (priority)
@@ -450,6 +452,13 @@ def _normalize_preprocessing(params: dict[str, Any]) -> dict[str, Any]:
                     step["error_handler_params"] = ""
                     changed = True
 
+                # Clear error_handler_params when error_handler is DEFAULT (0)
+                # — Zabbix rejects non-empty params with "value must be empty".
+                eh = step.get("error_handler")
+                if (eh == 0 or eh == "0") and step.get("error_handler_params"):
+                    step["error_handler_params"] = ""
+                    changed = True
+
     if changed:
         return {**params, "preprocessing": steps}
     return params
@@ -473,8 +482,6 @@ def _normalize_nested_interfaces(params: dict[str, Any]) -> dict[str, Any]:
             iface["type"] = new_val
             changed = True
 
-    if changed:
-        return {**params, "interfaces": params["interfaces"]}
     return params
 
 
@@ -496,9 +503,40 @@ def _normalize_nested_dchecks(params: dict[str, Any]) -> dict[str, Any]:
             check["type"] = new_val
             changed = True
 
-    if changed:
-        return {**params, "dchecks": params["dchecks"]}
     return params
+
+
+def _sanitize_create_params(params: dict[str, Any], api_method: str) -> None:
+    """Strip read-only and unsupported fields that LLMs copy from YAML templates.
+
+    Zabbix API rejects these with "unexpected parameter" errors.  Removing
+    them silently lets the create/update succeed without requiring the LLM
+    to know which fields are read-only in each context.
+    """
+    # trigger/triggerprototype: dependencies[].description is read-only
+    if api_method in ("trigger.create", "trigger.update",
+                      "triggerprototype.create", "triggerprototype.update"):
+        deps = params.get("dependencies")
+        if isinstance(deps, list):
+            for dep in deps:
+                if isinstance(dep, dict):
+                    dep.pop("description", None)
+
+    # discoveryrule: filter.conditions[].formulaid must be empty when
+    # formula type is AND/OR (Zabbix auto-assigns formulaid).
+    if api_method in ("discoveryrule.create", "discoveryrule.update",
+                      "discoveryruleprototype.create", "discoveryruleprototype.update"):
+        filt = params.get("filter")
+        if isinstance(filt, dict):
+            conditions = filt.get("conditions")
+            if isinstance(conditions, list):
+                for cond in conditions:
+                    if isinstance(cond, dict):
+                        cond.pop("formulaid", None)
+
+    # template.update: vendor is read-only (set during import only)
+    if api_method == "template.update":
+        params.pop("vendor", None)
 
 
 def _auto_wrap_arrays(params: dict[str, Any]) -> dict[str, Any]:
@@ -580,13 +618,14 @@ def _resolve_source_file(
         )
 
     raw_path = Path(params["source_file"])
-    path = raw_path.resolve()
 
-    # Reject symlinks — they could escape allowed directories
+    # Reject symlinks BEFORE resolving — they could escape allowed directories
     if raw_path.is_symlink():
         raise ValueError(
             "source_file must not be a symbolic link (security restriction)."
         )
+
+    path = raw_path.resolve()
 
     # Validate path is within an allowed directory (prevent path traversal)
     allowed = [Path(d).resolve() for d in allowed_import_dirs]
@@ -768,9 +807,17 @@ def _build_zabbix_params(
             # CALCULATED(15), SNMP_TRAP(17), DEPENDENT(18).
             if method_def.api_method in ("item.create", "itemprototype.create"):
                 _NO_DELAY_TYPES = {2, 5, 15, 17, 18}
-                item_type = int(params.get("type", -1))
+                try:
+                    item_type = int(params.get("type", -1))
+                except (ValueError, TypeError):
+                    item_type = -1
                 if "delay" not in params and item_type not in _NO_DELAY_TYPES and item_type >= 0:
                     params["delay"] = "1m"
+
+            # Strip read-only/unsupported fields that LLMs copy from YAML templates.
+            # Without this, Zabbix API rejects the request with "unexpected parameter".
+            _sanitize_create_params(params, method_def.api_method)
+
         return params
 
     # For get methods: build params dict from individual arguments
@@ -789,12 +836,14 @@ def _build_zabbix_params(
                 value = [f.strip() for f in value.split(",")]
             params[param_def.name] = value
 
-    # Default output to "extend" so LLMs get full objects, not just IDs
+    # Default output to "extend" so LLMs get full objects, not just IDs.
+    # Only add if the method actually accepts an "output" parameter.
+    has_output_param = any(p.name == "output" for p in method_def.params)
     if (
         method_def.read_only
+        and has_output_param
         and "output" not in params
         and "countOutput" not in params
-        and method_def.api_method != "user.checkAuthentication"
     ):
         params["output"] = "extend"
 
@@ -983,15 +1032,20 @@ def _make_tool_handler(
             if not method_def.read_only:
                 client_manager.check_write(server_name)
 
-            zabbix_version = client_manager.get_version(server_name)
+            zabbix_version = await asyncio.to_thread(
+                client_manager.get_version, server_name,
+            )
             params = _build_zabbix_params(
                 method_def, kwargs, zabbix_version,
                 allowed_import_dirs=allowed_import_dirs,
             )
-            params = _resolve_valuemap_by_name(
+            params = await asyncio.to_thread(
+                _resolve_valuemap_by_name,
                 params, method_def.api_method, client_manager, server_name,
             )
-            result = client_manager.call(server_name, method_def.api_method, params)
+            result = await asyncio.to_thread(
+                client_manager.call, server_name, method_def.api_method, params,
+            )
             return _truncate_result(result)
 
         except (ReadOnlyError, RateLimitError) as e:
@@ -1083,14 +1137,16 @@ def _register_tools(
         f"Defaults to '{server_names[0]}' if omitted."
     )
 
-    # Write operation suffixes — used to enforce read_only on raw API calls.
-    _WRITE_SUFFIXES = (
-        ".create", ".update", ".delete",
-        ".massadd", ".massremove", ".massupdate",
-        ".import", ".execute", ".acknowledge",
-        ".push", ".clear", ".propagate",
-        ".generate", ".provision", ".unblock",
-        ".resettotp", ".replacehostinterfaces",
+    # Build a set of known read-only API methods from tool definitions.
+    _KNOWN_READ_ONLY = {m.api_method.lower() for m in ALL_METHODS if m.read_only}
+
+    # Fallback suffix whitelist for methods not in ALL_METHODS.
+    _READ_ONLY_SUFFIXES = (
+        ".get",
+        ".getscriptsbyevents", ".getscriptsbyhosts",
+        ".export", ".importcompare",
+        ".checkauthentication",
+        ".test",
     )
 
     async def zabbix_raw_api_call(
@@ -1107,12 +1163,19 @@ def _register_tools(
         try:
             server_name = client_manager.resolve_server(server_name)
 
-            # Enforce read_only: block write operations on read-only servers
+            # Enforce read_only: check known definitions first, then fall back
+            # to suffix whitelist for unknown methods.
             method_lower = method.lower()
-            if any(method_lower.endswith(s) for s in _WRITE_SUFFIXES):
+            is_read_only = (
+                method_lower in _KNOWN_READ_ONLY
+                or any(method_lower.endswith(s) for s in _READ_ONLY_SUFFIXES)
+            )
+            if not is_read_only:
                 client_manager.check_write(server_name)
 
-            result = client_manager.call(server_name, method, params or {})
+            result = await asyncio.to_thread(
+                client_manager.call, server_name, method, params or {},
+            )
             return _truncate_result(result)
         except (ReadOnlyError, RateLimitError, ValueError) as e:
             return json.dumps({"error": True, "message": str(e), "type": type(e).__name__})
@@ -1134,8 +1197,7 @@ def _register_tools(
         for i, name in enumerate(client_manager.server_names, 1):
             label = f"server_{i}"
             try:
-                client = client_manager._get_client(name)
-                client.api_version()
+                await asyncio.to_thread(client_manager.check_connection, name)
                 results["zabbix_servers"][label] = {"status": "ok"}
             except Exception as e:
                 logger.warning("Health check failed for '%s': %s", name, e)
@@ -1231,7 +1293,17 @@ def run_server(
         )
         logger.info("Bearer token authentication enabled")
     elif transport in ("http", "sse") and not config.server.auth_token:
-        logger.warning("No auth_token configured — HTTP server is unauthenticated!")
+        if host == "127.0.0.1":
+            logger.info(
+                "No auth_token configured — server accepts unauthenticated "
+                "connections (safe: listening on localhost only)"
+            )
+        else:
+            logger.warning(
+                "No auth_token configured — server is unauthenticated on %s! "
+                "Set auth_token in config.toml to require bearer token authentication.",
+                host,
+            )
 
     # Security status summary at startup
     if transport in ("http", "sse"):
@@ -1240,6 +1312,8 @@ def run_server(
         # Authentication
         if config.server.auth_token:
             logger.warning("  auth_token:         ENABLED")
+        elif host == "127.0.0.1":
+            logger.warning("  auth_token:         not set (localhost only — OK)")
         else:
             logger.warning("  auth_token:         DISABLED — server is unauthenticated!")
 
@@ -1385,6 +1459,7 @@ def run_server(
                 "host": host,
                 "port": port,
                 "log_level": config.server.log_level.lower(),
+                "access_log": False,  # Suppress uvicorn access logs — they mix formats with app logs
             }
             if config.server.tls_cert_file and config.server.tls_key_file:
                 uvicorn_kwargs["ssl_certfile"] = config.server.tls_cert_file

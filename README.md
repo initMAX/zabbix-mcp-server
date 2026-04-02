@@ -44,14 +44,14 @@
         Zabbix MCP Server
     </h1>
     <h4>
-        Complete Zabbix API coverage for any MCP-compatible AI assistant (220 tools)
+        Complete Zabbix API coverage for any MCP-compatible AI assistant (225 tools)
     </h4>
     <br>
     <a href="https://github.com/initMAX/zabbix-mcp-server/releases"><img alt="Version" src="https://img.shields.io/github/v/release/initMAX/zabbix-mcp-server?color=%231f65f4&label=version"></a>&nbsp;
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>&nbsp;
     <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">&nbsp;
-    <img alt="Tools" src="https://img.shields.io/badge/tools-220-green">&nbsp;
-    <img alt="Zabbix" src="https://img.shields.io/badge/zabbix-5.0%E2%80%947.4-red">&nbsp;
+    <img alt="Tools" src="https://img.shields.io/badge/tools-225-green">&nbsp;
+    <img alt="Zabbix" src="https://img.shields.io/badge/zabbix-5.0%E2%80%948.0-red">&nbsp;
     <a href="https://safeskill.dev/scan/initmax-zabbix-mcp-server"><img alt="SafeSkill" src="https://img.shields.io/badge/SafeSkill-100%2F100_Verified%20Safe-brightgreen"></a>
 </div>
 <br>
@@ -65,7 +65,7 @@ The server runs as a standalone HTTP service. AI clients connect to it over the 
 
 ## Features
 
-- **Complete API coverage** - All 57 Zabbix API groups (220 tools): hosts, problems, triggers, templates, users, dashboards, and more
+- **Complete API coverage** - All 58 Zabbix API groups (225 tools): hosts, problems, triggers, templates, users, dashboards, and more
 - **Multi-server support** - Connect to multiple Zabbix instances (production, staging, ...) with separate tokens
 - **HTTP + SSE transports** - Streamable HTTP (recommended) and SSE for clients like n8n that lack session management
 - **Tool filtering** - Limit exposed tools by category (`monitoring`, `alerts`, `users`, etc.) to stay under LLM tool limits
@@ -149,31 +149,52 @@ verify_ssl = true
 
 All available options with detailed descriptions are documented in [`config.example.toml`](config.example.toml).
 
-#### Authentication
+#### Authentication — two tokens explained
 
-The HTTP endpoint can be protected with a bearer token. There are two ways to configure it:
+The config file contains **two different tokens** that serve different purposes:
 
-**Option 1** - token directly in config:
-
-```toml
-[server]
-auth_token = "your-secret-token-here"
+```
+┌─────────────┐    auth_token     ┌──────────────────┐    api_token     ┌────────────────┐
+│  MCP Client ├───────────────────►  MCP Server      ├──────────────────►  Zabbix Server  │
+│  (AI / IDE) │   (optional)      │  (zabbix-mcp)    │   (required)     │                │
+└─────────────┘                   └──────────────────┘                  └────────────────┘
 ```
 
-**Option 2** - token from environment variable (recommended for production):
+**`api_token`** (in `[zabbix.*]`) — **required** — authenticates the MCP server to your Zabbix instance. This is a [Zabbix API token](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens) that you create in the Zabbix frontend.
 
-```toml
-[server]
-auth_token = "${MCP_AUTH_TOKEN}"
-```
+How to create one:
 
-When `auth_token` is set, all clients must include it in the `Authorization` header:
+1. In Zabbix frontend: **Users → API tokens → Create API token**
+2. Select the user the token will belong to
+3. Optionally set an expiration date
+4. Copy the generated token — it is shown only once
+
+The token inherits the permissions of the Zabbix user it belongs to:
+
+| Use case | Recommended Zabbix role | `read_only` config |
+|----------|------------------|--------------------|
+| Read-only monitoring (problems, hosts, dashboards) | **User** role with read access to needed host groups | `true` |
+| Full management (create hosts, templates, triggers) | **Admin** role with read-write access to target host groups | `false` |
+| Complete API access (users, settings, global scripts) | **Super admin** role | `false` |
+
+Use the principle of least privilege — create a dedicated Zabbix user for the MCP server with only the permissions it needs.
+
+**`auth_token`** (in `[server]`) — **optional** — protects the MCP server itself from unauthorized access. When set, MCP clients must include it in every request:
 
 ```
 Authorization: Bearer your-secret-token-here
 ```
 
-When `auth_token` is not set, the server accepts unauthenticated connections. This is only safe when the server is bound to `127.0.0.1` (default).
+```toml
+[server]
+# Option 1 - token directly in config:
+auth_token = "your-secret-token-here"
+
+# Option 2 - token from environment variable (recommended for production):
+# auth_token = "${MCP_AUTH_TOKEN}"
+```
+
+When `auth_token` is not set, the MCP server accepts unauthenticated connections. This is safe when bound to `127.0.0.1` (default) but **must be set** when the server is exposed to the network (`0.0.0.0`).
 
 #### Multiple Zabbix servers
 
@@ -267,16 +288,17 @@ The MCP client configuration is the same for all clients:
 }
 ```
 
-Where to put this config depends on the client:
+Where to put this config depends on the client. **Claude Code is recommended** — it handles large tool sets (225 tools) without issues, unlike some clients that struggle with high tool counts.
 
-| Client | Config location |
-|---|---|
-| ChatGPT (initMAX widget) | MCP server settings in the widget configuration |
-| VS Code (Copilot / Continue / Cline) | `.vscode/mcp.json` or extension settings |
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
-| Claude Code | `.mcp.json` in project root or `~/.claude/settings.json` for global |
-| OpenAI Codex | MCP server settings in the Codex configuration |
-| JetBrains IDEs | MCP server settings in the IDE |
+| Client | Config location | Free tier |
+|---|---|---|
+| **Claude Code** (recommended) | `.mcp.json` in project root or `~/.claude/settings.json` for global | — |
+| **OpenAI Codex** (recommended) | MCP server settings in the Codex configuration | — |
+| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | Yes |
+| VS Code + GitHub Copilot | `.vscode/mcp.json` in workspace | Yes |
+| ChatGPT (initMAX widget) | MCP server settings in the widget configuration | — |
+| Cursor | MCP server settings in Cursor IDE | Yes |
+| JetBrains IDEs | MCP server settings in the IDE | — |
 
 When `auth_token` is configured on the server, clients must include the bearer token in requests:
 
@@ -309,9 +331,10 @@ All tools accept an optional `server` parameter to target a specific Zabbix inst
 
 <table>
 <tr><th width="160">Category</th><th width="340">Tool</th><th>Description</th></tr>
-<tr><td rowspan="4"><strong>Monitoring</strong></td><td><code>problem_get</code></td><td>Get active problems and alerts — the primary tool for checking what is wrong right now</td></tr>
+<tr><td rowspan="5"><strong>Monitoring</strong></td><td><code>problem_get</code></td><td>Get active problems and alerts — the primary tool for checking what is wrong right now</td></tr>
 <tr><td><code>event_get</code> / <code>event_acknowledge</code></td><td>Retrieve events and acknowledge, close, or comment on them</td></tr>
 <tr><td><code>history_get</code> / <code>trend_get</code></td><td>Query raw historical metric data or aggregated trends for capacity planning</td></tr>
+<tr><td><code>sla_get</code> / <code>sla_getsli</code></td><td>Manage SLAs and retrieve calculated service availability (SLI) data</td></tr>
 <tr><td><code>dashboard_*</code> / <code>map_*</code></td><td>Create, update, and manage dashboards and network maps</td></tr>
 <tr><td rowspan="6"><strong>Data Collection</strong></td><td><code>host_*</code> / <code>hostgroup_*</code></td><td>Manage monitored hosts, host groups, and their membership</td></tr>
 <tr><td><code>item_*</code> / <code>trigger_*</code> / <code>graph_*</code></td><td>Manage data collection items, trigger expressions, and graphs</td></tr>
@@ -350,24 +373,31 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="130">Section</th><th width="180">Parameter</th><th>Description</th></tr>
-<tr><td rowspan="8"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
+<tr><td rowspan="13"><code>[server]</code></td><td><code>transport</code></td><td><code>"http"</code> (recommended), <code>"sse"</code>, or <code>"stdio"</code></td></tr>
 <tr><td><code>host</code></td><td>HTTP bind address — <code>127.0.0.1</code> (localhost only) or <code>0.0.0.0</code> (all interfaces)</td></tr>
-<tr><td><code>port</code></td><td>HTTP port (default: <code>8080</code>)</td></tr>
-<tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, or <code>error</code></td></tr>
-<tr><td><code>log_file</code></td><td>Path to log file (in addition to stderr)</td></tr>
+<tr><td><code>port</code></td><td>HTTP port, 1–65535 (default: <code>8080</code>)</td></tr>
+<tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, <code>error</code>, or <code>critical</code></td></tr>
+<tr><td><code>log_file</code></td><td>Path to log file (parent directory must exist)</td></tr>
 <tr><td><code>auth_token</code></td><td>Bearer token for HTTP/SSE authentication (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute per client (default: <code>300</code>, set to <code>0</code> to disable)</td></tr>
-<tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix — e.g. <code>["monitoring", "alerts"]</code> (default: all ~220 tools)</td></tr>
-<tr><td rowspan="4"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL</td></tr>
+<tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix — e.g. <code>["monitoring", "alerts"]</code> (default: all ~225 tools)</td></tr>
+<tr><td><code>disabled_tools</code></td><td>Denylist counterpart to <code>tools</code> — exclude specific tool groups or prefixes</td></tr>
+<tr><td><code>tls_cert_file</code> / <code>tls_key_file</code></td><td>Enable native HTTPS — paths to TLS certificate and private key</td></tr>
+<tr><td><code>cors_origins</code></td><td>List of allowed CORS origins (default: disabled)</td></tr>
+<tr><td><code>allowed_hosts</code></td><td>IP allowlist — IPs and CIDR ranges (e.g. <code>["10.0.0.0/24"]</code>)</td></tr>
+<tr><td><code>allowed_import_dirs</code></td><td>Directories for <code>source_file</code> imports (default: disabled)</td></tr>
+<tr><td rowspan="5"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL (must start with <code>http://</code> or <code>https://</code>)</td></tr>
 <tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
 <tr><td><code>verify_ssl</code></td><td>Verify TLS certificates (default: <code>true</code>)</td></tr>
+<tr><td><code>skip_version_check</code></td><td>Skip zabbix-utils version compatibility check (default: <code>false</code>)</td></tr>
 </table>
 
 ## Zabbix Compatibility
 
 <table>
 <tr><th width="220">Zabbix Version</th><th width="120">Status</th><th>Notes</th></tr>
+<tr><td>8.0</td><td>Experimental</td><td>Works with <code>skip_version_check = true</code> — core API methods tested, some 8.0-specific methods may not be covered yet</td></tr>
 <tr><td>7.0 LTS, 7.2, 7.4</td><td>Fully supported</td><td>All API methods match this version — complete feature coverage</td></tr>
 <tr><td>6.0 LTS, 6.2, 6.4</td><td>Supported</td><td>Core methods work, some newer API methods (e.g. proxy groups, MFA) may return errors</td></tr>
 <tr><td>5.0 LTS, 5.2, 5.4</td><td>Basic support</td><td>Core monitoring and data collection work, newer features unavailable</td></tr>

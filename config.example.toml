@@ -33,23 +33,26 @@ transport = "http"
 #   "0.0.0.0"   - Listen on all interfaces (use when clients connect from other hosts).
 host = "127.0.0.1"
 
-# TCP port for the HTTP server.
+# TCP port for the HTTP server (1–65535).
 port = 8080
 
-# Logging level: "debug", "info", "warning", "error".
+# Logging level: "debug", "info", "warning", "error", "critical".
 #   "debug" logs every API call and its parameters - useful for troubleshooting.
 #   "info"  logs connections, disconnections, and startup info (default).
 log_level = "info"
 
-# Path to a log file. When set, logs are written to this file IN ADDITION to stderr.
+# Path to a log file. When set, logs are written to this file INSTEAD of stderr.
 # The parent directory must exist (the install script creates /var/log/zabbix-mcp/).
+# The default path below has logrotate configured by the install script (daily, 30 days).
 log_file = "/var/log/zabbix-mcp/server.log"
 
-# Bearer token for HTTP transport authentication.
-# When set, clients must send this token in the Authorization header:
-#   Authorization: Bearer <token>
-# When not set, the HTTP server accepts unauthenticated connections
-# (only safe when bound to 127.0.0.1).
+# Bearer token for MCP server authentication (OPTIONAL).
+# This protects the MCP server itself — MCP clients must send this token
+# in the Authorization header: Authorization: Bearer <token>
+# NOTE: This is NOT the Zabbix API token. The Zabbix API token is configured
+# below in the [zabbix.*] section and is REQUIRED.
+# When not set, the MCP server accepts unauthenticated connections
+# (safe when bound to 127.0.0.1, must be set when using 0.0.0.0).
 #
 # Option 1 - token directly in config:
 # auth_token = "your-secret-token-here"
@@ -141,7 +144,7 @@ rate_limit = 300
 #   3. Zabbix User Roles - enforce method-level access control at the API level
 
 # Filter which tool groups are exposed via MCP.
-# When not set or commented out, all ~220 tools are registered (default).
+# When not set or commented out, all ~225 tools are registered (default).
 # This is useful when your LLM has a tool limit (e.g. OpenAI max 128 tools).
 #
 # Use category names to include entire groups at once, individual tool prefixes,
@@ -153,7 +156,7 @@ rate_limit = 300
 #
 # Categories and their tools:
 #
-#   "monitoring" (77 tools):
+#   "monitoring" (82 tools):
 #     dcheck_get
 #     dhost_get
 #     discoveryrule_create, discoveryrule_delete, discoveryrule_get, discoveryrule_update
@@ -173,6 +176,7 @@ rate_limit = 300
 #     item_create, item_delete, item_get, item_update
 #     itemprototype_create, itemprototype_delete, itemprototype_get, itemprototype_update
 #     problem_get
+#     sla_create, sla_delete, sla_get, sla_getsli, sla_update
 #     trend_get
 #     trigger_create, trigger_delete, trigger_get, trigger_update
 #     triggerprototype_create, triggerprototype_delete, triggerprototype_get, triggerprototype_update
@@ -246,12 +250,14 @@ rate_limit = 300
 
 [zabbix.production]
 
-# Full URL of the Zabbix frontend (without /api_jsonrpc.php - added automatically).
+# Full URL of the Zabbix frontend (must start with http:// or https://).
+# The /api_jsonrpc.php path is added automatically by the API client.
 url = "https://zabbix.example.com"
 
-# API token for authentication.
+# Zabbix API token for authentication (REQUIRED).
+# This authenticates the MCP server to Zabbix — NOT the same as auth_token above.
 # Create one in Zabbix: User settings > API tokens > Create API token.
-# Tokens inherit the permissions of the user they belong to.
+# Tokens inherit the permissions of the Zabbix user they belong to.
 api_token = "your-api-token-here"
 
 # You can reference an environment variable instead of storing the token in plain text:

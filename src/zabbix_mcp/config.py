@@ -105,7 +105,7 @@ TOOL_GROUPS: dict[str, list[str]] = {
         "problem", "event", "history", "trend",
         "graph", "graphitem", "graphprototype",
         "discoveryrule", "discoveryruleprototype",
-        "dcheck", "dhost", "drule", "dservice", "httptest",
+        "dcheck", "dhost", "drule", "dservice", "httptest", "sla",
     ],
     "data_collection": [
         "template", "templategroup", "templatedashboard",
@@ -158,6 +158,18 @@ def load_config(path: str | Path) -> AppConfig:
     if transport not in ("stdio", "http", "sse"):
         raise ConfigError(f"Invalid transport '{transport}', must be 'stdio', 'http', or 'sse'")
 
+    # Validate log_level
+    log_level = server_raw.get("log_level", "info")
+    if log_level.upper() not in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"):
+        raise ConfigError(
+            f"Invalid log_level '{log_level}', must be one of: debug, info, warning, error, critical"
+        )
+
+    # Validate port range
+    port = server_raw.get("port", 8080)
+    if not isinstance(port, int) or not 1 <= port <= 65535:
+        raise ConfigError(f"Invalid port '{port}', must be an integer between 1 and 65535")
+
     tools_raw = server_raw.get("tools")
     tools_filter: list[str] | None = None
     if tools_raw is not None:
@@ -204,25 +216,13 @@ def load_config(path: str | Path) -> AppConfig:
             raise ConfigError("'allowed_hosts' must be a list of IP addresses or CIDR ranges")
         allowed_hosts = [str(h) for h in allowed_hosts_raw]
 
-    # Log file path validation
     log_file = server_raw.get("log_file")
-    if log_file:
-        log_file_path = Path(log_file).resolve()
-        _ALLOWED_LOG_PARENTS = (
-            Path("/var/log"),
-            Path("/tmp"),
-            Path.home(),
-        )
-        if not any(log_file_path.is_relative_to(p) for p in _ALLOWED_LOG_PARENTS):
-            raise ConfigError(
-                f"log_file '{log_file}' must be under /var/log, /tmp, or the user's home directory"
-            )
 
     server_config = ServerConfig(
         transport=transport,
         host=server_raw.get("host", "127.0.0.1"),
-        port=server_raw.get("port", 8080),
-        log_level=server_raw.get("log_level", "info"),
+        port=port,
+        log_level=log_level,
         log_file=log_file,
         auth_token=_resolve_env_vars(server_raw["auth_token"]) if server_raw.get("auth_token") else None,
         rate_limit=server_raw.get("rate_limit", 300),
@@ -249,12 +249,22 @@ def load_config(path: str | Path) -> AppConfig:
         url = srv.get("url")
         if not url:
             raise ConfigError(f"Zabbix server '{name}' is missing 'url'")
+        if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+            raise ConfigError(
+                f"Zabbix server '{name}' has invalid URL '{url}'. "
+                f"Must start with http:// or https://"
+            )
 
         api_token = srv.get("api_token")
         if not api_token:
             raise ConfigError(f"Zabbix server '{name}' is missing 'api_token'")
 
         api_token = _resolve_env_vars(api_token)
+        if not api_token.strip():
+            raise ConfigError(
+                f"Zabbix server '{name}' has empty 'api_token' after resolving "
+                f"environment variables"
+            )
 
         zabbix_servers[name] = ZabbixServerConfig(
             name=name,

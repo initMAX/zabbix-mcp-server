@@ -47,5 +47,6 @@ We will acknowledge your report within 48 hours and work with you on a fix.
 
 | Version | Supported |
 |---|---|
-| 1.11 (latest) | Yes |
+| 1.12 (latest) | Yes |
+| 1.11 | Yes |
 | < 1.11 | No |
