@@ -1285,6 +1285,27 @@ def run_server(
         else:
             logger.info("  source_file:        disabled (secure default)")
 
+        # Count warnings and show hint
+        warnings = []
+        if not config.server.auth_token:
+            warnings.append("auth_token")
+        if not config.server.tls_cert_file and host != "127.0.0.1":
+            warnings.append("tls_cert_file/tls_key_file")
+        if not config.server.allowed_hosts:
+            warnings.append("allowed_hosts")
+        if config.server.rate_limit <= 0:
+            warnings.append("rate_limit")
+        if writable:
+            warnings.append("read_only")
+        if no_ssl:
+            warnings.append("verify_ssl")
+        if warnings:
+            logger.warning(
+                "  Review disabled security features above. "
+                "Adjust in config.toml: %s", ", ".join(warnings),
+            )
+        else:
+            logger.info("  All security features are properly configured.")
         logger.info("-----------------------")
 
     mcp = FastMCP(
