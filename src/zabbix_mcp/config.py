@@ -59,6 +59,11 @@ class ServerConfig:
     rate_limit: int = 300
     tools: list[str] | None = None
     disabled_tools: list[str] | None = None
+    tls_cert_file: str | None = None
+    tls_key_file: str | None = None
+    cors_origins: list[str] | None = None
+    allowed_import_dirs: list[str] | None = None
+    allowed_hosts: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -167,16 +172,67 @@ def load_config(path: str | Path) -> AppConfig:
             raise ConfigError("'disabled_tools' must be a list of tool group names")
         disabled_tools_filter = _expand_tool_groups([str(t) for t in disabled_tools_raw])
 
+    # TLS configuration
+    tls_cert_file = server_raw.get("tls_cert_file")
+    tls_key_file = server_raw.get("tls_key_file")
+    if tls_cert_file and not tls_key_file:
+        raise ConfigError("tls_key_file is required when tls_cert_file is set")
+    if tls_key_file and not tls_cert_file:
+        raise ConfigError("tls_cert_file is required when tls_key_file is set")
+
+    # CORS configuration
+    cors_raw = server_raw.get("cors_origins")
+    cors_origins: list[str] | None = None
+    if cors_raw is not None:
+        if not isinstance(cors_raw, list):
+            raise ConfigError("'cors_origins' must be a list of origin URLs")
+        cors_origins = [str(o) for o in cors_raw]
+
+    # Allowed import directories for source_file feature
+    import_dirs_raw = server_raw.get("allowed_import_dirs")
+    allowed_import_dirs: list[str] | None = None
+    if import_dirs_raw is not None:
+        if not isinstance(import_dirs_raw, list):
+            raise ConfigError("'allowed_import_dirs' must be a list of directory paths")
+        allowed_import_dirs = [str(d) for d in import_dirs_raw]
+
+    # IP allowlist configuration
+    allowed_hosts_raw = server_raw.get("allowed_hosts")
+    allowed_hosts: list[str] | None = None
+    if allowed_hosts_raw is not None:
+        if not isinstance(allowed_hosts_raw, list):
+            raise ConfigError("'allowed_hosts' must be a list of IP addresses or CIDR ranges")
+        allowed_hosts = [str(h) for h in allowed_hosts_raw]
+
+    # Log file path validation
+    log_file = server_raw.get("log_file")
+    if log_file:
+        log_file_path = Path(log_file).resolve()
+        _ALLOWED_LOG_PARENTS = (
+            Path("/var/log"),
+            Path("/tmp"),
+            Path.home(),
+        )
+        if not any(log_file_path.is_relative_to(p) for p in _ALLOWED_LOG_PARENTS):
+            raise ConfigError(
+                f"log_file '{log_file}' must be under /var/log, /tmp, or the user's home directory"
+            )
+
     server_config = ServerConfig(
         transport=transport,
         host=server_raw.get("host", "127.0.0.1"),
         port=server_raw.get("port", 8080),
         log_level=server_raw.get("log_level", "info"),
-        log_file=server_raw.get("log_file"),
+        log_file=log_file,
         auth_token=_resolve_env_vars(server_raw["auth_token"]) if server_raw.get("auth_token") else None,
-        rate_limit=server_raw.get("rate_limit", 60),
+        rate_limit=server_raw.get("rate_limit", 300),
         tools=tools_filter,
         disabled_tools=disabled_tools_filter,
+        tls_cert_file=tls_cert_file,
+        tls_key_file=tls_key_file,
+        cors_origins=cors_origins,
+        allowed_import_dirs=allowed_import_dirs,
+        allowed_hosts=allowed_hosts,
     )
 
     zabbix_raw = raw.get("zabbix", {})

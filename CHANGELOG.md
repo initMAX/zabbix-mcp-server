@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.11 — 2026-04-02
+
+### Security
+
+Full adversarial security audit of the entire codebase ([#2](https://github.com/initMAX/zabbix-mcp-server/issues/2)). All findings fixed:
+
+- **Arbitrary file read via `source_file`** — path traversal allowed reading any file on disk (e.g. `/etc/shadow`, `config.toml` with API tokens); `source_file` feature is now **disabled by default** and requires explicit `allowed_import_dirs` whitelist; paths are resolved and validated with `is_relative_to()` to block `../` traversal and symlink escapes
+- **`zabbix_raw_api_call` bypassed `read_only`** — write operations (create/update/delete/execute) sent via the generic raw API call tool were not checked against the server's `read_only` setting; write-suffix detection now enforces `check_write()` on all raw calls
+- **Timing attack on bearer token** — Python `==` string comparison leaks token length via response timing differences; replaced with `hmac.compare_digest()` for constant-time comparison
+- **`getattr()` chain with user-controlled input** — `_do_call` accepted arbitrary attribute paths (e.g. `__class__.__bases__`), enabling potential access to internal Python objects; strict regex validation `^[a-zA-Z]+\.[a-zA-Z]+$` now rejects anything that isn't a valid Zabbix API method name
+- **Rate limiter memory exhaustion** — each unique client ID created an unbounded bucket; an attacker could exhaust server memory by sending requests with random client identifiers; hard cap of 1,000 buckets with LRU eviction added; also fixed `sum(1 for _ in ...)` → `len()`
+- **Log file path traversal** — `log_file` config accepted any path without validation (e.g. `/etc/cron.d/exploit`); now restricted to `/var/log`, `/tmp`, or the user's home directory
+- **Error messages leaked internals** — unhandled exceptions (stack traces, connection strings, internal paths) were returned to MCP clients; replaced with generic `"API call failed — check server logs"` message; full details logged server-side only
+- **Health endpoint information disclosure** — unauthenticated `/health` endpoint returned server version and tool count, aiding reconnaissance; now returns only `{"status": "ok"}`
+- **Dependency version pinning** — `mcp>=1.1.3` and `zabbix-utils>=2.0.2` had no upper bounds, allowing automatic installation of future major versions with potential breaking changes or supply-chain issues; added `<2.0` and `<3.0` caps
+- **Default rate limit mismatch** — `load_config` used a hardcoded default of 60 while `ServerConfig` dataclass and `config.example.toml` documented 300; aligned to 300
+
+### Added
+
+- **Native TLS/HTTPS** — new `tls_cert_file` and `tls_key_file` config options; when set, the server listens on HTTPS directly via uvicorn SSL support, eliminating the need for a TLS-terminating reverse proxy in simple deployments
+- **CORS control** — new `cors_origins` config option; accepts a list of allowed origin URLs (e.g. `["https://app.example.com"]`); when not set, no CORS headers are sent and cross-origin browser requests are blocked (secure default); warns in the server log when wildcard `*` is used
+- **IP allowlist** — new `allowed_hosts` config option; accepts IP addresses and CIDR ranges (e.g. `["10.0.0.0/24", "192.168.1.100"]`); enforced as ASGI middleware returning `403 Forbidden` for unlisted IPs; supports both IPv4 and IPv6
+- **File import sandbox** — new `allowed_import_dirs` config option; whitelist of directories from which `source_file` may read files; the feature is disabled when this option is not set (secure by default)
+- **Security warnings at startup** — the server now logs warnings when: listening on `0.0.0.0` without TLS configured, listening on `0.0.0.0` without `auth_token`, or CORS is configured with wildcard `*`
+
+### Improved
+
+- **HTTP transport uses uvicorn directly** — for HTTP and SSE transports, the server now builds the ASGI app from FastMCP and runs uvicorn directly, enabling TLS, CORS middleware, and IP allowlist without patching the framework
+- **`SECURITY.md` updated** — documents all new security features (TLS, CORS, IP allowlist, file sandbox, read-only enforcement on raw API calls); version table updated
+
 ## v1.10 — 2026-03-31
 
 ### Added

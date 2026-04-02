@@ -17,6 +17,7 @@
 
 """MCP server setup, lifespan management, and dynamic tool registration."""
 
+import hmac
 import inspect
 import json
 import logging
@@ -555,17 +556,39 @@ _UUID_RE = re.compile(
 )
 
 
-def _resolve_source_file(params: dict[str, Any]) -> dict[str, Any]:
+def _resolve_source_file(
+    params: dict[str, Any],
+    *,
+    allowed_import_dirs: list[str] | None = None,
+) -> dict[str, Any]:
     """Read file content for configuration.import when ``source_file`` is used.
 
     LLMs find it impractical to send large YAML/JSON templates as inline
     strings.  This allows ``"source_file": "/path/to/template.yaml"``
     as an alternative to ``"source": "<huge YAML string>"``.
+
+    Security: only files within ``allowed_import_dirs`` are readable.
+    If no directories are configured, this feature is disabled.
     """
     if "source_file" not in params or "source" in params:
         return params
 
-    path = Path(params["source_file"])
+    if not allowed_import_dirs:
+        raise ValueError(
+            "source_file feature is disabled. Configure 'allowed_import_dirs' "
+            "in [server] config to specify directories from which files may be read."
+        )
+
+    path = Path(params["source_file"]).resolve()
+
+    # Validate path is within an allowed directory (prevent path traversal)
+    allowed = [Path(d).resolve() for d in allowed_import_dirs]
+    if not any(path.is_relative_to(d) for d in allowed):
+        raise ValueError(
+            f"source_file must be within allowed import directories: "
+            f"{', '.join(str(d) for d in allowed)}"
+        )
+
     if not path.is_file():
         raise ValueError(f"source_file not found: {path}")
 
@@ -693,6 +716,8 @@ def _build_zabbix_params(
     method_def: MethodDef,
     kwargs: dict[str, Any],
     zabbix_version: str | None = None,
+    *,
+    allowed_import_dirs: list[str] | None = None,
 ) -> Any:
     """Convert tool keyword arguments into Zabbix API parameters."""
     args = {k: v for k, v in kwargs.items() if k != "server" and v is not None}
@@ -721,7 +746,7 @@ def _build_zabbix_params(
     if "params" in args:
         params = args["params"]
         if method_def.api_method in ("configuration.import", "configuration.importcompare"):
-            params = _resolve_source_file(params)
+            params = _resolve_source_file(params, allowed_import_dirs=allowed_import_dirs)
             _validate_import_uuids(params)
             params = _normalize_import_rules(params, zabbix_version)
         if isinstance(params, dict):
@@ -931,6 +956,8 @@ def _make_tool_handler(
     method_def: MethodDef,
     client_manager: ClientManager,
     server_names: list[str],
+    *,
+    allowed_import_dirs: list[str] | None = None,
 ):
     """Create a tool handler with a proper typed signature for FastMCP schema generation."""
 
@@ -947,7 +974,10 @@ def _make_tool_handler(
                 client_manager.check_write(server_name)
 
             zabbix_version = client_manager.get_version(server_name)
-            params = _build_zabbix_params(method_def, kwargs, zabbix_version)
+            params = _build_zabbix_params(
+                method_def, kwargs, zabbix_version,
+                allowed_import_dirs=allowed_import_dirs,
+            )
             params = _resolve_valuemap_by_name(
                 params, method_def.api_method, client_manager, server_name,
             )
@@ -960,7 +990,7 @@ def _make_tool_handler(
             return json.dumps({"error": True, "message": str(e), "type": type(e).__name__})
         except Exception as e:
             logger.exception("Error calling %s on server '%s'", method_def.api_method, server_name)
-            return json.dumps({"error": True, "message": f"Error calling {method_def.api_method}: {e}", "type": type(e).__name__})
+            return json.dumps({"error": True, "message": f"API call failed for {method_def.api_method}. Check server logs for details.", "type": "APIError"})
 
     # Build a dynamic function signature so FastMCP generates proper JSON Schema
     sig_params: list[inspect.Parameter] = []
@@ -1006,6 +1036,8 @@ def _register_tools(
     client_manager: ClientManager,
     tools_filter: list[str] | None = None,
     disabled_tools: list[str] | None = None,
+    *,
+    allowed_import_dirs: list[str] | None = None,
 ) -> int:
     """Register Zabbix API methods as MCP tools. Returns tool count.
 
@@ -1028,7 +1060,10 @@ def _register_tools(
         if disabled_tools is not None:
             if prefix in disabled_tools:
                 continue
-        handler = _make_tool_handler(method_def, client_manager, server_names)
+        handler = _make_tool_handler(
+            method_def, client_manager, server_names,
+            allowed_import_dirs=allowed_import_dirs,
+        )
         mcp.add_tool(handler, name=method_def.tool_name, description=method_def.description)
         count += 1
 
@@ -1036,6 +1071,16 @@ def _register_tools(
     server_desc = (
         f"Target Zabbix server. Available: {', '.join(server_names)}. "
         f"Defaults to '{server_names[0]}' if omitted."
+    )
+
+    # Write operation suffixes — used to enforce read_only on raw API calls.
+    _WRITE_SUFFIXES = (
+        ".create", ".update", ".delete",
+        ".massadd", ".massremove", ".massupdate",
+        ".import", ".execute", ".acknowledge",
+        ".push", ".clear", ".propagate",
+        ".generate", ".provision", ".unblock",
+        ".resettotp", ".replacehostinterfaces",
     )
 
     async def zabbix_raw_api_call(
@@ -1051,10 +1096,19 @@ def _register_tools(
             return json.dumps({"error": True, "message": "No Zabbix server configured.", "type": "ConfigurationError"})
         try:
             server_name = client_manager.resolve_server(server_name)
+
+            # Enforce read_only: block write operations on read-only servers
+            method_lower = method.lower()
+            if any(method_lower.endswith(s) for s in _WRITE_SUFFIXES):
+                client_manager.check_write(server_name)
+
             result = client_manager.call(server_name, method, params or {})
             return _truncate_result(result)
-        except Exception as e:
+        except (ReadOnlyError, RateLimitError, ValueError) as e:
             return json.dumps({"error": True, "message": str(e), "type": type(e).__name__})
+        except Exception as e:
+            logger.exception("Error in raw API call '%s' on server '%s'", method, server_name)
+            return json.dumps({"error": True, "message": f"API call failed for {method}. Check server logs for details.", "type": "APIError"})
 
     mcp.add_tool(zabbix_raw_api_call)
     count += 1
@@ -1092,7 +1146,8 @@ class _BearerTokenVerifier:
         self._expected_token = expected_token
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        if token == self._expected_token:
+        # Use constant-time comparison to prevent timing attacks
+        if hmac.compare_digest(token, self._expected_token):
             return AccessToken(
                 token=token,
                 client_id="mcp-client",
@@ -1100,6 +1155,47 @@ class _BearerTokenVerifier:
                 expires_at=int(time.time()) + 86400,
             )
         return None
+
+
+class _IPAllowlistMiddleware:
+    """ASGI middleware that rejects requests from IPs not in the allowlist.
+
+    Supports individual IPs (``"10.0.0.1"``) and CIDR ranges (``"10.0.0.0/24"``).
+    """
+
+    def __init__(self, app: Any, allowed: list[str]) -> None:
+        import ipaddress
+        self._app = app
+        self._networks: list[Any] = []
+        for entry in allowed:
+            try:
+                self._networks.append(ipaddress.ip_network(entry, strict=False))
+            except ValueError as e:
+                raise ValueError(f"Invalid allowed_hosts entry '{entry}': {e}") from e
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope["type"] in ("http", "websocket"):
+            import ipaddress
+            client = scope.get("client")
+            if client:
+                client_ip = ipaddress.ip_address(client[0])
+                if not any(client_ip in net for net in self._networks):
+                    # Reject with 403 Forbidden
+                    if scope["type"] == "http":
+                        await send({
+                            "type": "http.response.start",
+                            "status": 403,
+                            "headers": [[b"content-type", b"application/json"]],
+                        })
+                        await send({
+                            "type": "http.response.body",
+                            "body": b'{"error": true, "message": "Forbidden"}',
+                        })
+                        return
+                    # For websocket, close immediately
+                    await send({"type": "websocket.close", "code": 1008})
+                    return
+        await self._app(scope, receive, send)
 
 
 def run_server(
@@ -1112,10 +1208,13 @@ def run_server(
     """Create and run the MCP server."""
     client_manager = ClientManager(config)
 
+    # Determine URL scheme based on TLS configuration
+    scheme = "https" if config.server.tls_cert_file else "http"
+
     # Set up bearer token auth for HTTP transport
     auth_kwargs: dict[str, Any] = {}
     if config.server.auth_token and transport in ("http", "sse"):
-        server_url = f"http://{host}:{port}"
+        server_url = f"{scheme}://{host}:{port}"
         auth_kwargs["token_verifier"] = _BearerTokenVerifier(config.server.auth_token)
         auth_kwargs["auth"] = AuthSettings(
             issuer_url=server_url,
@@ -1123,7 +1222,23 @@ def run_server(
         )
         logger.info("Bearer token authentication enabled")
     elif transport in ("http", "sse") and not config.server.auth_token:
-        logger.warning("No auth_token configured - HTTP server is unauthenticated!")
+        logger.warning("No auth_token configured — HTTP server is unauthenticated!")
+
+    # Security warnings
+    if transport in ("http", "sse"):
+        if host != "127.0.0.1" and not config.server.tls_cert_file:
+            logger.warning(
+                "Listening on %s without TLS — tokens and API data are sent unencrypted! "
+                "Configure tls_cert_file/tls_key_file or use a TLS reverse proxy.",
+                host,
+            )
+        if host != "127.0.0.1" and not config.server.auth_token:
+            logger.warning(
+                "Listening on %s without auth_token — anyone on the network can access this server!",
+                host,
+            )
+        if config.server.cors_origins and "*" in config.server.cors_origins:
+            logger.warning("CORS configured with wildcard '*' — any origin can access this server!")
 
     mcp = FastMCP(
         name="zabbix-mcp-server",
@@ -1139,7 +1254,10 @@ def run_server(
         **auth_kwargs,
     )
 
-    tool_count = _register_tools(mcp, client_manager, config.server.tools, config.server.disabled_tools)
+    tool_count = _register_tools(
+        mcp, client_manager, config.server.tools, config.server.disabled_tools,
+        allowed_import_dirs=config.server.allowed_import_dirs,
+    )
     if config.server.tools or config.server.disabled_tools:
         parts = []
         if config.server.tools:
@@ -1150,27 +1268,54 @@ def run_server(
     else:
         logger.info("Registered %d tools", tool_count)
 
-    # HTTP health endpoint (unauthenticated, suitable for Docker/load-balancer checks)
+    # HTTP health endpoint (unauthenticated, returns minimal info only)
     if transport in ("http", "sse"):
         from starlette.requests import Request
         from starlette.responses import JSONResponse
 
         @mcp.custom_route("/health", methods=["GET"])
         async def http_health(request: Request) -> JSONResponse:
-            from zabbix_mcp import __version__
-
-            results: dict[str, Any] = {
-                "status": "ok",
-                "version": __version__,
-                "tools": tool_count,
-            }
-            return JSONResponse(results)
+            return JSONResponse({"status": "ok"})
 
     try:
-        if transport == "http":
-            mcp.run(transport="streamable-http")
-        elif transport == "sse":
-            mcp.run(transport="sse")
+        if transport in ("http", "sse"):
+            # Build the ASGI app from FastMCP for full control over TLS and CORS
+            if transport == "http":
+                asgi_app = mcp.streamable_http_app()
+            else:
+                asgi_app = mcp.sse_app()
+
+            # Apply IP allowlist middleware if configured
+            if config.server.allowed_hosts:
+                asgi_app = _IPAllowlistMiddleware(asgi_app, config.server.allowed_hosts)
+                logger.info("IP allowlist enabled: %s", ", ".join(config.server.allowed_hosts))
+
+            # Apply CORS middleware if configured
+            if config.server.cors_origins is not None:
+                from starlette.middleware.cors import CORSMiddleware
+                asgi_app = CORSMiddleware(
+                    app=asgi_app,
+                    allow_origins=config.server.cors_origins,
+                    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+                    allow_headers=["Authorization", "Content-Type"],
+                    allow_credentials=True,
+                )
+                logger.info("CORS enabled for origins: %s", ", ".join(config.server.cors_origins))
+
+            # Run with uvicorn (supports TLS natively)
+            import uvicorn
+
+            uvicorn_kwargs: dict[str, Any] = {
+                "host": host,
+                "port": port,
+                "log_level": config.server.log_level.lower(),
+            }
+            if config.server.tls_cert_file and config.server.tls_key_file:
+                uvicorn_kwargs["ssl_certfile"] = config.server.tls_cert_file
+                uvicorn_kwargs["ssl_keyfile"] = config.server.tls_key_file
+                logger.info("TLS enabled (cert: %s)", config.server.tls_cert_file)
+
+            uvicorn.run(asgi_app, **uvicorn_kwargs)
         else:
             mcp.run(transport="stdio")
     finally:

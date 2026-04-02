@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zabbix-mcp-server"
-version = "1.10"
+version = "1.11"
 description = "Production-quality MCP server for the complete Zabbix API"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -24,8 +24,8 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "mcp>=1.1.3",
-    "zabbix-utils>=2.0.2",
+    "mcp>=1.1.3,<2.0",
+    "zabbix-utils>=2.0.2,<3.0",
 ]
 
 [project.scripts]

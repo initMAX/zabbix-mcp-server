@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import time
 from typing import Any
@@ -47,6 +48,8 @@ class _RateLimiter:
     When *client_id* is ``None``, a shared "global" bucket is used.
     """
 
+    _MAX_BUCKETS = 1000
+
     def __init__(self, max_calls: int) -> None:
         self._max_calls = max_calls
         self._buckets: dict[str, list[float]] = {}
@@ -58,11 +61,17 @@ class _RateLimiter:
         key = client_id or "__global__"
         now = time.monotonic()
         with self._lock:
-            # Periodic cleanup of stale buckets (every 100 checks)
-            if sum(1 for _ in self._buckets) > 50:
+            # Periodic cleanup of stale buckets
+            if len(self._buckets) > 50:
                 stale = [k for k, v in self._buckets.items() if not v or now - v[-1] > 120.0]
                 for k in stale:
                     del self._buckets[k]
+
+            # Hard limit on bucket count to prevent memory exhaustion
+            if key not in self._buckets and len(self._buckets) >= self._MAX_BUCKETS:
+                # Evict the oldest bucket
+                oldest_key = min(self._buckets, key=lambda k: self._buckets[k][-1] if self._buckets[k] else 0.0)
+                del self._buckets[oldest_key]
 
             calls = self._buckets.get(key, [])
             calls = [t for t in calls if now - t < 60.0]
@@ -152,8 +161,16 @@ class ClientManager:
                 return self._do_call(client, method, params)
             raise
 
+    # Strict format: "object.method" — only ASCII letters, single dot separator.
+    _METHOD_RE = re.compile(r"^[a-zA-Z]+\.[a-zA-Z]+$")
+
     def _do_call(self, client: ZabbixAPI, method: str, params: Any) -> Any:
         """Execute the actual API call by traversing the method path."""
+        if not self._METHOD_RE.match(method):
+            raise ValueError(
+                f"Invalid API method format: '{method}'. "
+                f"Expected 'object.method' (e.g. 'host.get')."
+            )
         parts = method.split(".")
         obj: Any = client
         for part in parts:
