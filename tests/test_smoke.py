@@ -114,9 +114,14 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.server.transport, "stdio")
         self.assertEqual(cfg.server.host, "127.0.0.1")
         self.assertEqual(cfg.server.port, 8080)
-        self.assertEqual(cfg.server.rate_limit, 60)
+        self.assertEqual(cfg.server.rate_limit, 300)
         self.assertIsNone(cfg.server.auth_token)
         self.assertIsNone(cfg.server.log_file)
+        self.assertIsNone(cfg.server.tls_cert_file)
+        self.assertIsNone(cfg.server.tls_key_file)
+        self.assertIsNone(cfg.server.cors_origins)
+        self.assertIsNone(cfg.server.allowed_import_dirs)
+        self.assertIsNone(cfg.server.allowed_hosts)
 
     def test_multiple_servers(self):
         cfg = AppConfig(
@@ -576,11 +581,11 @@ class TestPreprocessingNormalization(unittest.TestCase):
 class TestSourceFile(unittest.TestCase):
     def test_resolve_source_file(self):
         import tempfile, os
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=tempfile.gettempdir()) as f:
             f.write("zabbix_export:\n  version: '7.0'\n")
             f.flush()
             params = {"source_file": f.name, "rules": {}}
-            result = _resolve_source_file(params)
+            result = _resolve_source_file(params, allowed_import_dirs=[tempfile.gettempdir()])
         os.unlink(f.name)
         self.assertIn("source", result)
         self.assertNotIn("source_file", result)
@@ -589,11 +594,11 @@ class TestSourceFile(unittest.TestCase):
 
     def test_resolve_source_file_xml(self):
         import tempfile, os
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False, dir=tempfile.gettempdir()) as f:
             f.write("<zabbix_export><version>7.0</version></zabbix_export>")
             f.flush()
             params = {"source_file": f.name}
-            result = _resolve_source_file(params)
+            result = _resolve_source_file(params, allowed_import_dirs=[tempfile.gettempdir()])
         os.unlink(f.name)
         self.assertEqual(result["format"], "xml")
 
@@ -603,19 +608,34 @@ class TestSourceFile(unittest.TestCase):
         result = _resolve_source_file(params)
         self.assertEqual(result["source"], "existing")
 
-    def test_missing_file_raises(self):
-        params = {"source_file": "/nonexistent/file.yaml"}
-        with self.assertRaises(ValueError):
+    def test_disabled_without_allowed_dirs(self):
+        """source_file is disabled when allowed_import_dirs is not configured."""
+        params = {"source_file": "/some/file.yaml"}
+        with self.assertRaises(ValueError) as ctx:
             _resolve_source_file(params)
+        self.assertIn("disabled", str(ctx.exception))
+
+    def test_path_traversal_blocked(self):
+        """Paths outside allowed directories are rejected."""
+        params = {"source_file": "/etc/passwd"}
+        with self.assertRaises(ValueError) as ctx:
+            _resolve_source_file(params, allowed_import_dirs=["/tmp/safe"])
+        self.assertIn("allowed import directories", str(ctx.exception))
+
+    def test_missing_file_raises(self):
+        import tempfile
+        params = {"source_file": tempfile.gettempdir() + "/nonexistent_file_12345.yaml"}
+        with self.assertRaises(ValueError):
+            _resolve_source_file(params, allowed_import_dirs=[tempfile.gettempdir()])
 
     def test_format_not_overridden(self):
         """Explicit format is preserved even with yaml extension."""
         import tempfile, os
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, dir=tempfile.gettempdir()) as f:
             f.write("data")
             f.flush()
             params = {"source_file": f.name, "format": "json"}
-            result = _resolve_source_file(params)
+            result = _resolve_source_file(params, allowed_import_dirs=[tempfile.gettempdir()])
         os.unlink(f.name)
         self.assertEqual(result["format"], "json")
 

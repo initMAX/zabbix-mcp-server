@@ -65,6 +65,45 @@ log_file = "/var/log/zabbix-mcp/server.log"
 rate_limit = 300
 
 # ---------------------------------------------------------------------------
+# TLS / HTTPS
+# ---------------------------------------------------------------------------
+# Enable native TLS by providing paths to a certificate and private key.
+# When set, the server listens on HTTPS instead of HTTP.
+# Alternative: use a TLS-terminating reverse proxy (nginx, Caddy).
+#
+# tls_cert_file = "/etc/zabbix-mcp/tls/server.crt"
+# tls_key_file = "/etc/zabbix-mcp/tls/server.key"
+
+# ---------------------------------------------------------------------------
+# CORS (Cross-Origin Resource Sharing)
+# ---------------------------------------------------------------------------
+# List of allowed origins for CORS requests. When not set, CORS headers are
+# not sent and cross-origin browser requests are blocked (secure default).
+# Use ["*"] to allow all origins (NOT recommended for production).
+#
+# cors_origins = ["https://your-app.example.com"]
+# cors_origins = ["https://app1.example.com", "https://app2.example.com"]
+# cors_origins = ["*"]  # allow all — only for development!
+
+# ---------------------------------------------------------------------------
+# IP allowlist
+# ---------------------------------------------------------------------------
+# Restrict access to specific IP addresses or CIDR ranges.
+# When not set, all IPs are allowed (access is controlled only by auth_token).
+# Supports individual IPs and CIDR notation.
+#
+# allowed_hosts = ["127.0.0.1", "10.0.0.0/24", "192.168.1.100"]
+
+# ---------------------------------------------------------------------------
+# File import directories
+# ---------------------------------------------------------------------------
+# The source_file feature allows configuration.import to read template files
+# from disk instead of requiring inline content. For security, this feature
+# is DISABLED by default. Set allowed directories to enable it.
+#
+# allowed_import_dirs = ["/etc/zabbix-mcp/imports", "/opt/zabbix-templates"]
+
+# ---------------------------------------------------------------------------
 # Permission hardening
 # ---------------------------------------------------------------------------
 # The tools filter and read_only flag can be combined to achieve fine-grained
