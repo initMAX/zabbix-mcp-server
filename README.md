@@ -190,8 +190,8 @@ Authorization: Bearer your-secret-token-here
 # Option 1 - token directly in config:
 auth_token = "your-secret-token-here"
 
-# Option 2 - token from environment variable (recommended for production):
-# auth_token = "${MCP_AUTH_TOKEN}"
+# Option 2 - token from environment variable (recommended for Docker / production):
+auth_token = "${MCP_AUTH_TOKEN}"
 ```
 
 When `auth_token` is not set, the MCP server accepts unauthenticated connections. This is safe when bound to `127.0.0.1` (default) but **must be set** when the server is exposed to the network (`0.0.0.0`).
@@ -258,10 +258,21 @@ git clone https://github.com/initMAX/zabbix-mcp-server.git
 cd zabbix-mcp-server
 cp config.example.toml config.toml
 nano config.toml                        # fill in your Zabbix details
+cp .env.example .env                    # optional: customize port, host, auth token
 docker compose up -d
 ```
 
-The config file is mounted read-only into the container. Logs are stored in a Docker volume. Inside the container, `host` and `port` from `config.toml` are overridden (`0.0.0.0:8080`) for Docker compatibility. To expose on a different host port, change only the left side of the `ports:` mapping in `docker-compose.yml` (e.g. `"8883:8080"`).
+The config file is mounted read-only into the container. Logs are stored in a Docker volume.
+
+**Customizing the port and host interface** — create a `.env` file (copy from `.env.example`) and set:
+
+```bash
+MCP_HOST=127.0.0.1   # interface to bind on the Docker host (default: 127.0.0.1)
+MCP_PORT=8080        # port used inside the container and exposed on the host (default: 8080)
+MCP_AUTH_TOKEN=...   # bearer token for MCP server authentication (optional)
+```
+
+`MCP_PORT` controls both the container-internal port and the host-side binding — no need to edit `docker-compose.yml`. The `port` setting in `config.toml` is ignored when running via Docker (overridden by `MCP_PORT`).
 
 **Upgrade:**
 
