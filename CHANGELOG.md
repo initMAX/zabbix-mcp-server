@@ -20,6 +20,7 @@
 ### Added
 
 - **Zabbix 8.0 support** — added `JSON` value type (`value_type=6`) to enum mappings for item create/update; updated tool descriptions to list JSON as valid value type; Zabbix 8.0 added to compatibility table as experimental (`skip_version_check = true` required)
+- **SLA API** — added `sla.get`, `sla.create`, `sla.update`, `sla.delete`, and `sla.getsli` tools for managing Service Level Agreements and retrieving SLI (Service Level Indicator) data (Zabbix 6.0+); total tool count: 225 across 58 API groups
 
 ### Improved
 

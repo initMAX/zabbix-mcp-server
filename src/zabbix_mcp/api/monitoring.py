@@ -18,7 +18,7 @@
 """Zabbix API method definitions for the Monitoring category.
 
 Covers dashboards, template dashboards, reports, HA nodes, history, trends,
-events, problems, maps, and tasks.
+events, problems, maps, tasks, and SLAs.
 """
 
 from zabbix_mcp.api.types import MethodDef, ParamDef
@@ -654,6 +654,102 @@ _TASK_CREATE = MethodDef(
 )
 
 # ---------------------------------------------------------------------------
+# SLA (Service Level Agreement) — Zabbix 6.0+
+# ---------------------------------------------------------------------------
+
+_SLA_GET = MethodDef(
+    api_method="sla.get",
+    tool_name="sla_get",
+    description=(
+        "Retrieve SLA definitions. SLAs measure service availability against "
+        "defined targets (e.g. 99.9% uptime). Each SLA has a schedule, SLO "
+        "(Service Level Objective) percentage, and is linked to services via "
+        "service tags. Use selectServiceTags, selectExcludedDowntimes, and "
+        "selectSchedule in extra_params to include related objects."
+    ),
+    read_only=True,
+    params=COMMON_GET_PARAMS + [
+        ParamDef(
+            "slaids", "list[str]",
+            "Return only SLAs with the given IDs.",
+        ),
+        ParamDef(
+            "serviceids", "list[str]",
+            "Return only SLAs linked to the given services.",
+        ),
+    ],
+)
+
+_SLA_CREATE = MethodDef(
+    api_method="sla.create",
+    tool_name="sla_create",
+    description=(
+        "Create a new SLA. Required fields: 'name', 'slo' (target percentage, "
+        "e.g. 99.9), 'period' (reporting period: 0=daily, 1=weekly, 2=monthly, "
+        "3=quarterly, 4=annually), 'timezone', and 'service_tags' (array of "
+        "tag objects that link this SLA to services). Optionally define "
+        "'schedule' and 'excluded_downtimes'."
+    ),
+    read_only=False,
+    params=[
+        ParamDef(
+            "params", "dict",
+            "SLA definition as a JSON dictionary. Required: name, slo, period, "
+            "timezone, service_tags.",
+            required=True,
+        ),
+    ],
+)
+
+_SLA_UPDATE = MethodDef(
+    api_method="sla.update",
+    tool_name="sla_update",
+    description="Update an existing SLA. The 'slaid' field is required.",
+    read_only=False,
+    params=UPDATE_PARAMS,
+)
+
+_SLA_DELETE = MethodDef(
+    api_method="sla.delete",
+    tool_name="sla_delete",
+    description="Delete SLAs by their IDs.",
+    read_only=False,
+    params=DELETE_PARAMS,
+)
+
+_SLA_GETSLI = MethodDef(
+    api_method="sla.getsli",
+    tool_name="sla_getsli",
+    description=(
+        "Get SLA Service Level Indicator (SLI) data — the actual calculated "
+        "availability percentages for services covered by an SLA. Returns "
+        "period-by-period SLI values showing whether the SLO target was met. "
+        "Required: 'slaid'. Optionally filter by 'serviceids' and time range "
+        "with 'period_from'/'period_to'."
+    ),
+    read_only=True,
+    params=[
+        ParamDef(
+            "slaid", "str",
+            "ID of the SLA to retrieve SLI data for.",
+            required=True,
+        ),
+        ParamDef(
+            "serviceids", "list[str]",
+            "Return SLI data only for these service IDs.",
+        ),
+        ParamDef(
+            "period_from", "int",
+            "Return SLI data starting from this Unix timestamp.",
+        ),
+        ParamDef(
+            "period_to", "int",
+            "Return SLI data up to this Unix timestamp.",
+        ),
+    ],
+)
+
+# ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
 
@@ -694,4 +790,10 @@ MONITORING_METHODS: list[MethodDef] = [
     # Task
     _TASK_GET,
     _TASK_CREATE,
+    # SLA
+    _SLA_GET,
+    _SLA_CREATE,
+    _SLA_UPDATE,
+    _SLA_DELETE,
+    _SLA_GETSLI,
 ]

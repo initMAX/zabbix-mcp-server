@@ -105,7 +105,7 @@ TOOL_GROUPS: dict[str, list[str]] = {
         "problem", "event", "history", "trend",
         "graph", "graphitem", "graphprototype",
         "discoveryrule", "discoveryruleprototype",
-        "dcheck", "dhost", "drule", "dservice", "httptest",
+        "dcheck", "dhost", "drule", "dservice", "httptest", "sla",
     ],
     "data_collection": [
         "template", "templategroup", "templatedashboard",

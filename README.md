@@ -44,7 +44,7 @@
         Zabbix MCP Server
     </h1>
     <h4>
-        Complete Zabbix API coverage for any MCP-compatible AI assistant (220 tools)
+        Complete Zabbix API coverage for any MCP-compatible AI assistant (225 tools)
     </h4>
     <br>
     <a href="https://github.com/initMAX/zabbix-mcp-server/releases"><img alt="Version" src="https://img.shields.io/github/v/release/initMAX/zabbix-mcp-server?color=%231f65f4&label=version"></a>&nbsp;
@@ -65,7 +65,7 @@ The server runs as a standalone HTTP service. AI clients connect to it over the 
 
 ## Features
 
-- **Complete API coverage** - All 57 Zabbix API groups (220 tools): hosts, problems, triggers, templates, users, dashboards, and more
+- **Complete API coverage** - All 58 Zabbix API groups (225 tools): hosts, problems, triggers, templates, users, dashboards, and more
 - **Multi-server support** - Connect to multiple Zabbix instances (production, staging, ...) with separate tokens
 - **HTTP + SSE transports** - Streamable HTTP (recommended) and SSE for clients like n8n that lack session management
 - **Tool filtering** - Limit exposed tools by category (`monitoring`, `alerts`, `users`, etc.) to stay under LLM tool limits
@@ -357,7 +357,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 <tr><td><code>log_file</code></td><td>Path to log file (parent directory must exist)</td></tr>
 <tr><td><code>auth_token</code></td><td>Bearer token for HTTP/SSE authentication (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute per client (default: <code>300</code>, set to <code>0</code> to disable)</td></tr>
-<tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix — e.g. <code>["monitoring", "alerts"]</code> (default: all ~220 tools)</td></tr>
+<tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix — e.g. <code>["monitoring", "alerts"]</code> (default: all ~225 tools)</td></tr>
 <tr><td><code>disabled_tools</code></td><td>Denylist counterpart to <code>tools</code> — exclude specific tool groups or prefixes</td></tr>
 <tr><td><code>tls_cert_file</code> / <code>tls_key_file</code></td><td>Enable native HTTPS — paths to TLS certificate and private key</td></tr>
 <tr><td><code>cors_origins</code></td><td>List of allowed CORS origins (default: disabled)</td></tr>
