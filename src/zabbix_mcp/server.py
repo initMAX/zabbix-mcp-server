@@ -138,6 +138,7 @@ _VALUE_TYPES: dict[str, int] = {
     "UNSIGNED": 3,
     "TEXT": 4,
     "BINARY": 5,
+    "JSON": 6,       # Zabbix 8.0+
 }
 
 # Trigger severity / priority (priority)

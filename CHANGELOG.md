@@ -17,6 +17,10 @@
 - **Integration test `test_health.py`** — removed assertions for `version` and `tools` fields that were dropped from the `health_check` tool in v1.11
 - **`_normalize_nested_interfaces` / `_normalize_nested_dchecks`** — removed unnecessary shallow copy of params dict on mutation (interfaces/dchecks are mutated in-place)
 
+### Added
+
+- **Zabbix 8.0 support** — added `JSON` value type (`value_type=6`) to enum mappings for item create/update; updated tool descriptions to list JSON as valid value type; Zabbix 8.0 added to compatibility table as experimental (`skip_version_check = true` required)
+
 ### Improved
 
 - **Parameter sanitization from production logs** — LLMs copying fields from YAML templates caused recurring Zabbix API rejections; the server now auto-strips: `description` from trigger dependencies, `formulaid` from discovery rule filter conditions, `vendor` from template.update, and clears `error_handler_params` when `error_handler` is DEFAULT (0)
