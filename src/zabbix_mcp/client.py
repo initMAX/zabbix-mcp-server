@@ -180,6 +180,11 @@ class ClientManager:
             return obj(params)
         return obj(**params)
 
+    def check_connection(self, server: str) -> None:
+        """Verify connectivity to a Zabbix server (for health checks)."""
+        client = self._get_client(server)
+        client.api_version()
+
     def get_version(self, server: str) -> str:
         """Return the Zabbix API version string for the given server."""
         client = self._get_client(server)

@@ -17,6 +17,7 @@
 
 """MCP server setup, lifespan management, and dynamic tool registration."""
 
+import asyncio
 import hmac
 import inspect
 import json
@@ -473,8 +474,6 @@ def _normalize_nested_interfaces(params: dict[str, Any]) -> dict[str, Any]:
             iface["type"] = new_val
             changed = True
 
-    if changed:
-        return {**params, "interfaces": params["interfaces"]}
     return params
 
 
@@ -496,8 +495,6 @@ def _normalize_nested_dchecks(params: dict[str, Any]) -> dict[str, Any]:
             check["type"] = new_val
             changed = True
 
-    if changed:
-        return {**params, "dchecks": params["dchecks"]}
     return params
 
 
@@ -580,13 +577,14 @@ def _resolve_source_file(
         )
 
     raw_path = Path(params["source_file"])
-    path = raw_path.resolve()
 
-    # Reject symlinks — they could escape allowed directories
+    # Reject symlinks BEFORE resolving — they could escape allowed directories
     if raw_path.is_symlink():
         raise ValueError(
             "source_file must not be a symbolic link (security restriction)."
         )
+
+    path = raw_path.resolve()
 
     # Validate path is within an allowed directory (prevent path traversal)
     allowed = [Path(d).resolve() for d in allowed_import_dirs]
@@ -768,7 +766,10 @@ def _build_zabbix_params(
             # CALCULATED(15), SNMP_TRAP(17), DEPENDENT(18).
             if method_def.api_method in ("item.create", "itemprototype.create"):
                 _NO_DELAY_TYPES = {2, 5, 15, 17, 18}
-                item_type = int(params.get("type", -1))
+                try:
+                    item_type = int(params.get("type", -1))
+                except (ValueError, TypeError):
+                    item_type = -1
                 if "delay" not in params and item_type not in _NO_DELAY_TYPES and item_type >= 0:
                     params["delay"] = "1m"
         return params
@@ -789,12 +790,14 @@ def _build_zabbix_params(
                 value = [f.strip() for f in value.split(",")]
             params[param_def.name] = value
 
-    # Default output to "extend" so LLMs get full objects, not just IDs
+    # Default output to "extend" so LLMs get full objects, not just IDs.
+    # Only add if the method actually accepts an "output" parameter.
+    has_output_param = any(p.name == "output" for p in method_def.params)
     if (
         method_def.read_only
+        and has_output_param
         and "output" not in params
         and "countOutput" not in params
-        and method_def.api_method != "user.checkAuthentication"
     ):
         params["output"] = "extend"
 
@@ -983,15 +986,20 @@ def _make_tool_handler(
             if not method_def.read_only:
                 client_manager.check_write(server_name)
 
-            zabbix_version = client_manager.get_version(server_name)
+            zabbix_version = await asyncio.to_thread(
+                client_manager.get_version, server_name,
+            )
             params = _build_zabbix_params(
                 method_def, kwargs, zabbix_version,
                 allowed_import_dirs=allowed_import_dirs,
             )
-            params = _resolve_valuemap_by_name(
+            params = await asyncio.to_thread(
+                _resolve_valuemap_by_name,
                 params, method_def.api_method, client_manager, server_name,
             )
-            result = client_manager.call(server_name, method_def.api_method, params)
+            result = await asyncio.to_thread(
+                client_manager.call, server_name, method_def.api_method, params,
+            )
             return _truncate_result(result)
 
         except (ReadOnlyError, RateLimitError) as e:
@@ -1119,7 +1127,9 @@ def _register_tools(
             if not is_read_only:
                 client_manager.check_write(server_name)
 
-            result = client_manager.call(server_name, method, params or {})
+            result = await asyncio.to_thread(
+                client_manager.call, server_name, method, params or {},
+            )
             return _truncate_result(result)
         except (ReadOnlyError, RateLimitError, ValueError) as e:
             return json.dumps({"error": True, "message": str(e), "type": type(e).__name__})
@@ -1141,8 +1151,7 @@ def _register_tools(
         for i, name in enumerate(client_manager.server_names, 1):
             label = f"server_{i}"
             try:
-                client = client_manager._get_client(name)
-                client.api_version()
+                await asyncio.to_thread(client_manager.check_connection, name)
                 results["zabbix_servers"][label] = {"status": "ok"}
             except Exception as e:
                 logger.warning("Health check failed for '%s': %s", name, e)
