@@ -212,6 +212,18 @@ api_token = "staging-token"
 read_only = false
 ```
 
+The first server (`production`) is used as the default. To target a specific instance, just mention it naturally in your prompt:
+
+| Prompt | Target server |
+|---|---|
+| *"Show me hosts with high CPU usage"* | `production` (default) |
+| *"Show me hosts in our staging Zabbix instance"* | `staging` |
+| *"Compare trigger counts between production and staging"* | both |
+| *"Create a maintenance window on staging for tonight"* | `staging` |
+| *"Migrate host 'web-01' from production to staging"* | both |
+
+The AI assistant maps your natural language to the correct `server` parameter automatically — no need to use technical syntax like `server = "staging"` in your prompts.
+
 ### Start
 
 ```bash
