@@ -33,6 +33,11 @@ Full adversarial security audit of the entire codebase ([#2](https://github.com/
 - **Security status summary at startup** — on every start the server logs a full security checklist (auth_token, TLS, IP allowlist, CORS, rate limit, read-only, SSL verification, source_file); disabled features are logged as warnings with a final hint listing the exact config keys to adjust
 - **Hidden server names in `health_check`** — Zabbix server identifiers are replaced with generic `server_1`, `server_2` labels to prevent leaking internal infrastructure naming
 
+### Fixed
+
+- **Duplicate log lines** — when `log_file` pointed to the same file as systemd `StandardError=append`, every line appeared twice; logging now writes only to file when `log_file` is set (skips stderr), or only to stderr when `log_file` is not set
+- **Logging configured on root logger** — `logging.basicConfig` added handlers to the root logger causing propagation duplicates; now configures named `zabbix_mcp` and `mcp` loggers directly with `propagate=False` and silences root logger handlers
+
 ### Improved
 
 - **HTTP transport uses uvicorn directly** — for HTTP and SSE transports, the server now builds the ASGI app from FastMCP and runs uvicorn directly, enabling TLS, CORS middleware, and IP allowlist without patching the framework
