@@ -70,15 +70,34 @@ def main() -> None:
 
     log_level = getattr(logging, config.server.log_level.upper(), logging.INFO)
     log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    formatter = logging.Formatter(log_format)
 
-    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)]
+    # Configure only our logger to avoid duplicate lines from root logger
+    app_logger = logging.getLogger("zabbix_mcp")
+    app_logger.setLevel(log_level)
+    app_logger.handlers.clear()
+    app_logger.propagate = False
+
+    stderr_handler = logging.StreamHandler(sys.stderr)
+    stderr_handler.setFormatter(formatter)
+    app_logger.addHandler(stderr_handler)
+
     if config.server.log_file:
         from pathlib import Path
         log_path = Path(config.server.log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(log_path))
+        file_handler = logging.FileHandler(log_path)
+        file_handler.setFormatter(formatter)
+        app_logger.addHandler(file_handler)
 
-    logging.basicConfig(level=log_level, format=log_format, handlers=handlers)
+    # Also configure the mcp library logger to use our format (single handler)
+    mcp_logger = logging.getLogger("mcp")
+    mcp_logger.setLevel(log_level)
+    mcp_logger.handlers.clear()
+    mcp_logger.propagate = False
+    mcp_logger.addHandler(stderr_handler)
+    if config.server.log_file:
+        mcp_logger.addHandler(file_handler)
 
     transport = args.transport or config.server.transport
     host = args.host or config.server.host
