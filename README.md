@@ -149,20 +149,29 @@ verify_ssl = true
 
 All available options with detailed descriptions are documented in [`config.example.toml`](config.example.toml).
 
-#### Zabbix API token
+#### Authentication — two tokens explained
 
-The MCP server authenticates to Zabbix using an [API token](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens). The token inherits all permissions of the Zabbix user it belongs to.
+The config file contains **two different tokens** that serve different purposes:
 
-**How to create one:**
+```
+┌─────────────┐    auth_token     ┌──────────────────┐    api_token     ┌────────────────┐
+│  MCP Client ├───────────────────►  MCP Server      ├──────────────────►  Zabbix Server  │
+│  (AI / IDE) │   (optional)      │  (zabbix-mcp)    │   (required)     │                │
+└─────────────┘                   └──────────────────┘                  └────────────────┘
+```
+
+**`api_token`** (in `[zabbix.*]`) — **required** — authenticates the MCP server to your Zabbix instance. This is a [Zabbix API token](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens) that you create in the Zabbix frontend.
+
+How to create one:
 
 1. In Zabbix frontend: **Users → API tokens → Create API token**
 2. Select the user the token will belong to
 3. Optionally set an expiration date
 4. Copy the generated token — it is shown only once
 
-**What user role/permissions are needed:**
+The token inherits the permissions of the Zabbix user it belongs to:
 
-| Use case | Recommended role | `read_only` config |
+| Use case | Recommended Zabbix role | `read_only` config |
 |----------|------------------|--------------------|
 | Read-only monitoring (problems, hosts, dashboards) | **User** role with read access to needed host groups | `true` |
 | Full management (create hosts, templates, triggers) | **Admin** role with read-write access to target host groups | `false` |
@@ -170,31 +179,22 @@ The MCP server authenticates to Zabbix using an [API token](https://www.zabbix.c
 
 Use the principle of least privilege — create a dedicated Zabbix user for the MCP server with only the permissions it needs.
 
-#### Authentication
-
-The HTTP endpoint can be protected with a bearer token. There are two ways to configure it:
-
-**Option 1** - token directly in config:
-
-```toml
-[server]
-auth_token = "your-secret-token-here"
-```
-
-**Option 2** - token from environment variable (recommended for production):
-
-```toml
-[server]
-auth_token = "${MCP_AUTH_TOKEN}"
-```
-
-When `auth_token` is set, all clients must include it in the `Authorization` header:
+**`auth_token`** (in `[server]`) — **optional** — protects the MCP server itself from unauthorized access. When set, MCP clients must include it in every request:
 
 ```
 Authorization: Bearer your-secret-token-here
 ```
 
-When `auth_token` is not set, the server accepts unauthenticated connections. This is only safe when the server is bound to `127.0.0.1` (default).
+```toml
+[server]
+# Option 1 - token directly in config:
+auth_token = "your-secret-token-here"
+
+# Option 2 - token from environment variable (recommended for production):
+# auth_token = "${MCP_AUTH_TOKEN}"
+```
+
+When `auth_token` is not set, the MCP server accepts unauthenticated connections. This is safe when bound to `127.0.0.1` (default) but **must be set** when the server is exposed to the network (`0.0.0.0`).
 
 #### Multiple Zabbix servers
 

@@ -46,11 +46,13 @@ log_level = "info"
 # The default path below has logrotate configured by the install script (daily, 30 days).
 log_file = "/var/log/zabbix-mcp/server.log"
 
-# Bearer token for HTTP transport authentication.
-# When set, clients must send this token in the Authorization header:
-#   Authorization: Bearer <token>
-# When not set, the HTTP server accepts unauthenticated connections
-# (only safe when bound to 127.0.0.1).
+# Bearer token for MCP server authentication (OPTIONAL).
+# This protects the MCP server itself — MCP clients must send this token
+# in the Authorization header: Authorization: Bearer <token>
+# NOTE: This is NOT the Zabbix API token. The Zabbix API token is configured
+# below in the [zabbix.*] section and is REQUIRED.
+# When not set, the MCP server accepts unauthenticated connections
+# (safe when bound to 127.0.0.1, must be set when using 0.0.0.0).
 #
 # Option 1 - token directly in config:
 # auth_token = "your-secret-token-here"
@@ -252,9 +254,10 @@ rate_limit = 300
 # The /api_jsonrpc.php path is added automatically by the API client.
 url = "https://zabbix.example.com"
 
-# API token for authentication. Must not be empty.
+# Zabbix API token for authentication (REQUIRED).
+# This authenticates the MCP server to Zabbix — NOT the same as auth_token above.
 # Create one in Zabbix: User settings > API tokens > Create API token.
-# Tokens inherit the permissions of the user they belong to.
+# Tokens inherit the permissions of the Zabbix user they belong to.
 api_token = "your-api-token-here"
 
 # You can reference an environment variable instead of storing the token in plain text:
