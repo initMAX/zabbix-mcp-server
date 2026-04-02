@@ -804,9 +804,12 @@ def _build_zabbix_params(
         if isinstance(sev_min, int) and 0 <= sev_min <= 5:
             params["severities"] = list(range(sev_min, 6))
 
-    # Merge extra_params (selectXxx, etc.) — typed params take precedence
+    # Merge extra_params (selectXxx, etc.) — typed params take precedence.
+    # Keys must be alphanumeric (reject injection attempts like __proto__).
     if "extra_params" in args and isinstance(args["extra_params"], dict):
         for k, v in args["extra_params"].items():
+            if not isinstance(k, str) or not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", k):
+                continue
             params.setdefault(k, v)
 
     return params
@@ -1116,21 +1119,19 @@ def _register_tools(
     # Health check tool
     async def health_check() -> str:
         """Check the health of the MCP server and its connections to Zabbix servers.
-        Returns the status of each configured Zabbix server (version, connectivity)."""
-        from zabbix_mcp import __version__
+        Returns the connectivity status of each configured Zabbix server."""
         results: dict[str, Any] = {
             "mcp_server": "ok",
-            "version": __version__,
-            "tools": count,
             "zabbix_servers": {},
         }
         for name in client_manager.server_names:
             try:
                 client = client_manager._get_client(name)
-                version = client.api_version()
-                results["zabbix_servers"][name] = {"status": "ok", "zabbix_version": str(version)}
+                client.api_version()
+                results["zabbix_servers"][name] = {"status": "ok"}
             except Exception as e:
-                results["zabbix_servers"][name] = {"status": "error", "error": str(e)}
+                logger.warning("Health check failed for '%s': %s", name, e)
+                results["zabbix_servers"][name] = {"status": "error"}
         return json.dumps(results, indent=2)
 
     mcp.add_tool(health_check)

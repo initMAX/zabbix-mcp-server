@@ -6,6 +6,7 @@ dist/
 build/
 .venv/
 .env
+.env.*
 *.toml
 !config.example.toml
 !pyproject.toml
@@ -19,3 +20,8 @@ tests/stress_test_*.py
 tests/verify_ui.js
 tests/integration/
 .DS_Store
+*.key
+*.pem
+*.p12
+secrets.*
+credentials.*

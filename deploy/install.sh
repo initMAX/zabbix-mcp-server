@@ -74,6 +74,12 @@ NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
 ReadWritePaths=/var/log/zabbix-mcp
 
 [Install]
@@ -156,7 +162,9 @@ do_install() {
         info "Copying example config to $CONFIG_DIR/config.toml..."
         cp "$SCRIPT_DIR/config.example.toml" "$CONFIG_DIR/config.toml"
         # Set transport to http for systemd deployment
-        sed -i 's/^transport = "stdio"/transport = "http"/' "$CONFIG_DIR/config.toml"
+        if ! sed -i 's/^transport = "stdio"/transport = "http"/' "$CONFIG_DIR/config.toml"; then
+            warn "Failed to set transport to http — edit $CONFIG_DIR/config.toml manually."
+        fi
         chmod 600 "$CONFIG_DIR/config.toml"
         chown "$SERVICE_USER:$SERVICE_USER" "$CONFIG_DIR/config.toml"
     else

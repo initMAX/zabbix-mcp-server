@@ -1373,7 +1373,7 @@ _CONFIGURATION_METHODS: list[MethodDef] = [
             "Returns a diff showing what would be created, updated, or deleted. Useful for "
             "dry-run validation before an actual import."
         ),
-        read_only=False,
+        read_only=True,
         params=[
             ParamDef(
                 "params", "dict",
