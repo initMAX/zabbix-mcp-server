@@ -1228,40 +1228,40 @@ def run_server(
 
     # Security status summary at startup
     if transport in ("http", "sse"):
-        logger.info("--- Security status ---")
+        logger.warning("--- Security status ---")
 
         # Authentication
         if config.server.auth_token:
-            logger.info("  auth_token:         ENABLED")
+            logger.warning("  auth_token:         ENABLED")
         else:
             logger.warning("  auth_token:         DISABLED — server is unauthenticated!")
 
         # TLS
         if config.server.tls_cert_file:
-            logger.info("  TLS:                ENABLED (cert: %s)", config.server.tls_cert_file)
+            logger.warning("  TLS:                ENABLED (cert: %s)", config.server.tls_cert_file)
         else:
             if host != "127.0.0.1":
                 logger.warning("  TLS:                DISABLED — traffic is unencrypted on %s!", host)
             else:
-                logger.info("  TLS:                disabled (localhost only)")
+                logger.warning("  TLS:                disabled (localhost only)")
 
         # IP allowlist
         if config.server.allowed_hosts:
-            logger.info("  IP allowlist:       ENABLED (%d entries)", len(config.server.allowed_hosts))
+            logger.warning("  IP allowlist:       ENABLED (%d entries)", len(config.server.allowed_hosts))
         else:
             logger.warning("  IP allowlist:       DISABLED — no IP restrictions")
 
         # CORS
         if config.server.cors_origins is None:
-            logger.info("  CORS:               disabled (no cross-origin access)")
+            logger.warning("  CORS:               disabled (no cross-origin access)")
         elif "*" in config.server.cors_origins:
             logger.warning("  CORS:               WILDCARD '*' — any origin can access this server!")
         else:
-            logger.info("  CORS:               ENABLED (%d origins)", len(config.server.cors_origins))
+            logger.warning("  CORS:               ENABLED (%d origins)", len(config.server.cors_origins))
 
         # Rate limiting
         if config.server.rate_limit > 0:
-            logger.info("  Rate limit:         %d calls/min per client", config.server.rate_limit)
+            logger.warning("  Rate limit:         %d calls/min per client", config.server.rate_limit)
         else:
             logger.warning("  Rate limit:         DISABLED — no request throttling")
 
@@ -1270,20 +1270,20 @@ def run_server(
         if writable:
             logger.warning("  Read-only:          DISABLED for: %s", ", ".join(writable))
         else:
-            logger.info("  Read-only:          all servers read-only")
+            logger.warning("  Read-only:          all servers read-only")
 
         # SSL verification
         no_ssl = [n for n, s in config.zabbix_servers.items() if not s.verify_ssl]
         if no_ssl:
             logger.warning("  SSL verification:   DISABLED for: %s", ", ".join(no_ssl))
         else:
-            logger.info("  SSL verification:   all servers verified")
+            logger.warning("  SSL verification:   all servers verified")
 
         # File import sandbox
         if config.server.allowed_import_dirs:
-            logger.info("  source_file:        ENABLED (%d directories)", len(config.server.allowed_import_dirs))
+            logger.warning("  source_file:        ENABLED (%d directories)", len(config.server.allowed_import_dirs))
         else:
-            logger.info("  source_file:        disabled (secure default)")
+            logger.warning("  source_file:        disabled (secure default)")
 
         # Count warnings and show hint
         warnings = []
@@ -1305,8 +1305,8 @@ def run_server(
                 "Adjust in config.toml: %s", ", ".join(warnings),
             )
         else:
-            logger.info("  All security features are properly configured.")
-        logger.info("-----------------------")
+            logger.warning("  All security features are properly configured.")
+        logger.warning("-----------------------")
 
     mcp = FastMCP(
         name="zabbix-mcp-server",
