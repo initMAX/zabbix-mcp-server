@@ -18,7 +18,7 @@ services:
   zabbix-mcp-server:
     build: .
     container_name: zabbix-mcp-server
-    restart: unless-stopped
+    restart: always
     # MCP_HOST  - host interface to bind on the Docker host (default: 127.0.0.1)
     # MCP_PORT  - port used inside the container and exposed on the Docker host (default: 8080)
     # Set these in .env to override without editing this file.
