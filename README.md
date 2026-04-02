@@ -374,6 +374,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 <table>
 <tr><th width="220">Zabbix Version</th><th width="120">Status</th><th>Notes</th></tr>
+<tr><td>8.0</td><td>Experimental</td><td>Works with <code>skip_version_check = true</code> — core API methods tested, some 8.0-specific methods may not be covered yet</td></tr>
 <tr><td>7.0 LTS, 7.2, 7.4</td><td>Fully supported</td><td>All API methods match this version — complete feature coverage</td></tr>
 <tr><td>6.0 LTS, 6.2, 6.4</td><td>Supported</td><td>Core methods work, some newer API methods (e.g. proxy groups, MFA) may return errors</td></tr>
 <tr><td>5.0 LTS, 5.2, 5.4</td><td>Basic support</td><td>Core monitoring and data collection work, newer features unavailable</td></tr>
