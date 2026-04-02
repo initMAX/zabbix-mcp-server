@@ -293,10 +293,10 @@ Where to put this config depends on the client. **Claude Code is recommended** �
 | Client | Config location | Free tier |
 |---|---|---|
 | **Claude Code** (recommended) | `.mcp.json` in project root or `~/.claude/settings.json` for global | — |
+| **OpenAI Codex** (recommended) | MCP server settings in the Codex configuration | — |
 | Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows) | Yes |
 | VS Code + GitHub Copilot | `.vscode/mcp.json` in workspace | Yes |
 | ChatGPT (initMAX widget) | MCP server settings in the widget configuration | — |
-| OpenAI Codex | MCP server settings in the Codex configuration | — |
 | Cursor | MCP server settings in Cursor IDE | Yes |
 | JetBrains IDEs | MCP server settings in the IDE | — |
 
