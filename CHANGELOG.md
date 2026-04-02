@@ -18,6 +18,8 @@
 
 ### Improved
 
+- **Parameter sanitization from production logs** — LLMs copying fields from YAML templates caused recurring Zabbix API rejections; the server now auto-strips: `description` from trigger dependencies, `formulaid` from discovery rule filter conditions, `vendor` from template.update, and clears `error_handler_params` when `error_handler` is DEFAULT (0)
+- **Uvicorn access logs suppressed** — uvicorn's built-in access log format (`INFO: 10.0.0.1:port - "POST /mcp..."`) was mixing with the app's structured log format, making log parsing difficult; disabled in favor of the app's own request logging
 - **`ClientManager.check_connection()`** — new public method for health checks, replacing direct access to private `_get_client()`
 - **Dockerfile** — removed redundant `pip install pip`; added `HEALTHCHECK` instruction for container orchestration
 - **`pyproject.toml`** — added `Repository` URL to project metadata

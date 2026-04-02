@@ -451,6 +451,13 @@ def _normalize_preprocessing(params: dict[str, Any]) -> dict[str, Any]:
                     step["error_handler_params"] = ""
                     changed = True
 
+                # Clear error_handler_params when error_handler is DEFAULT (0)
+                # — Zabbix rejects non-empty params with "value must be empty".
+                eh = step.get("error_handler")
+                if (eh == 0 or eh == "0") and step.get("error_handler_params"):
+                    step["error_handler_params"] = ""
+                    changed = True
+
     if changed:
         return {**params, "preprocessing": steps}
     return params
@@ -496,6 +503,39 @@ def _normalize_nested_dchecks(params: dict[str, Any]) -> dict[str, Any]:
             changed = True
 
     return params
+
+
+def _sanitize_create_params(params: dict[str, Any], api_method: str) -> None:
+    """Strip read-only and unsupported fields that LLMs copy from YAML templates.
+
+    Zabbix API rejects these with "unexpected parameter" errors.  Removing
+    them silently lets the create/update succeed without requiring the LLM
+    to know which fields are read-only in each context.
+    """
+    # trigger/triggerprototype: dependencies[].description is read-only
+    if api_method in ("trigger.create", "trigger.update",
+                      "triggerprototype.create", "triggerprototype.update"):
+        deps = params.get("dependencies")
+        if isinstance(deps, list):
+            for dep in deps:
+                if isinstance(dep, dict):
+                    dep.pop("description", None)
+
+    # discoveryrule: filter.conditions[].formulaid must be empty when
+    # formula type is AND/OR (Zabbix auto-assigns formulaid).
+    if api_method in ("discoveryrule.create", "discoveryrule.update",
+                      "discoveryruleprototype.create", "discoveryruleprototype.update"):
+        filt = params.get("filter")
+        if isinstance(filt, dict):
+            conditions = filt.get("conditions")
+            if isinstance(conditions, list):
+                for cond in conditions:
+                    if isinstance(cond, dict):
+                        cond.pop("formulaid", None)
+
+    # template.update: vendor is read-only (set during import only)
+    if api_method == "template.update":
+        params.pop("vendor", None)
 
 
 def _auto_wrap_arrays(params: dict[str, Any]) -> dict[str, Any]:
@@ -772,6 +812,11 @@ def _build_zabbix_params(
                     item_type = -1
                 if "delay" not in params and item_type not in _NO_DELAY_TYPES and item_type >= 0:
                     params["delay"] = "1m"
+
+            # Strip read-only/unsupported fields that LLMs copy from YAML templates.
+            # Without this, Zabbix API rejects the request with "unexpected parameter".
+            _sanitize_create_params(params, method_def.api_method)
+
         return params
 
     # For get methods: build params dict from individual arguments
@@ -1401,6 +1446,7 @@ def run_server(
                 "host": host,
                 "port": port,
                 "log_level": config.server.log_level.lower(),
+                "access_log": False,  # Suppress uvicorn access logs — they mix formats with app logs
             }
             if config.server.tls_cert_file and config.server.tls_key_file:
                 uvicorn_kwargs["ssl_certfile"] = config.server.tls_cert_file
