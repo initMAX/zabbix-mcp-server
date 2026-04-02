@@ -142,7 +142,7 @@ rate_limit = 300
 #   3. Zabbix User Roles - enforce method-level access control at the API level
 
 # Filter which tool groups are exposed via MCP.
-# When not set or commented out, all ~220 tools are registered (default).
+# When not set or commented out, all ~225 tools are registered (default).
 # This is useful when your LLM has a tool limit (e.g. OpenAI max 128 tools).
 #
 # Use category names to include entire groups at once, individual tool prefixes,
@@ -154,7 +154,7 @@ rate_limit = 300
 #
 # Categories and their tools:
 #
-#   "monitoring" (77 tools):
+#   "monitoring" (82 tools):
 #     dcheck_get
 #     dhost_get
 #     discoveryrule_create, discoveryrule_delete, discoveryrule_get, discoveryrule_update
@@ -174,6 +174,7 @@ rate_limit = 300
 #     item_create, item_delete, item_get, item_update
 #     itemprototype_create, itemprototype_delete, itemprototype_get, itemprototype_update
 #     problem_get
+#     sla_create, sla_delete, sla_get, sla_getsli, sla_update
 #     trend_get
 #     trigger_create, trigger_delete, trigger_get, trigger_update
 #     triggerprototype_create, triggerprototype_delete, triggerprototype_get, triggerprototype_update

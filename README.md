@@ -50,7 +50,7 @@
     <a href="https://github.com/initMAX/zabbix-mcp-server/releases"><img alt="Version" src="https://img.shields.io/github/v/release/initMAX/zabbix-mcp-server?color=%231f65f4&label=version"></a>&nbsp;
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue"></a>&nbsp;
     <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">&nbsp;
-    <img alt="Tools" src="https://img.shields.io/badge/tools-220-green">&nbsp;
+    <img alt="Tools" src="https://img.shields.io/badge/tools-225-green">&nbsp;
     <img alt="Zabbix" src="https://img.shields.io/badge/zabbix-5.0%E2%80%948.0-red">&nbsp;
     <a href="https://safeskill.dev/scan/initmax-zabbix-mcp-server"><img alt="SafeSkill" src="https://img.shields.io/badge/SafeSkill-100%2F100_Verified%20Safe-brightgreen"></a>
 </div>
@@ -309,9 +309,10 @@ All tools accept an optional `server` parameter to target a specific Zabbix inst
 
 <table>
 <tr><th width="160">Category</th><th width="340">Tool</th><th>Description</th></tr>
-<tr><td rowspan="4"><strong>Monitoring</strong></td><td><code>problem_get</code></td><td>Get active problems and alerts — the primary tool for checking what is wrong right now</td></tr>
+<tr><td rowspan="5"><strong>Monitoring</strong></td><td><code>problem_get</code></td><td>Get active problems and alerts — the primary tool for checking what is wrong right now</td></tr>
 <tr><td><code>event_get</code> / <code>event_acknowledge</code></td><td>Retrieve events and acknowledge, close, or comment on them</td></tr>
 <tr><td><code>history_get</code> / <code>trend_get</code></td><td>Query raw historical metric data or aggregated trends for capacity planning</td></tr>
+<tr><td><code>sla_get</code> / <code>sla_getsli</code></td><td>Manage SLAs and retrieve calculated service availability (SLI) data</td></tr>
 <tr><td><code>dashboard_*</code> / <code>map_*</code></td><td>Create, update, and manage dashboards and network maps</td></tr>
 <tr><td rowspan="6"><strong>Data Collection</strong></td><td><code>host_*</code> / <code>hostgroup_*</code></td><td>Manage monitored hosts, host groups, and their membership</td></tr>
 <tr><td><code>item_*</code> / <code>trigger_*</code> / <code>graph_*</code></td><td>Manage data collection items, trigger expressions, and graphs</td></tr>
