@@ -20,6 +20,7 @@ tests/stress_test_*.py
 tests/verify_ui.js
 tests/integration/
 .DS_Store
+.claude/
 *.key
 *.pem
 *.p12

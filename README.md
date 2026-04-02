@@ -214,13 +214,17 @@ read_only = false
 
 The first server (`production`) is used as the default. To target a specific instance, just mention it naturally in your prompt:
 
-| Prompt | Target server |
-|---|---|
-| *"Show me hosts with high CPU usage"* | `production` (default) |
-| *"Show me hosts in our staging Zabbix instance"* | `staging` |
-| *"Compare trigger counts between production and staging"* | both |
-| *"Create a maintenance window on staging for tonight"* | `staging` |
-| *"Migrate host 'web-01' from production to staging"* | both |
+| Prompt                                                           | Target server        | What happens                                                        |
+|------------------------------------------------------------------|----------------------|---------------------------------------------------------------------|
+| *"Show me hosts with high CPU usage"*                            | `production` (default) | Queries the first defined server automatically                    |
+| *"Show me hosts in our staging Zabbix instance"*                 | `staging`            | AI recognizes "staging" and routes to the matching server            |
+| *"What are the top triggers in the last hour on production?"*    | `production`         | Explicit mention of "production" confirms the default               |
+| *"Compare trigger counts between production and staging"*        | both                 | AI queries both servers and combines the results                    |
+| *"Create a maintenance window on staging for tonight"*           | `staging`            | Write operation routed to staging (requires `read_only = false`)    |
+| *"Acknowledge all disaster problems on production"*              | `production`         | Write operation on production (blocked if `read_only = true`)       |
+| *"Export the 'Linux by Zabbix agent' template from production"*  | `production`         | Read-only export, works even with `read_only = true`                |
+| *"Import this template to staging"*                              | `staging`            | Write operation routed to staging                                   |
+| *"Migrate host 'web-01' from production to staging"*             | both                 | AI reads from production, creates on staging                        |
 
 The AI assistant maps your natural language to the correct `server` parameter automatically — no need to use technical syntax like `server = "staging"` in your prompts.
 
