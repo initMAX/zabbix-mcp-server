@@ -13,9 +13,16 @@ Full adversarial security audit of the entire codebase ([#2](https://github.com/
 - **Rate limiter memory exhaustion** — each unique client ID created an unbounded bucket; an attacker could exhaust server memory by sending requests with random client identifiers; hard cap of 1,000 buckets with LRU eviction added; also fixed `sum(1 for _ in ...)` → `len()`
 - **Log file path traversal** — `log_file` config accepted any path without validation (e.g. `/etc/cron.d/exploit`); now restricted to `/var/log`, `/tmp`, or the user's home directory
 - **Error messages leaked internals** — unhandled exceptions (stack traces, connection strings, internal paths) were returned to MCP clients; replaced with generic `"API call failed — check server logs"` message; full details logged server-side only
-- **Health endpoint information disclosure** — unauthenticated `/health` endpoint returned server version and tool count, aiding reconnaissance; now returns only `{"status": "ok"}`
+- **Health endpoint information disclosure** — unauthenticated `/health` endpoint returned server version and tool count, aiding reconnaissance; now returns only `{"status": "ok"}`; the `health_check` MCP tool no longer exposes server version, tool count, or Zabbix versions — returns only connectivity status
+- **`configuration.importcompare` incorrect write flag** — dry-run comparison method was marked `read_only=False`, blocking it on read-only servers even though it makes no changes; corrected to `read_only=True`
+- **`extra_params` key injection** — pass-through dict accepted arbitrary keys including `__proto__` or dunder patterns; now validated with `^[a-zA-Z][a-zA-Z0-9_]*$`
 - **Dependency version pinning** — `mcp>=1.1.3` and `zabbix-utils>=2.0.2` had no upper bounds, allowing automatic installation of future major versions with potential breaking changes or supply-chain issues; added `<2.0` and `<3.0` caps
 - **Default rate limit mismatch** — `load_config` used a hardcoded default of 60 while `ServerConfig` dataclass and `config.example.toml` documented 300; aligned to 300
+- **Incomplete `.dockerignore`** — missing exclusions for `config.toml`, `.env*`, `.mcp.json`, `*.key`, `*.pem`, `*.p12`; sensitive files could leak into Docker image layers
+- **Incomplete `.gitignore`** — missing patterns for `*.key`, `*.pem`, `*.p12`, `secrets.*`, `credentials.*`, `.env.*`
+- **Dockerfile base image unpinned** — `python:3.13-slim` replaced with `python:3.13.5-slim` to prevent silent base image changes
+- **Systemd unit insufficient hardening** — added `PrivateDevices`, `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`, `RestrictSUIDSGID`, `RestrictNamespaces`
+- **`install.sh` silent sed failure** — config modification via `sed` could fail silently; added error checking with user warning
 
 ### Added
 

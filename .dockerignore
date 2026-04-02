@@ -7,3 +7,16 @@ build
 *.egg-info
 .readme
 tests
+.mcp.json
+.mcp.json.example
+.env
+.env.*
+config.toml
+*.key
+*.pem
+*.p12
+.DS_Store
+.claude
+.github
+node_modules
+test-results

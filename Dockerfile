@@ -15,7 +15,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-FROM python:3.13-slim AS builder
+FROM python:3.13.5-slim AS builder
 
 WORKDIR /build
 COPY . .
@@ -23,7 +23,7 @@ RUN python -m venv /opt/zabbix-mcp/venv \
     && /opt/zabbix-mcp/venv/bin/pip install --no-cache-dir --quiet . \
     && /opt/zabbix-mcp/venv/bin/pip install --no-cache-dir --quiet pip
 
-FROM python:3.13-slim
+FROM python:3.13.5-slim
 
 LABEL maintainer="initMAX s.r.o. <info@initmax.com>"
 LABEL org.opencontainers.image.title="Zabbix MCP Server"
