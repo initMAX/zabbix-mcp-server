@@ -43,6 +43,7 @@ log_level = "info"
 
 # Path to a log file. When set, logs are written to this file INSTEAD of stderr.
 # The parent directory must exist (the install script creates /var/log/zabbix-mcp/).
+# The default path below has logrotate configured by the install script (daily, 30 days).
 log_file = "/var/log/zabbix-mcp/server.log"
 
 # Bearer token for HTTP transport authentication.
