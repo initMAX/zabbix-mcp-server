@@ -39,11 +39,14 @@ Full adversarial security audit of the entire codebase ([#2](https://github.com/
 
 - **Duplicate log lines** — when `log_file` pointed to the same file as systemd `StandardError=append`, every line appeared twice; logging now writes only to file when `log_file` is set (skips stderr), or only to stderr when `log_file` is not set
 - **Logging configured on root logger** — `logging.basicConfig` added handlers to the root logger causing propagation duplicates; now configures named `zabbix_mcp` and `mcp` loggers directly with `propagate=False` and silences root logger handlers
+- **Security status log level** — all startup security summary lines now use WARNING level so the entire block is visible together when filtering logs by severity; the final "all features configured" message uses INFO
 
 ### Improved
 
 - **HTTP transport uses uvicorn directly** — for HTTP and SSE transports, the server now builds the ASGI app from FastMCP and runs uvicorn directly, enabling TLS, CORS middleware, and IP allowlist without patching the framework
 - **`SECURITY.md` updated** — documents all new security features (TLS, CORS, IP allowlist, file sandbox, read-only enforcement on raw API calls); version table updated
+- **Related Projects section in README** — added link to Zabbix AI Skills
+- **`.gitignore`** — added `.DS_Store` exclusion
 
 ## v1.10 — 2026-03-31
 
