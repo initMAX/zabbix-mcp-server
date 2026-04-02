@@ -1293,7 +1293,17 @@ def run_server(
         )
         logger.info("Bearer token authentication enabled")
     elif transport in ("http", "sse") and not config.server.auth_token:
-        logger.warning("No auth_token configured — HTTP server is unauthenticated!")
+        if host == "127.0.0.1":
+            logger.info(
+                "No auth_token configured — server accepts unauthenticated "
+                "connections (safe: listening on localhost only)"
+            )
+        else:
+            logger.warning(
+                "No auth_token configured — server is unauthenticated on %s! "
+                "Set auth_token in config.toml to require bearer token authentication.",
+                host,
+            )
 
     # Security status summary at startup
     if transport in ("http", "sse"):
@@ -1302,6 +1312,8 @@ def run_server(
         # Authentication
         if config.server.auth_token:
             logger.warning("  auth_token:         ENABLED")
+        elif host == "127.0.0.1":
+            logger.warning("  auth_token:         not set (localhost only — OK)")
         else:
             logger.warning("  auth_token:         DISABLED — server is unauthenticated!")
 
