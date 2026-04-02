@@ -33,6 +33,7 @@ zabbix-mcp-server = "zabbix_mcp.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/initMAX/zabbix-mcp-server"
+Repository = "https://github.com/initMAX/zabbix-mcp-server"
 Issues = "https://github.com/initMAX/zabbix-mcp-server/issues"
 
 [tool.hatch.build.targets.wheel]

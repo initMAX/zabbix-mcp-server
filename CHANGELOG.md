@@ -5,6 +5,22 @@
 ### Security
 
 - **`zabbix_raw_api_call` switched from write-suffix blacklist to read-only whitelist** — previously, the raw API call tool blocked write operations by matching a hardcoded list of write suffixes (`.create`, `.update`, `.delete`, etc.); any new Zabbix API method with an unlisted suffix would bypass `read_only` enforcement; now uses a two-layer whitelist: first checks against known read-only methods from tool definitions (`ALL_METHODS`), then falls back to a conservative suffix whitelist (`.get`, `.export`, etc.); unknown methods are blocked by default on read-only servers
+- **`source_file` symlink check reordered** — symlink detection now runs before `Path.resolve()` to prevent following symlinks before rejecting them
+- **Config validation hardened** — `log_level`, `port` (1–65535), Zabbix server `url` (must start with `http://` or `https://`), and empty `api_token` after env var resolution are now validated at config load time instead of failing at runtime
+
+### Fixed
+
+- **Blocking I/O in async handlers** — all Zabbix API calls (`client_manager.call`, `get_version`, `check_connection`) are now wrapped in `asyncio.to_thread()` to avoid blocking the event loop on HTTP/SSE transports with concurrent clients
+- **`int()` crash in delay auto-fill** — if an unrecognized item type string survived enum normalization, `int(params["type"])` would raise `ValueError`; now caught gracefully
+- **Hardcoded `user.checkAuthentication` exception** — default `output: extend` was skipped via a hardcoded method name check; now dynamically checks whether the method's parameter list includes an `output` parameter
+- **Integration test `test_health.py`** — removed assertions for `version` and `tools` fields that were dropped from the `health_check` tool in v1.11
+- **`_normalize_nested_interfaces` / `_normalize_nested_dchecks`** — removed unnecessary shallow copy of params dict on mutation (interfaces/dchecks are mutated in-place)
+
+### Improved
+
+- **`ClientManager.check_connection()`** — new public method for health checks, replacing direct access to private `_get_client()`
+- **Dockerfile** — removed redundant `pip install pip`; added `HEALTHCHECK` instruction for container orchestration
+- **`pyproject.toml`** — added `Repository` URL to project metadata
 
 ## v1.11 — 2026-04-02
 
