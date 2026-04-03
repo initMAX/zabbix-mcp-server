@@ -631,8 +631,10 @@ do_update() {
 
     # Pull latest code if we're in a git repo
     if [[ -d "$SCRIPT_DIR/.git" ]]; then
-        spin "Pulling latest changes from git" git -C "$SCRIPT_DIR" pull --ff-only || \
-            warn "Git pull failed — continuing with current local version."
+        local pull_output
+        pull_output=$(git -C "$SCRIPT_DIR" pull --ff-only 2>&1) && \
+            ok "Git pull: $pull_output" || \
+            warn "Git pull skipped — local changes or no network. Continuing with current version."
     fi
 
     # Show current version
