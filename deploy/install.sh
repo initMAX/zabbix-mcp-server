@@ -50,6 +50,19 @@ get_configured_port() {
     echo "$DEFAULT_PORT"
 }
 
+get_configured_host() {
+    local config_file="$CONFIG_DIR/config.toml"
+    if [[ -f "$config_file" ]]; then
+        local host
+        host=$(grep -E '^\s*host\s*=' "$config_file" | head -1 | sed 's/.*=\s*//' | tr -d ' "'\''')
+        if [[ -n "$host" ]]; then
+            echo "$host"
+            return
+        fi
+    fi
+    echo "127.0.0.1"
+}
+
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
@@ -310,7 +323,12 @@ check_firewall_and_selinux() {
 # --------------------------------------------------------------------------- #
 check_health() {
     local port="${1:-$DEFAULT_PORT}"
-    local url="http://localhost:${port}/health"
+    local configured_host="${2:-127.0.0.1}"
+    # For curl, always use 127.0.0.1 (0.0.0.0 binds all interfaces, including localhost)
+    local curl_host="127.0.0.1"
+    local url="http://${curl_host}:${port}/health"
+
+    info "Server configured on ${configured_host}:${port}"
 
     if ! command -v curl &>/dev/null; then
         warn "curl is not installed — skipping health check."
@@ -512,8 +530,9 @@ do_install() {
     install_logrotate
 
     # Firewall & SELinux checks
-    local active_port
+    local active_port active_host
     active_port=$(get_configured_port)
+    active_host=$(get_configured_host)
     check_firewall_and_selinux "$active_port"
 
     echo
@@ -527,7 +546,7 @@ do_install() {
     echo "  5. View logs:        tail -f $LOG_DIR/server.log"
     echo "  6. Health check:     curl http://localhost:$active_port/health"
     echo
-    echo "  Endpoints (from config.toml, port $active_port):"
+    echo "  Endpoints (from config.toml — ${active_host}:${active_port}):"
     echo "    MCP endpoint:  http://localhost:$active_port/mcp"
     echo "    Health check:  http://localhost:$active_port/health"
     echo
@@ -580,7 +599,7 @@ do_update() {
             systemctl restart "$SERVICE_NAME"
             ok "Service restarted."
             # Health check after restart
-            check_health "$(get_configured_port)"
+            check_health "$(get_configured_port)" "$(get_configured_host)"
         else
             warn "Service is not running. Start with: sudo systemctl start $SERVICE_NAME"
         fi
