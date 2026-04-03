@@ -35,6 +35,22 @@ DRY_RUN=false
 AUTO_INSTALL_PYTHON=false
 
 # --------------------------------------------------------------------------- #
+# Read port from config.toml (falls back to DEFAULT_PORT)
+# --------------------------------------------------------------------------- #
+get_configured_port() {
+    local config_file="$CONFIG_DIR/config.toml"
+    if [[ -f "$config_file" ]]; then
+        local port
+        port=$(grep -E '^\s*port\s*=' "$config_file" | head -1 | sed 's/.*=\s*//' | tr -d ' "'\''')
+        if [[ -n "$port" && "$port" =~ ^[0-9]+$ ]]; then
+            echo "$port"
+            return
+        fi
+    fi
+    echo "$DEFAULT_PORT"
+}
+
+# --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
 info()  { echo -e "\e[1;34m>>>\e[0m $*"; }
@@ -440,7 +456,7 @@ do_dry_run() {
     fi
 
     # Firewall & SELinux
-    check_firewall_and_selinux "$DEFAULT_PORT"
+    check_firewall_and_selinux "$(get_configured_port)"
 
     echo
     ok "=== Dry run complete — no changes made ==="
@@ -496,7 +512,9 @@ do_install() {
     install_logrotate
 
     # Firewall & SELinux checks
-    check_firewall_and_selinux "$DEFAULT_PORT"
+    local active_port
+    active_port=$(get_configured_port)
+    check_firewall_and_selinux "$active_port"
 
     echo
     ok "=== Installation complete ==="
@@ -507,11 +525,11 @@ do_install() {
     echo "  3. Enable on boot:   sudo systemctl enable $SERVICE_NAME"
     echo "  4. Check status:     sudo systemctl status $SERVICE_NAME"
     echo "  5. View logs:        tail -f $LOG_DIR/server.log"
-    echo "  6. Health check:     curl http://localhost:$DEFAULT_PORT/health"
+    echo "  6. Health check:     curl http://localhost:$active_port/health"
     echo
-    echo "  Endpoints (default config):"
-    echo "    MCP endpoint:  http://localhost:$DEFAULT_PORT/mcp"
-    echo "    Health check:  http://localhost:$DEFAULT_PORT/health"
+    echo "  Endpoints (from config.toml, port $active_port):"
+    echo "    MCP endpoint:  http://localhost:$active_port/mcp"
+    echo "    Health check:  http://localhost:$active_port/health"
     echo
 }
 
@@ -562,7 +580,7 @@ do_update() {
             systemctl restart "$SERVICE_NAME"
             ok "Service restarted."
             # Health check after restart
-            check_health "$DEFAULT_PORT"
+            check_health "$(get_configured_port)"
         else
             warn "Service is not running. Start with: sudo systemctl start $SERVICE_NAME"
         fi
