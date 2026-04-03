@@ -23,9 +23,13 @@ cd tests/installer
 | `Dockerfile.rhel9` | Rocky Linux 9 | python3.11 | Full install succeeds |
 | `Dockerfile.alma9` | AlmaLinux 9 | python3.11 | Full install succeeds |
 | `Dockerfile.oracle9` | Oracle Linux 9 | python3.11 | Full install succeeds |
+| `Dockerfile.rhel8-autoinstall` | Rocky Linux 8 | python3.9 → auto 3.12 | `--install-python` installs Python and succeeds |
 | `Dockerfile.rhel10` | Rocky Linux 10 | python3.12 | Full install succeeds |
 | `Dockerfile.alma10` | AlmaLinux 10 | python3.12 | Full install succeeds |
 | `Dockerfile.oracle10` | Oracle Linux 10 | python3.12 | Full install succeeds |
+| `Dockerfile.fedora` | Fedora (latest) | python3.13+ | Full install succeeds |
+| `Dockerfile.amazon2023` | Amazon Linux 2023 | python3.11 | Full install succeeds |
+| `Dockerfile.suse15` | openSUSE Leap 15 | python3.11 | Full install succeeds |
 | `Dockerfile.ubuntu22` | Ubuntu 22.04 | python3.10 | Full install succeeds |
 | `Dockerfile.ubuntu24` | Ubuntu 24.04 | python3.12 | Full install succeeds |
 | `Dockerfile.debian12` | Debian 12 | python3.11 | Full install succeeds |

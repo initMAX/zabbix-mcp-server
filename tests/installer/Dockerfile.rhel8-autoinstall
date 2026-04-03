@@ -1,0 +1,14 @@
+# RHEL 8 / Rocky 8 — test --install-python flag
+# System has only python3.9, installer should auto-install python3.12
+FROM rockylinux:8
+
+RUN dnf install -y python39 && dnf clean all
+
+COPY . /opt/src
+WORKDIR /opt/src
+
+# Auto-install Python and full install in one go
+RUN chmod +x deploy/install.sh && \
+    deploy/install.sh --install-python install 2>&1 | tee /tmp/install.log && \
+    /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
+    echo "PASS: auto-install python + full install succeeded"

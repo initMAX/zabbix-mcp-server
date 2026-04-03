@@ -1,0 +1,16 @@
+# openSUSE Leap 15 — python3.6 default, python3.11 available
+FROM opensuse/leap:15
+
+RUN zypper --non-interactive install python311 python311-pip && zypper clean
+
+COPY . /opt/src
+WORKDIR /opt/src
+
+RUN chmod +x deploy/install.sh && \
+    deploy/install.sh --dry-run 2>&1 | tee /tmp/output.log && \
+    grep -q "Using python3.11" /tmp/output.log && echo "PASS: detected python3.11" || \
+    (echo "FAIL: did not detect python3.11" && cat /tmp/output.log && exit 1)
+
+RUN deploy/install.sh install 2>&1 | tee /tmp/install.log && \
+    /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
+    echo "PASS: full install succeeded"
