@@ -71,6 +71,44 @@ ok()    { echo -e "\e[1;32m>>>\e[0m $*"; }
 warn()  { echo -e "\e[1;33m>>>\e[0m $*"; }
 error() { echo -e "\e[1;31m>>>\e[0m $*" >&2; }
 
+# Run a command with a spinner — usage: spin "message" command [args...]
+spin() {
+    local msg="$1"; shift
+    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local i=0
+
+    # Run command in background, capture output
+    local tmpfile
+    tmpfile=$(mktemp)
+    "$@" > "$tmpfile" 2>&1 &
+    local pid=$!
+
+    # Animate spinner while command runs
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r\e[1;34m %s \e[0m %s" "${frames[$i]}" "$msg"
+        i=$(( (i + 1) % ${#frames[@]} ))
+        sleep 0.1
+    done
+
+    # Get exit code
+    wait "$pid"
+    local exit_code=$?
+
+    # Clear spinner line
+    printf "\r\e[K"
+
+    if [[ $exit_code -eq 0 ]]; then
+        ok "$msg"
+    else
+        error "$msg — failed!"
+        # Show output on failure
+        cat "$tmpfile" >&2
+    fi
+
+    rm -f "$tmpfile"
+    return $exit_code
+}
+
 need_root() {
     if [[ $EUID -ne 0 ]]; then
         error "This script must be run as root (sudo)."
@@ -340,15 +378,16 @@ check_health() {
     local attempt=1
 
     info "Waiting for service to start..."
+    sleep 1
 
     while [[ $attempt -le $max_attempts ]]; do
-        sleep 2
         if curl -sf --max-time 3 "$url" &>/dev/null; then
             ok "Health check passed: $url → OK"
             return
         fi
         warn "Health check attempt $attempt/$max_attempts failed — retrying..."
         ((attempt++))
+        sleep 2
     done
 
     error "Health check failed after $max_attempts attempts!"
@@ -399,7 +438,7 @@ ReadWritePaths=/var/log/zabbix-mcp
 WantedBy=multi-user.target
 UNIT
     if command -v systemctl &>/dev/null; then
-        systemctl daemon-reload
+        spin "Reloading systemd" systemctl daemon-reload
     else
         warn "systemctl not found - skipping daemon-reload (no systemd on this system)."
     fi
@@ -429,13 +468,11 @@ LOGROTATE
 # --------------------------------------------------------------------------- #
 install_package() {
     if [[ ! -d "$INSTALL_DIR/venv" ]]; then
-        info "Creating virtual environment..."
-        "$PYTHON_BIN" -m venv "$INSTALL_DIR/venv"
+        spin "Creating virtual environment" "$PYTHON_BIN" -m venv "$INSTALL_DIR/venv"
     fi
 
-    info "Installing zabbix-mcp-server from ${SCRIPT_DIR}..."
-    "$INSTALL_DIR/venv/bin/pip" install --upgrade pip --quiet
-    "$INSTALL_DIR/venv/bin/pip" install "$SCRIPT_DIR" --quiet
+    spin "Upgrading pip" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip --quiet
+    spin "Installing zabbix-mcp-server from ${SCRIPT_DIR}" "$INSTALL_DIR/venv/bin/pip" install "$SCRIPT_DIR" --quiet
 
     local version
     version=$("$INSTALL_DIR/venv/bin/zabbix-mcp-server" --version 2>&1 || true)
@@ -594,12 +631,8 @@ do_update() {
 
     # Pull latest code if we're in a git repo
     if [[ -d "$SCRIPT_DIR/.git" ]]; then
-        info "Pulling latest changes from git..."
-        if git -C "$SCRIPT_DIR" pull --ff-only 2>&1; then
-            ok "Git pull successful."
-        else
+        spin "Pulling latest changes from git" git -C "$SCRIPT_DIR" pull --ff-only || \
             warn "Git pull failed — continuing with current local version."
-        fi
     fi
 
     # Show current version
@@ -626,9 +659,7 @@ do_update() {
     # Restart service if running
     if command -v systemctl &>/dev/null; then
         if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-            info "Restarting $SERVICE_NAME..."
-            systemctl restart "$SERVICE_NAME"
-            ok "Service restarted."
+            spin "Restarting $SERVICE_NAME" systemctl restart "$SERVICE_NAME"
             # Health check after restart
             check_health "$(get_configured_port)" "$(get_configured_host)"
         else
