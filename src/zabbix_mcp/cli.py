@@ -114,9 +114,9 @@ def main() -> None:
     # Silence root logger to prevent any stray duplicates
     logging.root.handlers.clear()
 
-    transport = args.transport or config.server.transport
-    host = args.host or config.server.host
-    port = args.port or config.server.port
+    transport = args.transport if args.transport is not None else config.server.transport
+    host = args.host if args.host is not None else config.server.host
+    port = args.port if args.port is not None else config.server.port
 
     server_names = ", ".join(config.zabbix_servers.keys())
     logger.info("Starting Zabbix MCP Server v%s", __version__)

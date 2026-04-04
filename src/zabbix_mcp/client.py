@@ -90,6 +90,7 @@ class ClientManager:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
         self._clients: dict[str, ZabbixAPI] = {}
+        self._versions: dict[str, str] = {}
         self._rate_limiter = _RateLimiter(config.server.rate_limit)
 
     @property
@@ -186,9 +187,11 @@ class ClientManager:
         client.api_version()
 
     def get_version(self, server: str) -> str:
-        """Return the Zabbix API version string for the given server."""
-        client = self._get_client(server)
-        return str(client.api_version())
+        """Return the Zabbix API version string for the given server (cached)."""
+        if server not in self._versions:
+            client = self._get_client(server)
+            self._versions[server] = str(client.api_version())
+        return self._versions[server]
 
     def check_write(self, server: str) -> None:
         """Raise ReadOnlyError if the server is read-only."""
@@ -200,11 +203,14 @@ class ClientManager:
             )
 
     def close(self) -> None:
-        """Logout and close all client connections."""
+        """Close all client connections. Skip logout for token-based auth."""
         for name, client in self._clients.items():
             try:
-                client.logout()
+                # Token-based auth does not use sessions — logout is a no-op
+                # that would generate a warning. Only logout for session-based auth.
+                if not self.get_server_config(name).api_token:
+                    client.logout()
                 logger.info("Disconnected from '%s'", name)
             except Exception:
-                logger.warning("Failed to logout from '%s'", name, exc_info=True)
+                logger.warning("Failed to disconnect from '%s'", name, exc_info=True)
         self._clients.clear()

@@ -151,8 +151,11 @@ def load_config(path: str | Path) -> AppConfig:
     if not path.exists():
         raise ConfigError(f"Config file not found: {path}")
 
-    with open(path, "rb") as f:
-        raw = tomllib.load(f)
+    try:
+        with open(path, "rb") as f:
+            raw = tomllib.load(f)
+    except Exception as e:
+        raise ConfigError(f"Failed to parse {path}: {e}") from e
 
     server_raw = raw.get("server", {})
     transport = server_raw.get("transport", "stdio")

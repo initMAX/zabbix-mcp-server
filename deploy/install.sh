@@ -310,7 +310,7 @@ check_firewall_and_selinux() {
             warn "SELinux is ENFORCING — you may need to allow port $port:"
             echo -e "  \e[1;33msudo semanage port -a -t http_port_t -p tcp $port\e[0m"
             echo -e "  \e[1;33msudo restorecon -Rv $INSTALL_DIR\e[0m"
-            ((warnings++))
+            warnings=$((warnings + 1))
         else
             ok "SELinux: $selinux_status"
         fi
@@ -331,7 +331,7 @@ check_firewall_and_selinux() {
             else
                 error "WARNING: Port $port/tcp is NOT open in firewalld!"
                 echo -e "  \e[1;31msudo firewall-cmd --add-port=${port}/tcp --permanent && sudo firewall-cmd --reload\e[0m"
-                ((warnings++))
+                warnings=$((warnings + 1))
             fi
         fi
     fi
@@ -347,7 +347,7 @@ check_firewall_and_selinux() {
             else
                 error "WARNING: Port $port/tcp may be blocked by ufw!"
                 echo -e "  \e[1;31msudo ufw allow ${port}/tcp\e[0m"
-                ((warnings++))
+                warnings=$((warnings + 1))
             fi
         fi
     fi
@@ -357,7 +357,7 @@ check_firewall_and_selinux() {
         if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
             warn "Port $port is already in use by another process!"
             ss -tlnp 2>/dev/null | grep ":${port} " | head -3
-            ((warnings++))
+            warnings=$((warnings + 1))
         fi
     fi
 
@@ -373,7 +373,8 @@ check_firewall_and_selinux() {
 check_permissions() {
     info "Checking file permissions..."
     local issues=()
-    local fix_cmds=()
+    local fix_paths=()
+    local fix_mkdir=false
 
     # Check LOG_DIR ownership
     if [[ -d "$LOG_DIR" ]]; then
@@ -381,11 +382,11 @@ check_permissions() {
         dir_owner=$(stat -c '%U:%G' "$LOG_DIR" 2>/dev/null)
         if [[ "$dir_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
             issues+=("$LOG_DIR is owned by $dir_owner (expected $SERVICE_USER:$SERVICE_USER)")
-            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $LOG_DIR")
+            fix_paths+=("$LOG_DIR")
         fi
     else
         issues+=("$LOG_DIR does not exist")
-        fix_cmds+=("mkdir -p $LOG_DIR && chown $SERVICE_USER:$SERVICE_USER $LOG_DIR")
+        fix_mkdir=true
     fi
 
     # Check log file ownership (if it exists)
@@ -395,7 +396,7 @@ check_permissions() {
         file_owner=$(stat -c '%U:%G' "$log_file" 2>/dev/null)
         if [[ "$file_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
             issues+=("$log_file is owned by $file_owner (expected $SERVICE_USER:$SERVICE_USER)")
-            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $log_file")
+            fix_paths+=("$log_file")
         fi
     fi
 
@@ -405,7 +406,7 @@ check_permissions() {
         config_owner=$(stat -c '%U:%G' "$CONFIG_DIR/config.toml" 2>/dev/null)
         if [[ "$config_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
             issues+=("$CONFIG_DIR/config.toml is owned by $config_owner (expected $SERVICE_USER:$SERVICE_USER)")
-            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $CONFIG_DIR/config.toml")
+            fix_paths+=("$CONFIG_DIR/config.toml")
         fi
     fi
 
@@ -423,8 +424,11 @@ check_permissions() {
     if [[ -t 0 ]]; then
         read -rp "$(echo -e '\e[1;33m>>>\e[0m') Fix permissions now? [Y/n] " answer
         if [[ ! "$answer" =~ ^[Nn]$ ]]; then
-            for cmd in "${fix_cmds[@]}"; do
-                eval "$cmd"
+            if $fix_mkdir; then
+                mkdir -p "$LOG_DIR"
+            fi
+            for p in "${fix_paths[@]}"; do
+                chown "$SERVICE_USER:$SERVICE_USER" "$p"
             done
             ok "Permissions fixed."
         else
@@ -432,8 +436,11 @@ check_permissions() {
         fi
     else
         warn "Non-interactive mode — fix manually:"
-        for cmd in "${fix_cmds[@]}"; do
-            warn "  $cmd"
+        if $fix_mkdir; then
+            warn "  mkdir -p $LOG_DIR"
+        fi
+        for p in "${fix_paths[@]}"; do
+            warn "  chown $SERVICE_USER:$SERVICE_USER $p"
         done
     fi
 }
@@ -737,8 +744,7 @@ do_update() {
         if command -v git &>/dev/null; then
             local need_reexec=false
             local pull_output
-            pull_output=$(git -C "$SCRIPT_DIR" pull --ff-only 2>&1)
-            if [[ $? -eq 0 ]]; then
+            if pull_output=$(git -C "$SCRIPT_DIR" pull --ff-only 2>&1); then
                 if [[ "$pull_output" != *"Already up to date"* ]]; then
                     need_reexec=true
                 fi

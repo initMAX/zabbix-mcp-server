@@ -620,12 +620,7 @@ def _resolve_source_file(
 
     raw_path = Path(params["source_file"])
 
-    # Reject symlinks BEFORE resolving — they could escape allowed directories
-    if raw_path.is_symlink():
-        raise ValueError(
-            "source_file must not be a symbolic link (security restriction)."
-        )
-
+    # Resolve first, then validate — avoids TOCTOU race between symlink check and resolve
     path = raw_path.resolve()
 
     # Validate path is within an allowed directory (prevent path traversal)
@@ -636,10 +631,19 @@ def _resolve_source_file(
             f"{', '.join(str(d) for d in allowed)}"
         )
 
-    if not path.is_file():
-        raise ValueError(f"source_file not found: {path}")
-
-    content = path.read_text(encoding="utf-8")
+    # Open with O_NOFOLLOW to reject symlinks atomically (no TOCTOU race)
+    import os
+    try:
+        fd = os.open(str(path), os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        raise ValueError(
+            "source_file must not be a symbolic link (security restriction)."
+        )
+    try:
+        content = os.fdopen(fd, "r", encoding="utf-8").read()
+    except Exception:
+        os.close(fd)
+        raise
     result = {**params, "source": content}
     del result["source_file"]
 
@@ -737,7 +741,10 @@ def _normalize_import_rules(params: dict[str, Any], zabbix_version: str | None =
 
     # Step 3: version-aware group parameter fixup
     if zabbix_version:
-        major_minor = tuple(int(x) for x in zabbix_version.split(".")[:2])
+        try:
+            major_minor = tuple(int(x) for x in zabbix_version.split(".")[:2])
+        except (ValueError, IndexError):
+            major_minor = (7, 0)  # safe default on unparseable version
 
         if major_minor < (6, 2):
             # Zabbix <6.2: only "groups" exists
