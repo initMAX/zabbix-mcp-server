@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.16 — 2026-04-04
+
+### Added
+
+- **Startup success banner** — clear `#### Zabbix MCP Server started successfully ####` log message after all initialization is complete; makes it immediately obvious in logs whether the server started or failed
+
 ## v1.15 — 2026-04-04
 
 ### Fixed
