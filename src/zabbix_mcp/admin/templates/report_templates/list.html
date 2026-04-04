@@ -23,9 +23,7 @@
             </div>
             <div class="card-body">
                 <p class="text-sm" style="margin-bottom:16px;">{{ template.description }}</p>
-                <form method="post" action="/templates/{{ template.id }}/duplicate" style="display:inline;">
-                    <button type="submit" class="btn btn-ghost btn-sm">&#x1F4CB; Duplicate</button>
-                </form>
+                <a href="/templates/create?duplicate={{ template.id }}" class="btn btn-ghost btn-sm">&#x1F4CB; Duplicate</a>
             </div>
         </div>
         {% endfor %}
@@ -47,12 +45,11 @@
             <div class="card-body">
                 <p class="text-sm" style="margin-bottom:16px;">{{ template.description }}</p>
                 <div class="actions">
-                    <a href="/templates/{{ template.id }}/edit" class="btn btn-ghost btn-sm">&#x270F; Edit</a>
-                    <button class="btn btn-danger btn-sm"
-                            hx-delete="/templates/{{ template.id }}"
-                            hx-target="#template-{{ template.id }}"
-                            hx-swap="outerHTML swap:0.3s"
-                            hx-confirm="Are you sure you want to delete template '{{ template.name }}'?">Delete</button>
+                    <a href="/templates/{{ template.id }}" class="btn btn-ghost btn-sm">&#x270F; Edit</a>
+                    <form method="post" action="/templates/{{ template.id }}/delete" style="display:inline;"
+                          onsubmit="return confirm('Are you sure you want to delete template \'{{ template.name }}\'?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
                 </div>
             </div>
         </div>

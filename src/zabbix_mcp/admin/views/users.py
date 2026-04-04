@@ -12,6 +12,7 @@ import logging
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
+from zabbix_mcp.admin.audit_writer import write_audit
 from zabbix_mcp.admin.auth import hash_password
 from zabbix_mcp.admin.config_writer import (
     add_config_table,
@@ -103,6 +104,8 @@ async def user_create(request: Request) -> Response:
         admin["users"][username] = user_table
         save_config_document(admin_app.config_path, doc)
         logger.info("User '%s' created (role: %s) by %s", username, role, session.user)
+        client_ip = request.client.host if request.client else ""
+        write_audit("user_create", user=session.user, target_type="user", target_id=username, details={"role": role}, ip=client_ip)
     except Exception as e:
         logger.exception("Failed to create user: %s", e)
         return admin_app.render("users/create.html", request, {
@@ -175,6 +178,8 @@ async def user_delete(request: Request) -> Response:
             del users[username]
             save_config_document(admin_app.config_path, doc)
             logger.info("User '%s' deleted by %s", username, session.user)
+            client_ip = request.client.host if request.client else ""
+            write_audit("user_delete", user=session.user, target_type="user", target_id=username, ip=client_ip)
     except Exception as e:
         logger.error("Failed to delete user: %s", e)
 

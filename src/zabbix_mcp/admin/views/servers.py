@@ -14,6 +14,7 @@ import re
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse, Response
 
+from zabbix_mcp.admin.audit_writer import write_audit
 from zabbix_mcp.admin.config_writer import (
     add_config_table,
     load_config_document,
@@ -90,6 +91,8 @@ async def server_create(request: Request) -> Response:
         }
         add_config_table(admin_app.config_path, "zabbix", name, server_data)
         logger.info("Zabbix server '%s' added by %s", name, session.user)
+        client_ip = request.client.host if request.client else ""
+        write_audit("server_create", user=session.user, target_type="server", target_id=name, ip=client_ip)
     except Exception as e:
         logger.error("Failed to add server: %s", e)
 
@@ -119,7 +122,7 @@ async def server_edit(request: Request) -> Response:
 
         return admin_app.render("servers_edit.html", request, {
             "active": "servers",
-            "server_name": server_name,
+            "edit_server_name": server_name,
             "server": srv,
         })
 
@@ -142,6 +145,8 @@ async def server_edit(request: Request) -> Response:
             zabbix[server_name]["verify_ssl"] = verify_ssl
             save_config_document(admin_app.config_path, doc)
             logger.info("Zabbix server '%s' updated by %s", server_name, session.user)
+            client_ip = request.client.host if request.client else ""
+            write_audit("server_edit", user=session.user, target_type="server", target_id=server_name, ip=client_ip)
     except Exception as e:
         logger.error("Failed to update server: %s", e)
 
@@ -159,6 +164,8 @@ async def server_delete(request: Request) -> Response:
     try:
         remove_config_table(admin_app.config_path, "zabbix", server_name)
         logger.info("Zabbix server '%s' deleted by %s", server_name, session.user)
+        client_ip = request.client.host if request.client else ""
+        write_audit("server_delete", user=session.user, target_type="server", target_id=server_name, ip=client_ip)
     except Exception as e:
         logger.error("Failed to delete server: %s", e)
 

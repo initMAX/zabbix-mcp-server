@@ -50,8 +50,8 @@
                     {% endif %}
                 </td>
                 <td>
-                    {% if token.ip_allowlist %}
-                    <span class="text-sm monospace">{{ token.ip_allowlist | join(', ') }}</span>
+                    {% if token.allowed_ips %}
+                    <span class="text-sm monospace">{{ token.allowed_ips | join(', ') }}</span>
                     {% else %}
                     <span class="text-muted text-sm">Any</span>
                     {% endif %}
@@ -63,19 +63,17 @@
                     <span class="badge badge-success">Active</span>
                     {% endif %}
                 </td>
-                <td class="text-sm text-muted">{{ token.last_used or 'Never' }}</td>
+                <td class="text-sm text-muted">{{ token.last_used_at or 'Never' }}</td>
                 <td>
                     <div class="actions">
                         {% if token.revoked %}
-                        <button class="btn btn-ghost btn-sm"
-                                hx-post="/tokens/{{ token.id }}/activate"
-                                hx-target="#token-{{ token.id }}"
-                                hx-swap="outerHTML">Activate</button>
+                        <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
+                            <button type="submit" class="btn btn-ghost btn-sm">Activate</button>
+                        </form>
                         {% else %}
-                        <button class="btn btn-ghost btn-sm"
-                                hx-post="/tokens/{{ token.id }}/revoke"
-                                hx-target="#token-{{ token.id }}"
-                                hx-swap="outerHTML">Revoke</button>
+                        <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
+                            <button type="submit" class="btn btn-ghost btn-sm">Revoke</button>
+                        </form>
                         {% endif %}
                         <button class="btn btn-danger btn-sm"
                                 onclick="openModal('delete-modal-{{ token.id }}')">Delete</button>
@@ -93,11 +91,10 @@
                             </div>
                             <div class="modal-footer">
                                 <button class="btn btn-ghost" onclick="closeModal('delete-modal-{{ token.id }}')">Cancel</button>
-                                <button class="btn btn-danger"
-                                        hx-delete="/tokens/{{ token.id }}"
-                                        hx-target="#token-{{ token.id }}"
-                                        hx-swap="outerHTML swap:0.3s"
-                                        onclick="closeModal('delete-modal-{{ token.id }}')">Delete</button>
+                                <form method="post" action="/tokens/{{ token.id }}/delete" style="display:inline;">
+                                    <button type="submit" class="btn btn-danger"
+                                            onclick="closeModal('delete-modal-{{ token.id }}')">Delete</button>
+                                </form>
                             </div>
                         </div>
                     </div>

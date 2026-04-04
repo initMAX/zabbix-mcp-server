@@ -24,7 +24,7 @@ from zabbix_mcp.reporting.engine import TEMPLATE_DIR, _REPORT_TEMPLATES, REPORTI
 
 logger = logging.getLogger("zabbix_mcp.admin")
 
-CUSTOM_TEMPLATE_DIR = TEMPLATE_DIR / "custom"
+CUSTOM_TEMPLATE_DIR = Path("/var/log/zabbix-mcp/templates")
 
 
 def _get_builtin_templates() -> list[dict]:
@@ -121,19 +121,28 @@ async def template_create(request: Request) -> Response:
     # Sanitize name for filesystem
     import re
     safe_name = re.sub(r"[^a-z0-9_]", "_", name.lower())[:50]
-    filename = f"custom/{safe_name}.html"
+    filename = f"{safe_name}.html"
 
-    # Write HTML to file
-    CUSTOM_TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = TEMPLATE_DIR / filename
-    file_path.write_text(html_content, encoding="utf-8")
+    # Write HTML to file in writable location
+    try:
+        CUSTOM_TEMPLATE_DIR.mkdir(parents=True, exist_ok=True)
+        file_path = CUSTOM_TEMPLATE_DIR / filename
+        file_path.write_text(html_content, encoding="utf-8")
+    except Exception as e:
+        logger.error("Failed to write template file: %s", e)
+        return admin_app.render("report_templates/edit.html", request, {
+            "active": "templates",
+            "create_mode": True,
+            "error": f"Failed to write template file: {e}",
+            "initial_content": html_content,
+        })
 
     # Write to config
     try:
         add_config_table(admin_app.config_path, "report_templates", safe_name, {
             "display_name": display_name,
             "description": description,
-            "template_file": filename,
+            "template_file": str(CUSTOM_TEMPLATE_DIR / filename),
         })
         logger.info("Report template '%s' created by %s", safe_name, session.user)
     except Exception as e:
@@ -156,7 +165,8 @@ async def template_edit(request: Request) -> Response:
     if not tmpl:
         return RedirectResponse("/templates", status_code=303)
 
-    file_path = TEMPLATE_DIR / tmpl["template_file"]
+    tmpl_file = tmpl["template_file"]
+    file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
     content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
 
     if request.method == "POST":
@@ -166,7 +176,11 @@ async def template_edit(request: Request) -> Response:
         html_content = str(form.get("html_content", ""))
 
         # Update file
-        file_path.write_text(html_content, encoding="utf-8")
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(html_content, encoding="utf-8")
+        except Exception as e:
+            logger.error("Failed to write template file: %s", e)
 
         # Update config
         try:
@@ -242,9 +256,13 @@ async def template_delete(request: Request) -> Response:
 
     if tmpl:
         # Delete file
-        file_path = TEMPLATE_DIR / tmpl.get("template_file", "")
-        if file_path.exists() and "custom/" in str(file_path):
-            file_path.unlink()
+        tmpl_file = tmpl.get("template_file", "")
+        file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
+        if file_path.exists() and str(file_path) != str(TEMPLATE_DIR):
+            try:
+                file_path.unlink()
+            except Exception as e:
+                logger.error("Failed to delete template file: %s", e)
 
         # Remove from config
         try:

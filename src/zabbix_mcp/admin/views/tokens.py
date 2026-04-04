@@ -19,6 +19,7 @@ from zabbix_mcp.admin.config_writer import (
     update_config_section,
     TOMLKIT_AVAILABLE,
 )
+from zabbix_mcp.admin.audit_writer import write_audit
 from zabbix_mcp.token_store import TokenStore
 
 logger = logging.getLogger("zabbix_mcp.admin")
@@ -100,6 +101,8 @@ async def token_create(request: Request) -> Response:
         # Reload token store
         _reload_tokens(admin_app)
         logger.info("Token '%s' created by %s", name, session.user)
+        client_ip = request.client.host if request.client else ""
+        write_audit("token_create", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
     except Exception as e:
         logger.error("Failed to create token: %s", e)
         return admin_app.render("tokens/create.html", request, {
@@ -192,6 +195,8 @@ async def token_revoke(request: Request) -> Response:
             _reload_tokens(admin_app)
             action = "revoked" if current else "activated"
             logger.info("Token '%s' %s by %s", token_id, action, session.user)
+            client_ip = request.client.host if request.client else ""
+            write_audit(f"token_{action}", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
     except Exception as e:
         logger.error("Failed to revoke token: %s", e)
 
@@ -209,6 +214,8 @@ async def token_delete(request: Request) -> Response:
         remove_config_table(admin_app.config_path, "tokens", token_id)
         _reload_tokens(admin_app)
         logger.info("Token '%s' deleted by %s", token_id, session.user)
+        client_ip = request.client.host if request.client else ""
+        write_audit("token_delete", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
     except Exception as e:
         logger.error("Failed to delete token: %s", e)
 

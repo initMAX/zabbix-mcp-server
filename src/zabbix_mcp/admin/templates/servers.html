@@ -43,6 +43,11 @@
     </form>
 </div>
 
+<div class="alert alert-warning" style="padding:12px 16px; margin-bottom:20px; border-radius:var(--radius-md); background:rgba(245,158,11,0.1); border:1px solid var(--color-warning); color:var(--color-warning);">
+    &#x26A0;&#xFE0F; Server changes in config.toml require a service restart to take effect.
+    <code>sudo systemctl restart zabbix-mcp-server</code>
+</div>
+
 {% if servers %}
 <div class="grid-2">
     {% for server in servers %}

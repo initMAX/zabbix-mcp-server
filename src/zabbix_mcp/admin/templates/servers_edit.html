@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Edit Server: {{ server_name }}{% endblock %}
+{% block title %}Edit Server: {{ edit_server_name }}{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">Edit: {{ server_name }}</h1>
+        <h1 class="page-title">Edit: {{ edit_server_name }}</h1>
         <p class="page-subtitle">Modify Zabbix server connection</p>
     </div>
     <a href="/servers" class="btn btn-ghost">&larr; Back</a>
 </div>
 
 <div class="card" style="max-width:640px;">
-    <form method="post" action="/servers/{{ server_name }}/edit">
+    <form method="post" action="/servers/{{ edit_server_name }}/edit">
         <div class="form-group">
             <label class="form-label">Zabbix URL</label>
             <input type="url" name="url" class="form-input" value="{{ server.url | default('') }}" required>

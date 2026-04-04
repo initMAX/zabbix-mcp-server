@@ -30,20 +30,22 @@ async def settings_view(request: Request) -> Response:
     if not session:
         return RedirectResponse("/login", status_code=303)
 
-    # Read current config
+    # Read current config — flatten sections so template can use settings.host etc.
     settings = {}
     if TOMLKIT_AVAILABLE:
         try:
             doc = load_config_document(admin_app.config_path)
-            settings = {
-                "server": dict(doc.get("server", {})),
-                "admin": dict(doc.get("admin", {})),
-            }
-            # Remove sensitive values from display
-            if "auth_token" in settings["server"]:
-                settings["server"]["auth_token"] = "••••••••"
+            server_cfg = dict(doc.get("server", {}))
+            admin_cfg = dict(doc.get("admin", {}))
+            reporting_cfg = dict(doc.get("reporting", {}))
+            # Remove sensitive values
+            server_cfg.pop("auth_token", None)
             # Remove users sub-table from admin display
-            settings["admin"].pop("users", None)
+            admin_cfg.pop("users", None)
+            # Merge all into flat dict
+            settings.update(server_cfg)
+            settings.update(admin_cfg)
+            settings.update(reporting_cfg)
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 
@@ -62,7 +64,7 @@ async def settings_update(request: Request) -> Response:
         return RedirectResponse("/settings", status_code=303)
 
     section = request.path_params["section"]
-    if section not in ("server", "admin"):
+    if section not in ("server", "admin", "reporting", "security"):
         return RedirectResponse("/settings", status_code=303)
 
     form = await request.form()

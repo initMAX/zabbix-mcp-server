@@ -25,6 +25,7 @@ from starlette.staticfiles import StaticFiles
 
 import jinja2
 
+from zabbix_mcp.admin.audit_writer import write_audit
 from zabbix_mcp.admin.auth import SessionManager, LoginRateLimiter
 
 if TYPE_CHECKING:
@@ -200,6 +201,7 @@ class AdminApp:
         if not user_data or not verify_password(password, user_data.get("password_hash", "")):
             self.rate_limiter.record_attempt(client_ip)
             logger.warning("Failed login attempt for user '%s' from %s", username, client_ip)
+            write_audit("login_failure", user=username, ip=client_ip)
             return self.render("login.html", request, {
                 "error": "Invalid username or password.",
             }, status_code=401)
@@ -209,6 +211,7 @@ class AdminApp:
         role = user_data.get("role", "viewer")
         session_token = self.sessions.create_session(username, role, client_ip)
         logger.info("Admin login: user '%s' from %s (role: %s)", username, client_ip, role)
+        write_audit("login_success", user=username, details={"role": role}, ip=client_ip)
 
         response = RedirectResponse("/", status_code=303)
         response.set_cookie(

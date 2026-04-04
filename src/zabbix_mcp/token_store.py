@@ -99,15 +99,20 @@ class TokenStore:
                 elif isinstance(raw_ips, list):
                     allowed_ips = raw_ips
 
+            hash_value = token_hash.split(":", 1)[1] if ":" in token_hash else token_hash
+            token_prefix = hash_value[:12] + "..."
+
             info = TokenInfo(
                 id=token_id,
                 name=cfg.get("name", token_id),
                 token_hash=token_hash,
+                token_prefix=token_prefix,
                 scopes=cfg.get("scopes", ["*"]),
                 read_only=cfg.get("read_only", True),
                 allowed_ips=allowed_ips,
                 expires_at=cfg.get("expires_at"),
                 is_legacy=cfg.get("is_legacy", False),
+                revoked=not cfg.get("is_active", True),
             )
 
             # Preserve runtime stats from existing token
@@ -165,6 +170,11 @@ class TokenStore:
 
         # Constant-time comparison as an extra safety layer
         if not hmac.compare_digest(computed_hash, info.token_hash):
+            return None
+
+        # Check revoked
+        if info.revoked:
+            logger.warning("Token '%s' is revoked", info.id)
             return None
 
         # Check expiration

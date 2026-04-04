@@ -61,7 +61,7 @@
 
             <div class="form-group">
                 <label class="form-label" for="ip_allowlist">IP Allowlist</label>
-                <textarea id="ip_allowlist" name="ip_allowlist" class="form-textarea" rows="3">{{ token.ip_allowlist | join('\n') if token.ip_allowlist else '' }}</textarea>
+                <textarea id="ip_allowlist" name="ip_allowlist" class="form-textarea" rows="3">{{ token.allowed_ips | join('\n') if token.allowed_ips else '' }}</textarea>
                 <div class="form-hint">One IP address or CIDR range per line.</div>
             </div>
 
@@ -84,15 +84,15 @@
             </div>
             <div class="settings-row" style="grid-template-columns: 140px 1fr;">
                 <div class="settings-label">Total Calls</div>
-                <div><strong>{{ token.total_calls | default(0) }}</strong></div>
+                <div><strong>{{ token.use_count | default(0) }}</strong></div>
             </div>
             <div class="settings-row" style="grid-template-columns: 140px 1fr;">
                 <div class="settings-label">Last Used</div>
-                <div class="text-sm">{{ token.last_used or 'Never' }}</div>
+                <div class="text-sm">{{ token.last_used_at or 'Never' }}</div>
             </div>
             <div class="settings-row" style="grid-template-columns: 140px 1fr;">
                 <div class="settings-label">Last IP</div>
-                <div class="monospace text-sm">{{ token.last_ip or 'N/A' }}</div>
+                <div class="monospace text-sm">{{ token.last_used_ip or 'N/A' }}</div>
             </div>
             <div class="settings-row" style="grid-template-columns: 140px 1fr;">
                 <div class="settings-label">Created</div>
@@ -107,16 +107,14 @@
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 {% if token.revoked %}
-                <button class="btn btn-success"
-                        hx-post="/tokens/{{ token.id }}/activate"
-                        hx-swap="none"
-                        onclick="location.reload()">Activate Token</button>
+                <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
+                    <button type="submit" class="btn btn-success">Activate Token</button>
+                </form>
                 {% else %}
-                <button class="btn btn-ghost"
-                        hx-post="/tokens/{{ token.id }}/revoke"
-                        hx-swap="none"
-                        hx-confirm="Are you sure you want to revoke this token?"
-                        onclick="setTimeout(function(){location.reload()}, 300)">Revoke Token</button>
+                <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;"
+                      onsubmit="return confirm('Are you sure you want to revoke this token?')">
+                    <button type="submit" class="btn btn-ghost">Revoke Token</button>
+                </form>
                 {% endif %}
                 <button class="btn btn-danger" onclick="openModal('delete-modal')">Delete Token</button>
             </div>
