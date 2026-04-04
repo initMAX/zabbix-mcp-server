@@ -119,7 +119,7 @@ def main() -> None:
     port = args.port if args.port is not None else config.server.port
 
     server_names = ", ".join(config.zabbix_servers.keys())
-    logger.info("Starting Zabbix MCP Server v%s", __version__)
+    logger.info("Zabbix MCP Server v%s — developed by initMAX s.r.o.", __version__)
     logger.info("Transport: %s | Listening on: %s:%d", transport, host, port)
     logger.info("Zabbix servers: %s", server_names)
 
