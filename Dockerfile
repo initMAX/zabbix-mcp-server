@@ -31,8 +31,8 @@ LABEL org.opencontainers.image.source="https://github.com/initMAX/zabbix-mcp-ser
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
 
 RUN useradd --system --shell /usr/sbin/nologin --home-dir /opt/zabbix-mcp zabbix-mcp \
-    && mkdir -p /var/log/zabbix-mcp \
-    && chown zabbix-mcp:zabbix-mcp /var/log/zabbix-mcp
+    && mkdir -p /var/log/zabbix-mcp /etc/zabbix-mcp \
+    && chown zabbix-mcp:zabbix-mcp /var/log/zabbix-mcp /etc/zabbix-mcp
 
 COPY --from=builder /opt/zabbix-mcp/venv /opt/zabbix-mcp/venv
 
