@@ -1486,6 +1486,7 @@ tbody tr:last-child td {
 .login-page {
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
@@ -1664,11 +1665,7 @@ tbody tr:last-child td {
     color: var(--text-muted);
 }
 
-.login-page {
-    position: relative;
-    min-height: 100vh;
-    padding-bottom: 60px;
-}
+/* duplicate removed — .login-page defined above */
 
 /* ---------- Sidebar copyright ---------- */
 .sidebar-footer .copyright {

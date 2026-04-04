@@ -23,7 +23,7 @@
         <div class="stat-content">
             <div class="stat-value">
                 {% for server in servers %}
-                <span class="status-dot {% if server.connected %}status-dot-green{% else %}status-dot-red{% endif %}"></span>
+                <span class="status-dot {% if server.status == 'online' %}status-dot-green{% else %}status-dot-red{% endif %}"></span>
                 {% endfor %}
                 {{ stats.server_count | default(0) }}
             </div>
