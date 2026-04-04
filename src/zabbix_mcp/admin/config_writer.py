@@ -73,31 +73,34 @@ def save_config_document(config_path: str | Path, doc: "tomlkit.TOMLDocument") -
     original_stat = os.stat(path)
     original_mode = original_stat.st_mode
 
+    content = tomlkit.dumps(doc)
+
+    # Try atomic write (temp + rename), fallback to direct write
+    # (rename fails on Docker bind mounts / cross-device)
     fd = None
     tmp_path = None
     try:
         fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".config_", suffix=".tmp")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            fd = None  # os.fdopen takes ownership of the fd
-            f.write(tomlkit.dumps(doc))
+            fd = None
+            f.write(content)
             f.flush()
             os.fsync(f.fileno())
-
-        # Restore original permissions on the temp file before rename
         os.chmod(tmp_path, original_mode)
-
-        # Atomic rename (same filesystem guaranteed by mkstemp in same dir)
         os.rename(tmp_path, str(path))
-        tmp_path = None  # rename succeeded, nothing to clean up
+        tmp_path = None
         logger.info("Config saved atomically: %s", path)
-
-    except Exception:
-        # Clean up temp file on failure
+    except OSError:
+        # Atomic rename failed (cross-device mount) — fall back to direct write
         if fd is not None:
             os.close(fd)
         if tmp_path is not None and os.path.exists(tmp_path):
             os.unlink(tmp_path)
-        raise
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+            f.flush()
+            os.fsync(f.fileno())
+        logger.info("Config saved (direct write): %s", path)
 
 
 def update_config_section(config_path: str | Path, section: str, data: dict) -> None:
