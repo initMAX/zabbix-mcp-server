@@ -46,9 +46,8 @@
                 <p class="text-sm" style="margin-bottom:16px;">{{ template.description }}</p>
                 <div class="actions">
                     <a href="/templates/{{ template.id }}" class="btn btn-ghost btn-sm">&#x270F; Edit</a>
-                    <form method="post" action="/templates/{{ template.id }}/delete" style="display:inline;"
-                          onsubmit="return confirm('Are you sure you want to delete template \'{{ template.name }}\'?')">
-                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    <form method="post" action="/templates/{{ template.id }}/delete" style="display:inline;" id="del-tpl-{{ template.id }}">
+                        <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('template {{ template.name }}', 'del-tpl-{{ template.id }}')">Delete</button>
                     </form>
                 </div>
             </div>

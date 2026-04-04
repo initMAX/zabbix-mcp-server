@@ -84,9 +84,7 @@
 <div class="alert alert-warning" style="padding:12px 16px; margin-bottom:20px; border-radius:var(--radius-md); background:rgba(245,158,11,0.1); border:1px solid var(--color-warning); color:var(--color-warning); display:flex; align-items:center; justify-content:space-between;">
     <span>&#x26A0;&#xFE0F; Server config changed — restart required to apply.</span>
     {% if current_user_role == 'admin' %}
-    <form method="post" action="/servers/restart" style="margin:0;">
-        <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Restart the MCP server now?')">Restart Now</button>
-    </form>
+    <button class="btn btn-warning btn-sm" onclick="confirmRestart()">Restart Now</button>
     {% else %}
     <code>sudo systemctl restart zabbix-mcp-server</code>
     {% endif %}
@@ -146,8 +144,8 @@
                 Test Connection
             </button>
                 {% if current_user_role != 'viewer' %}
-                <form method="post" action="/servers/{{ server.name }}/delete" style="display:inline;">
-                    <button class="btn btn-danger btn-sm" onclick="return confirm('Delete server {{ server.name }}?')">Delete</button>
+                <form method="post" action="/servers/{{ server.name }}/delete" style="display:inline;" id="del-srv-{{ server.name }}">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('server {{ server.name }}', 'del-srv-{{ server.name }}')">Delete</button>
                 </form>
                 {% endif %}
             </div>

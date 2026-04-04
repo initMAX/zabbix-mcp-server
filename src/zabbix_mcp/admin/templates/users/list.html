@@ -41,9 +41,9 @@
                     <div class="actions">
                         <a href="/users/{{ username }}" class="btn btn-ghost btn-sm">Edit</a>
                         {% if username != current_user %}
-                        <form method="post" action="/users/{{ username }}/delete" style="display:inline;">
-                            <button class="btn btn-danger btn-sm"
-                                    onclick="return confirm('Delete user {{ username }}?')">Delete</button>
+                        <form method="post" action="/users/{{ username }}/delete" style="display:inline;" id="del-user-{{ username }}">
+                            <button type="button" class="btn btn-danger btn-sm"
+                                    onclick="confirmDelete('user {{ username }}', 'del-user-{{ username }}')">Delete</button>
                         </form>
                         {% endif %}
                     </div>

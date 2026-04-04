@@ -1720,3 +1720,55 @@ tbody tr:last-child td {
     70% { opacity: 1; }
     100% { opacity: 0; }
 }
+
+/* ---------- Custom Modal ---------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+}
+.modal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 0;
+    width: 90%;
+    max-width: 440px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.modal-header {
+    padding: 20px 24px 0;
+}
+.modal-header h3 { margin: 0; font-size: 1.15rem; }
+.modal-body {
+    padding: 16px 24px;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+.modal-footer {
+    padding: 12px 24px 20px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* ---------- Progress bar ---------- */
+.progress-bar {
+    height: 6px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 12px 0 8px;
+}
+.progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}

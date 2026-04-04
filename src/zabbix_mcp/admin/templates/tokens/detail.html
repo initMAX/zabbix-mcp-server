@@ -114,9 +114,8 @@
                     <button type="submit" class="btn btn-success">Activate Token</button>
                 </form>
                 {% else %}
-                <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;"
-                      onsubmit="return confirm('Are you sure you want to revoke this token?')">
-                    <button type="submit" class="btn btn-ghost">Revoke Token</button>
+                <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;" id="revoke-form">
+                    <button type="button" class="btn btn-ghost" onclick="showConfirm('Revoke Token', 'This token will immediately stop working for MCP authentication.', 'Revoke', 'btn-warning', function(){ document.getElementById('revoke-form').submit(); })">Revoke Token</button>
                 </form>
                 {% endif %}
                 <button class="btn btn-danger" onclick="openModal('delete-modal')">Delete Token</button>

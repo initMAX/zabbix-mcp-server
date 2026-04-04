@@ -76,7 +76,85 @@
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Global confirm modal -->
+    <div class="modal-overlay" id="confirm-modal" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirm</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message">Are you sure?</p>
+                <div id="confirm-progress" style="display:none;">
+                    <div class="progress-bar"><div class="progress-fill" id="confirm-progress-fill"></div></div>
+                    <p class="text-sm text-muted" id="confirm-status">Processing...</p>
+                </div>
+            </div>
+            <div class="modal-footer" id="confirm-buttons">
+                <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirm-action-btn" onclick="executeConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+    var _confirmCallback = null;
+
+    function showConfirm(title, message, btnText, btnClass, callback) {
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').textContent = message;
+        var btn = document.getElementById('confirm-action-btn');
+        btn.textContent = btnText || 'Confirm';
+        btn.className = 'btn ' + (btnClass || 'btn-danger');
+        document.getElementById('confirm-progress').style.display = 'none';
+        document.getElementById('confirm-buttons').style.display = 'flex';
+        document.getElementById('confirm-modal').style.display = 'flex';
+        _confirmCallback = callback;
+    }
+
+    function showProgress(title, message) {
+        document.getElementById('confirm-title').textContent = title;
+        document.getElementById('confirm-message').style.display = 'none';
+        document.getElementById('confirm-buttons').style.display = 'none';
+        document.getElementById('confirm-progress').style.display = 'block';
+        document.getElementById('confirm-status').textContent = message;
+        document.getElementById('confirm-progress-fill').style.width = '0%';
+        document.getElementById('confirm-modal').style.display = 'flex';
+        // Animate progress
+        var fill = document.getElementById('confirm-progress-fill');
+        fill.style.transition = 'width 3s ease';
+        setTimeout(function() { fill.style.width = '80%'; }, 50);
+    }
+
+    function closeModal() {
+        document.getElementById('confirm-modal').style.display = 'none';
+        document.getElementById('confirm-message').style.display = 'block';
+        _confirmCallback = null;
+    }
+
+    function executeConfirm() {
+        if (_confirmCallback) _confirmCallback();
+    }
+
+    function confirmDelete(name, formId) {
+        showConfirm('Delete ' + name, 'This action cannot be undone. Are you sure?', 'Delete', 'btn-danger', function() {
+            document.getElementById(formId).submit();
+            closeModal();
+        });
+    }
+
+    function confirmRestart() {
+        showConfirm('Restart MCP Server', 'The MCP server will be restarted. Active connections will be interrupted.', 'Restart Now', 'btn-warning', function() {
+            showProgress('Restarting...', 'Sending restart signal...');
+            fetch('/servers/restart', {method: 'POST'}).then(function(r) {
+                document.getElementById('confirm-progress-fill').style.width = '100%';
+                document.getElementById('confirm-status').textContent = 'Restart signal sent. Page will reload...';
+                setTimeout(function() { window.location.reload(); }, 2000);
+            }).catch(function() {
+                document.getElementById('confirm-status').textContent = 'Restart failed. Try manually.';
+                document.getElementById('confirm-status').style.color = 'var(--color-danger)';
+            });
+        });
+    }
     // Theme management: light / auto / dark
     function setTheme(mode) {
         localStorage.setItem('theme', mode);
