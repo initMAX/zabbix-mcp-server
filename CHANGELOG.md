@@ -14,6 +14,13 @@
 - **Graceful log file fallback** — if the application cannot write to `log_file` due to permission errors, it falls back to stderr (visible in journal) with a clear warning and fix command instead of crashing in a restart loop
 - **Config file permission error message** — if `config.toml` is unreadable (e.g. `root:root` with `0600`), the server now prints a human-readable error with the fix command instead of a raw Python traceback
 - **Installer `uninstall` command** — `sudo ./deploy/install.sh uninstall` performs a complete removal: stops and disables the service, removes the systemd unit, logrotate config, virtualenv (`/opt/zabbix-mcp`), configuration (`/etc/zabbix-mcp`), logs (`/var/log/zabbix-mcp`), and the `zabbix-mcp` system user; requires explicit `yes` confirmation
+- **Installer uninstall tests** — all 15 full-install Dockerfiles now include an uninstall verification step; permission check test added for AlmaLinux 9
+
+### Improved
+
+- **Installer robustness in containers** — `install_systemd_unit` and `install_logrotate` now gracefully skip when `/etc/systemd/system` or `/etc/logrotate.d` directories do not exist; `systemctl daemon-reload` is non-fatal (containers, chroots); `userdel` failure in uninstall is non-fatal with a manual fix hint
+- **Explicit group creation** — installer now runs `groupadd --system` before `useradd` to ensure the service group exists on all distributions (fixes openSUSE where `useradd` does not auto-create a matching group)
+- **Installer test coverage** — fixed Dockerfiles for AlmaLinux 10 (`shadow-utils`), Amazon Linux 2023 (`shadow-utils`), openSUSE 15 (`shadow`), RHEL 10 (switched to `almalinux:10` since `rockylinux:10` is not yet available on Docker Hub)
 
 ## v1.14 — 2026-04-04
 
