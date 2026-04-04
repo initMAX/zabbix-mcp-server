@@ -108,7 +108,14 @@ class AdminApp:
             Mount("/static", app=StaticFiles(directory=str(STATIC_DIR)), name="static"),
         ]
 
-        app = Starlette(routes=routes)
+        async def not_found(request: Request, exc: Exception) -> Response:
+            """Redirect 404s to dashboard (if logged in) or login."""
+            session = self._get_session(request)
+            if session:
+                return RedirectResponse("/", status_code=303)
+            return RedirectResponse("/login", status_code=303)
+
+        app = Starlette(routes=routes, exception_handlers={404: not_found})
         app.state.admin_app = self
         return app
 
