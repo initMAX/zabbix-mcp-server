@@ -213,8 +213,20 @@ async def template_preview(request: Request) -> Response:
     if not session:
         return HTMLResponse("Unauthorized", status_code=401)
 
-    form = await request.form()
-    html_content = str(form.get("html_content", ""))
+    html_content = ""
+    if request.method == "POST":
+        form = await request.form()
+        html_content = str(form.get("html_content", ""))
+    elif "template_id" in request.path_params:
+        # GET — load template content from file
+        template_id = request.path_params["template_id"]
+        custom = _get_custom_templates(admin_app.config_path)
+        tmpl = next((t for t in custom if t["id"] == template_id), None)
+        if tmpl and tmpl.get("template_file"):
+            tmpl_file = tmpl["template_file"]
+            file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
+            if file_path.exists():
+                html_content = file_path.read_text(encoding="utf-8")
 
     if not html_content:
         return HTMLResponse("<p>No content to preview.</p>")

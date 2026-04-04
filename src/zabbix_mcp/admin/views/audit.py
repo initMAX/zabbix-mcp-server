@@ -21,7 +21,7 @@ logger = logging.getLogger("zabbix_mcp.admin")
 AUDIT_LOG_PATH = Path("/var/log/zabbix-mcp/audit.log")
 
 
-def _read_audit_entries(limit: int = 200, action_filter: str | None = None) -> list[dict]:
+def _read_audit_entries(limit: int = 200, action_filter: str | None = None, search: str | None = None, date_from: str | None = None, date_to: str | None = None) -> list[dict]:
     """Read audit log entries (newest first)."""
     if not AUDIT_LOG_PATH.exists():
         return []
@@ -36,6 +36,12 @@ def _read_audit_entries(limit: int = 200, action_filter: str | None = None) -> l
                 try:
                     entry = json.loads(line)
                     if action_filter and entry.get("action", "") != action_filter:
+                        continue
+                    if search and search.lower() not in json.dumps(entry).lower():
+                        continue
+                    if date_from and entry.get("timestamp", "") < date_from:
+                        continue
+                    if date_to and entry.get("timestamp", "") > date_to + " 23:59:59":
                         continue
                     entries.append(entry)
                 except json.JSONDecodeError:
@@ -56,8 +62,11 @@ async def audit_view(request: Request) -> Response:
 
     action_filter = request.query_params.get("action")
     limit = int(request.query_params.get("limit", "200"))
+    search = request.query_params.get("search")
+    date_from = request.query_params.get("date_from")
+    date_to = request.query_params.get("date_to")
 
-    entries = _read_audit_entries(limit=limit, action_filter=action_filter)
+    entries = _read_audit_entries(limit=limit, action_filter=action_filter, search=search, date_from=date_from, date_to=date_to)
 
     # Collect unique action types for filter dropdown
     action_types = set()

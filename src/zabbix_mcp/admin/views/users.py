@@ -145,6 +145,8 @@ async def user_detail(request: Request) -> Response:
 
             save_config_document(admin_app.config_path, doc)
             logger.info("User '%s' updated by %s", username, session.user)
+            client_ip = request.client.host if request.client else ""
+            write_audit("user_edit", user=session.user, target_type="user", target_id=username, ip=client_ip)
         except Exception as e:
             logger.error("Failed to update user: %s", e)
 

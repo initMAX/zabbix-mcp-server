@@ -33,15 +33,9 @@
             hx-include="[name='date_from'], [name='date_to'], [name='search']"
             hx-swap="innerHTML">
         <option value="">All Actions</option>
-        <option value="login" {% if filters.action == 'login' %}selected{% endif %}>Login</option>
-        <option value="logout" {% if filters.action == 'logout' %}selected{% endif %}>Logout</option>
-        <option value="token.create" {% if filters.action == 'token.create' %}selected{% endif %}>Token Create</option>
-        <option value="token.revoke" {% if filters.action == 'token.revoke' %}selected{% endif %}>Token Revoke</option>
-        <option value="token.delete" {% if filters.action == 'token.delete' %}selected{% endif %}>Token Delete</option>
-        <option value="user.create" {% if filters.action == 'user.create' %}selected{% endif %}>User Create</option>
-        <option value="user.delete" {% if filters.action == 'user.delete' %}selected{% endif %}>User Delete</option>
-        <option value="settings.update" {% if filters.action == 'settings.update' %}selected{% endif %}>Settings Update</option>
-        <option value="api.call" {% if filters.action == 'api.call' %}selected{% endif %}>API Call</option>
+        {% for action in action_types %}
+        <option value="{{ action }}" {% if filters.action == action %}selected{% endif %}>{{ action }}</option>
+        {% endfor %}
     </select>
     <input type="search" name="search" class="form-input search-input" placeholder="Search user, target, details..."
            value="{{ filters.search | default('') }}"
@@ -86,7 +80,7 @@
                     {% endif %}
                 </td>
                 <td>{{ entry.user }}</td>
-                <td class="text-sm">{{ entry.target }}</td>
+                <td class="text-sm">{% if entry.target_type %}{{ entry.target_type }}: {{ entry.target_id }}{% endif %}</td>
                 <td class="text-sm text-muted" style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ entry.details }}">{{ entry.details }}</td>
                 <td class="monospace text-sm">{{ entry.ip }}</td>
             </tr>

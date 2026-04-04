@@ -34,7 +34,7 @@
                     <span class="badge badge-muted">viewer</span>
                     {% endif %}
                 </td>
-                <td class="text-sm text-muted">{{ user_data.last_login | default('Never') }}</td>
+                <td class="text-sm text-muted"><a href="/audit?action=login_success&search={{ username }}" class="text-muted">View in audit</a></td>
                 <td>
                     <div class="actions">
                         <a href="/users/{{ username }}" class="btn btn-ghost btn-sm">Edit</a>

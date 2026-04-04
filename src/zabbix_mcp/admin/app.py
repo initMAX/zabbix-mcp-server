@@ -102,8 +102,9 @@ class AdminApp:
             Route("/servers/{server_name}/test", server_test, methods=["POST"]),
             Route("/templates", template_list),
             Route("/templates/create", template_create, methods=["GET", "POST"]),
+            Route("/templates/preview", template_preview, methods=["POST"]),
             Route("/templates/{template_id}", template_edit, methods=["GET", "POST"]),
-            Route("/templates/{template_id}/preview", template_preview, methods=["POST"]),
+            Route("/templates/{template_id}/preview", template_preview, methods=["GET", "POST"]),
             Route("/templates/{template_id}/delete", template_delete, methods=["POST"]),
             Route("/settings", settings_view, methods=["GET"]),
             Route("/settings/{section}", settings_update, methods=["POST"]),
@@ -114,10 +115,12 @@ class AdminApp:
 
         async def not_found(request: Request, exc: Exception) -> Response:
             """Redirect 404s to dashboard (if logged in) or login."""
-            session = self._get_session(request)
-            if session:
-                return RedirectResponse("/", status_code=303)
-            return RedirectResponse("/login", status_code=303)
+            if request.method == "GET":
+                session = self._get_session(request)
+                if session:
+                    return RedirectResponse("/", status_code=303)
+                return RedirectResponse("/login", status_code=303)
+            return HTMLResponse("Not Found", status_code=404)
 
         app = Starlette(routes=routes, exception_handlers={404: not_found})
         app.state.admin_app = self
@@ -227,6 +230,9 @@ class AdminApp:
         """Handle logout."""
         token = request.cookies.get("admin_session")
         if token:
+            session = self.sessions.validate_session(token)
+            if session:
+                write_audit("logout", user=session.user, ip=request.client.host if request.client else "")
             self.sessions.destroy_session(token)
         response = RedirectResponse("/login", status_code=303)
         response.delete_cookie("admin_session")

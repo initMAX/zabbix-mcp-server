@@ -11,19 +11,21 @@
     <a href="/templates" class="btn btn-ghost">&larr; Back to Templates</a>
 </div>
 
-{% if not t.id %}
-<!-- Name/description for new templates -->
+<!-- Name/description -->
 <div class="card mb-4" style="max-width:640px;">
     <div class="form-group">
         <label class="form-label" for="template-name">Template Name</label>
+        {% if t.id %}
+        <input type="text" id="template-name" name="display_name" class="form-input" value="{{ t.name | default('') }}" placeholder="My Report Template" readonly>
+        {% else %}
         <input type="text" id="template-name" name="name" class="form-input" value="{{ t.name | default('') }}" placeholder="My Report Template" required>
+        {% endif %}
     </div>
     <div class="form-group mb-0">
         <label class="form-label" for="template-desc">Description</label>
         <input type="text" id="template-desc" name="description" class="form-input" value="{{ t.description | default('') }}" placeholder="Brief description of this template">
     </div>
 </div>
-{% endif %}
 
 <!-- Split-view Editor -->
 <div class="editor-container">
@@ -101,12 +103,16 @@
 {% block scripts %}
 <script>
 function updatePreview() {
-    var iframe = document.getElementById('preview-frame');
     var content = document.getElementById('template-editor').value;
-    var doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(content);
-    doc.close();
+    var iframe = document.getElementById('preview-frame');
+    var form = new FormData();
+    form.append('html_content', content);
+    fetch('/templates/preview', {method: 'POST', body: form})
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+            var doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open(); doc.write(html); doc.close();
+        });
 }
 
 function insertVariable(variable) {

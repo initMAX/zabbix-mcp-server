@@ -70,8 +70,8 @@ async def token_create(request: Request) -> Response:
     if not scopes:
         scopes = ["*"]
 
-    read_only = form.get("read_only") == "on"
-    allowed_ips_raw = str(form.get("allowed_ips", "")).strip()
+    read_only = "read_only" in form
+    allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
     allowed_ips = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()] if allowed_ips_raw else None
     expires_at = str(form.get("expires_at", "")).strip() or None
 
@@ -141,10 +141,10 @@ async def token_detail(request: Request) -> Response:
         if scopes:
             updates["scopes"] = list(scopes)
 
-        read_only = form.get("read_only") == "on"
+        read_only = "read_only" in form
         updates["read_only"] = read_only
 
-        allowed_ips_raw = str(form.get("allowed_ips", "")).strip()
+        allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
         if allowed_ips_raw:
             updates["allowed_ips"] = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()]
         else:
@@ -165,6 +165,8 @@ async def token_detail(request: Request) -> Response:
                 save_config_document(admin_app.config_path, doc)
                 _reload_tokens(admin_app)
                 logger.info("Token '%s' updated by %s", token_id, session.user)
+                client_ip = request.client.host if request.client else ""
+                write_audit("token_edit", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
         except Exception as e:
             logger.error("Failed to update token: %s", e)
 
