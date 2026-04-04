@@ -18,3 +18,11 @@ RUN chmod +x deploy/install.sh && \
 RUN deploy/install.sh install 2>&1 | tee /tmp/install.log && \
     /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
     echo "PASS: full install succeeded"
+
+# Test uninstall
+RUN echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall.log && \
+    ! test -d /opt/zabbix-mcp && \
+    ! test -d /etc/zabbix-mcp && \
+    ! test -d /var/log/zabbix-mcp && \
+    ! id zabbix-mcp 2>/dev/null && \
+    echo "PASS: uninstall removed everything"

@@ -481,6 +481,10 @@ check_health() {
 # Embedded: systemd unit
 # --------------------------------------------------------------------------- #
 install_systemd_unit() {
+    if [[ ! -d /etc/systemd/system ]]; then
+        warn "No systemd detected — skipping unit installation."
+        return 0
+    fi
     info "Installing systemd unit..."
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<'UNIT'
 [Unit]
@@ -520,7 +524,11 @@ ReadWritePaths=/var/log/zabbix-mcp
 WantedBy=multi-user.target
 UNIT
     if command -v systemctl &>/dev/null; then
-        spin "Reloading systemd" systemctl daemon-reload
+        if spin "Reloading systemd" systemctl daemon-reload; then
+            :
+        else
+            warn "systemctl daemon-reload failed — if running in a container, this is expected."
+        fi
     else
         warn "systemctl not found - skipping daemon-reload (no systemd on this system)."
     fi
@@ -530,6 +538,10 @@ UNIT
 # Embedded: logrotate
 # --------------------------------------------------------------------------- #
 install_logrotate() {
+    if [[ ! -d /etc/logrotate.d ]]; then
+        warn "No logrotate detected — skipping logrotate configuration."
+        return 0
+    fi
     info "Installing logrotate config..."
     cat > "/etc/logrotate.d/${SERVICE_NAME}" <<'LOGROTATE'
 /var/log/zabbix-mcp/*.log {
@@ -848,7 +860,7 @@ do_uninstall() {
         rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
         ok "Removed systemd unit"
         if command -v systemctl &>/dev/null; then
-            systemctl daemon-reload &>/dev/null
+            systemctl daemon-reload &>/dev/null || true
         fi
     fi
 
@@ -878,15 +890,18 @@ do_uninstall() {
 
     # Remove system user
     if id "$SERVICE_USER" &>/dev/null; then
-        userdel "$SERVICE_USER" 2>/dev/null
-        ok "Removed system user '$SERVICE_USER'"
+        if userdel "$SERVICE_USER" 2>/dev/null; then
+            ok "Removed system user '$SERVICE_USER'"
+        else
+            warn "Could not remove user '$SERVICE_USER' — remove manually: userdel $SERVICE_USER"
+        fi
     fi
 
     echo
     ok "=== Uninstall complete ==="
     echo
-    echo "  Note: This git repository ($SCRIPT_DIR) was NOT removed."
-    echo "  To remove it: rm -rf $SCRIPT_DIR"
+    echo "  Note: The git repository ($SCRIPT_DIR) was NOT removed."
+    echo "  You can safely delete it manually if no longer needed."
     echo
 }
 
