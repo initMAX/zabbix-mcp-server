@@ -219,7 +219,7 @@ a:hover {
 .logo-text {
     font-weight: 600;
     font-size: 1.1rem;
-    color: var(--text-inverse);
+    color: #f1f5f9;
     white-space: nowrap;
 }
 

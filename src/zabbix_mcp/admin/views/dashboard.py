@@ -33,6 +33,18 @@ async def dashboard(request: Request) -> Response:
     tokens = token_store.list_tokens()
     active_tokens = sum(1 for t in tokens if not getattr(t, "revoked", False))
 
+    # Count admin users from config
+    admin_user_count = 0
+    try:
+        from zabbix_mcp.admin.config_writer import load_config_document, TOMLKIT_AVAILABLE
+        if TOMLKIT_AVAILABLE:
+            doc = load_config_document(admin_app.config_path)
+            admin_section = doc.get("admin", {})
+            users_section = admin_section.get("users", {})
+            admin_user_count = len(users_section)
+    except Exception:
+        pass
+
     # Zabbix server status
     servers = []
     for name in client_manager.server_names:
@@ -72,6 +84,7 @@ async def dashboard(request: Request) -> Response:
             "total_tokens": len(tokens),
             "server_count": len(servers),
             "online_servers": sum(1 for s in servers if s["status"] == "online"),
+            "admin_users": admin_user_count,
         },
         "servers": servers,
         "recent_audit": recent_audit[:10],
