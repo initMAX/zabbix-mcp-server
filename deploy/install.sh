@@ -357,6 +357,77 @@ check_firewall_and_selinux() {
 }
 
 # --------------------------------------------------------------------------- #
+# Permission check — detect and optionally fix ownership issues
+# --------------------------------------------------------------------------- #
+check_permissions() {
+    info "Checking file permissions..."
+    local issues=()
+    local fix_cmds=()
+
+    # Check LOG_DIR ownership
+    if [[ -d "$LOG_DIR" ]]; then
+        local dir_owner
+        dir_owner=$(stat -c '%U:%G' "$LOG_DIR" 2>/dev/null)
+        if [[ "$dir_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
+            issues+=("$LOG_DIR is owned by $dir_owner (expected $SERVICE_USER:$SERVICE_USER)")
+            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $LOG_DIR")
+        fi
+    else
+        issues+=("$LOG_DIR does not exist")
+        fix_cmds+=("mkdir -p $LOG_DIR && chown $SERVICE_USER:$SERVICE_USER $LOG_DIR")
+    fi
+
+    # Check log file ownership (if it exists)
+    local log_file="$LOG_DIR/server.log"
+    if [[ -f "$log_file" ]]; then
+        local file_owner
+        file_owner=$(stat -c '%U:%G' "$log_file" 2>/dev/null)
+        if [[ "$file_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
+            issues+=("$log_file is owned by $file_owner (expected $SERVICE_USER:$SERVICE_USER)")
+            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $log_file")
+        fi
+    fi
+
+    # Check config ownership
+    if [[ -f "$CONFIG_DIR/config.toml" ]]; then
+        local config_owner
+        config_owner=$(stat -c '%U:%G' "$CONFIG_DIR/config.toml" 2>/dev/null)
+        if [[ "$config_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
+            issues+=("$CONFIG_DIR/config.toml is owned by $config_owner (expected $SERVICE_USER:$SERVICE_USER)")
+            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $CONFIG_DIR/config.toml")
+        fi
+    fi
+
+    if [[ ${#issues[@]} -eq 0 ]]; then
+        ok "File permissions OK"
+        return 0
+    fi
+
+    warn "Permission issues found:"
+    for issue in "${issues[@]}"; do
+        warn "  - $issue"
+    done
+    echo
+
+    if [[ -t 0 ]]; then
+        read -rp "$(echo -e '\e[1;33m>>>\e[0m') Fix permissions now? [Y/n] " answer
+        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+            for cmd in "${fix_cmds[@]}"; do
+                eval "$cmd"
+            done
+            ok "Permissions fixed."
+        else
+            warn "Skipped — fix manually if the service fails to start."
+        fi
+    else
+        warn "Non-interactive mode — fix manually:"
+        for cmd in "${fix_cmds[@]}"; do
+            warn "  $cmd"
+        done
+    fi
+}
+
+# --------------------------------------------------------------------------- #
 # Health check after installation
 # --------------------------------------------------------------------------- #
 check_health() {
@@ -417,9 +488,9 @@ ExecStart=/opt/zabbix-mcp/venv/bin/zabbix-mcp-server \
 Restart=on-failure
 RestartSec=5
 
-# Logging
-StandardOutput=append:/var/log/zabbix-mcp/server.log
-StandardError=append:/var/log/zabbix-mcp/server.log
+# Logging — application writes to log_file from config.toml directly.
+# Startup errors (before logging init) go to journal:
+#   journalctl -u zabbix-mcp-server
 
 # Security hardening
 NoNewPrivileges=yes
@@ -553,6 +624,8 @@ do_install() {
     info "Creating directories..."
     mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
     chown "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
+    touch "$LOG_DIR/server.log"
+    chown "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR/server.log"
 
     # Package
     install_package
@@ -574,6 +647,9 @@ do_install() {
     # systemd + logrotate
     install_systemd_unit
     install_logrotate
+
+    # Verify permissions (catches issues from re-runs or partial earlier installs)
+    check_permissions
 
     # Firewall & SELinux checks
     local active_port active_host
@@ -687,6 +763,9 @@ do_update() {
     # Update systemd + logrotate (in case they changed)
     install_systemd_unit
     install_logrotate
+
+    # Check and fix file permissions (catches issues from failed earlier installs)
+    check_permissions
 
     # Restart service if running
     if command -v systemctl &>/dev/null; then
