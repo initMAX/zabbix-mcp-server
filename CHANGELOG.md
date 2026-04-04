@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.15 — 2026-04-04
+
+### Fixed
+
+- **Systemd log file permission conflict** — the systemd unit used `StandardOutput=append:` which created `/var/log/zabbix-mcp/server.log` as `root:root` before dropping privileges; when the Python application then tried to open the same file via `FileHandler`, it failed with `PermissionError`; removed `StandardOutput` / `StandardError` append directives from the systemd unit — the application now manages log file writing directly via the `log_file` config option; startup errors (before logging init) go to the systemd journal (`journalctl -u zabbix-mcp-server`)
+- **Installer did not pre-create log file** — `do_install()` created and chowned `/var/log/zabbix-mcp/` but never touched `server.log` itself; if systemd or another root process created the file first, it would be owned by `root:root`; the installer now pre-creates `server.log` with correct `zabbix-mcp:zabbix-mcp` ownership
+- **Update did not fix file permissions** — `do_update()` never checked or repaired ownership on the log directory, log file, or config file; if a previous install failed mid-way (e.g. Python not found) or files were created by root, permissions stayed broken across upgrades
+
+### Added
+
+- **Installer permission check** — new `check_permissions()` runs during both `install` and `update`; detects wrong ownership on `/var/log/zabbix-mcp/`, `server.log`, and `config.toml`; lists all issues and offers an interactive fix prompt (default: **Y**); in non-interactive mode, prints the fix commands
+- **Graceful log file fallback** — if the application cannot write to `log_file` due to permission errors, it falls back to stderr (visible in journal) with a clear warning and fix command instead of crashing in a restart loop
+- **Config file permission error message** — if `config.toml` is unreadable (e.g. `root:root` with `0600`), the server now prints a human-readable error with the fix command instead of a raw Python traceback
+- **Installer `uninstall` command** — `sudo ./deploy/install.sh uninstall` performs a complete removal: stops and disables the service, removes the systemd unit, logrotate config, virtualenv (`/opt/zabbix-mcp`), configuration (`/etc/zabbix-mcp`), logs (`/var/log/zabbix-mcp`), and the `zabbix-mcp` system user; requires explicit `yes` confirmation
+- **Installer uninstall tests** — all 15 full-install Dockerfiles now include an uninstall verification step; permission check test added for AlmaLinux 9
+
+### Improved
+
+- **Installer robustness in containers** — `install_systemd_unit` and `install_logrotate` now gracefully skip when `/etc/systemd/system` or `/etc/logrotate.d` directories do not exist; `systemctl daemon-reload` is non-fatal (containers, chroots); `userdel` failure in uninstall is non-fatal with a manual fix hint
+- **Explicit group creation** — installer now runs `groupadd --system` before `useradd` to ensure the service group exists on all distributions (fixes openSUSE where `useradd` does not auto-create a matching group)
+- **Installer test coverage** — fixed Dockerfiles for AlmaLinux 10 (`shadow-utils`), Amazon Linux 2023 (`shadow-utils`), openSUSE 15 (`shadow`), RHEL 10 (switched to `almalinux:10` since `rockylinux:10` is not yet available on Docker Hub)
+
 ## v1.14 — 2026-04-04
 
 ### Security

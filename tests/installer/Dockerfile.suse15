@@ -1,7 +1,7 @@
 # openSUSE Leap 15 — python3.6 default, python3.11 available
 FROM opensuse/leap:15
 
-RUN zypper --non-interactive install python311 python311-pip && zypper clean
+RUN zypper --non-interactive install python311 python311-pip shadow && zypper clean
 
 COPY . /opt/src
 WORKDIR /opt/src
@@ -14,3 +14,11 @@ RUN chmod +x deploy/install.sh && \
 RUN deploy/install.sh install 2>&1 | tee /tmp/install.log && \
     /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
     echo "PASS: full install succeeded"
+
+# Test uninstall
+RUN echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall.log && \
+    ! test -d /opt/zabbix-mcp && \
+    ! test -d /etc/zabbix-mcp && \
+    ! test -d /var/log/zabbix-mcp && \
+    ! id zabbix-mcp 2>/dev/null && \
+    echo "PASS: uninstall removed everything"

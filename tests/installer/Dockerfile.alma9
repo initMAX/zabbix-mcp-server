@@ -14,3 +14,17 @@ RUN chmod +x deploy/install.sh && \
 RUN deploy/install.sh install 2>&1 | tee /tmp/install.log && \
     /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
     echo "PASS: full install succeeded"
+
+# Test permission check detects bad ownership (reported issue on AlmaLinux 9)
+RUN chown root:root /var/log/zabbix-mcp /var/log/zabbix-mcp/server.log && \
+    deploy/install.sh update 2>&1 | tee /tmp/update-perms.log && \
+    grep -q "Permission issues found" /tmp/update-perms.log && \
+    echo "PASS: permission check detected bad ownership"
+
+# Test uninstall
+RUN echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall.log && \
+    ! test -d /opt/zabbix-mcp && \
+    ! test -d /etc/zabbix-mcp && \
+    ! test -d /var/log/zabbix-mcp && \
+    ! id zabbix-mcp 2>/dev/null && \
+    echo "PASS: uninstall removed everything"

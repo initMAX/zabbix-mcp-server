@@ -64,6 +64,13 @@ def main() -> None:
 
     try:
         config = load_config(args.config)
+    except PermissionError:
+        print(
+            f"ERROR: Cannot read {args.config} (permission denied). "
+            f"Fix: sudo chown zabbix-mcp:zabbix-mcp {args.config}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     except ConfigError as e:
         print(f"Configuration error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -72,15 +79,23 @@ def main() -> None:
     log_format = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
     formatter = logging.Formatter(log_format)
 
-    # Build handler list: when log_file is set, write ONLY to file (not stderr)
-    # to avoid duplicates when systemd also redirects stderr to the same file.
-    # When log_file is not set, write to stderr only.
+    # Build handler list: when log_file is set, write ONLY to file (not stderr).
+    # When log_file is not set, write to stderr (goes to journal under systemd).
     handlers: list[logging.Handler] = []
     if config.server.log_file:
         from pathlib import Path
         log_path = Path(config.server.log_file)
         log_path.parent.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(log_path))
+        try:
+            handlers.append(logging.FileHandler(log_path))
+        except PermissionError:
+            handlers.append(logging.StreamHandler(sys.stderr))
+            print(
+                f"WARNING: Cannot write to {log_path} (permission denied), "
+                f"falling back to stderr. "
+                f"Fix: sudo chown zabbix-mcp:zabbix-mcp {log_path}",
+                file=sys.stderr,
+            )
     else:
         handlers.append(logging.StreamHandler(sys.stderr))
 

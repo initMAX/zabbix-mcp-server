@@ -102,14 +102,10 @@ The update preserves your config, upgrades the package, refreshes the systemd un
 ### Uninstall
 
 ```bash
-sudo systemctl stop zabbix-mcp-server
-sudo systemctl disable zabbix-mcp-server
-sudo rm /etc/systemd/system/zabbix-mcp-server.service
-sudo systemctl daemon-reload
-sudo rm -rf /opt/zabbix-mcp /etc/zabbix-mcp /var/log/zabbix-mcp
-sudo rm /etc/logrotate.d/zabbix-mcp-server
-sudo userdel zabbix-mcp
+sudo ./deploy/install.sh uninstall
 ```
+
+Complete removal: stops and disables the service, removes the systemd unit, logrotate config, virtualenv, configuration, logs, and the system user. Requires explicit `yes` confirmation.
 
 ### Installer CLI reference
 
@@ -121,6 +117,7 @@ sudo ./deploy/install.sh [COMMAND] [OPTIONS]
 |---|---|
 | `install` | Fresh installation (default) |
 | `update` | Update existing installation, preserve config |
+| `uninstall` | Complete removal — service, config, logs, virtualenv, system user |
 | `--dry-run` | Check prerequisites without installing |
 | `--install-python` | Auto-install Python 3.12 if no suitable version found |
 | `-h`, `--help` | Show full help |

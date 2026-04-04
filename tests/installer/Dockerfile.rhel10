@@ -1,5 +1,6 @@
 # RHEL 10 / Rocky 10 — python3.12 as system default
-FROM rockylinux:10
+# Rocky 10 image not yet on Docker Hub; using AlmaLinux 10 as equivalent RHEL 10 test
+FROM almalinux:10
 
 RUN dnf install -y python3 python3-pip && dnf clean all
 
@@ -16,3 +17,11 @@ RUN chmod +x deploy/install.sh && \
 RUN deploy/install.sh install 2>&1 | tee /tmp/install.log && \
     /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
     echo "PASS: full install succeeded"
+
+# Test uninstall
+RUN echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall.log && \
+    ! test -d /opt/zabbix-mcp && \
+    ! test -d /etc/zabbix-mcp && \
+    ! test -d /var/log/zabbix-mcp && \
+    ! id zabbix-mcp 2>/dev/null && \
+    echo "PASS: uninstall removed everything"

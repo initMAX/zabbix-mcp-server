@@ -116,6 +116,7 @@ The install script will:
 4. Copy the example config to `/etc/zabbix-mcp/config.toml`
 5. Install a systemd service unit (`zabbix-mcp-server`)
 6. Set up logrotate for `/var/log/zabbix-mcp/*.log` (daily, 30 days retention)
+7. Verify file permissions and offer to fix any issues
 
 ### Upgrade
 
@@ -125,7 +126,7 @@ git pull
 sudo ./deploy/install.sh update
 ```
 
-The update command will upgrade the package to the latest version, refresh the systemd unit and logrotate config, and restart the service if it is running.
+The update command will upgrade the package to the latest version, refresh the systemd unit and logrotate config, check file permissions (and offer to fix any issues), and restart the service if it is running.
 
 ### Configure
 
@@ -275,11 +276,13 @@ Use the HTTP `/health` endpoint for load balancer probes, uptime monitoring, and
 
 ### Logs
 
+The application writes to the log file configured in `config.toml` (`log_file`). Startup errors before logging initialization go to the systemd journal.
+
 ```bash
-# Live log stream
+# Live log stream (application log)
 tail -f /var/log/zabbix-mcp/server.log
 
-# Via journalctl
+# Via journalctl (startup errors + fallback)
 sudo journalctl -u zabbix-mcp-server -f
 ```
 
@@ -486,6 +489,7 @@ sudo ./deploy/install.sh [COMMAND] [OPTIONS]
 |---|---|
 | `install` | Fresh installation (default) |
 | `update` | Update existing installation, preserve config |
+| `uninstall` | Complete removal — service, config, logs, virtualenv, system user |
 | `--dry-run` | Check prerequisites (Python, firewall, SELinux) without installing |
 | `--install-python` | Automatically install Python 3.12 if no suitable version found |
 | `-h`, `--help` | Show help |

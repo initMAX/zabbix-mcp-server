@@ -126,6 +126,7 @@ Usage:
 Commands:
   install       Fresh installation (default if no command given)
   update        Update existing installation, preserve config
+  uninstall     Complete removal of the server and all its data
 
 Options:
   --dry-run           Check prerequisites without installing anything
@@ -135,6 +136,7 @@ Options:
 Examples:
   sudo ./deploy/install.sh                       # fresh install
   sudo ./deploy/install.sh update                # update in place
+  sudo ./deploy/install.sh uninstall             # complete removal
   sudo ./deploy/install.sh --dry-run             # verify prerequisites
   sudo ./deploy/install.sh --install-python      # auto-install Python if needed
   sudo ./deploy/install.sh install --dry-run     # dry-run for fresh install
@@ -146,12 +148,21 @@ What it does:
     3. Installs the package from local git clone
     4. Copies config.example.toml → /etc/zabbix-mcp/config.toml
     5. Installs systemd unit and logrotate config
-    6. Checks firewall/SELinux and reports warnings
+    6. Checks file permissions, firewall/SELinux and reports warnings
 
   update:
     1. Reinstalls the package into existing virtualenv
     2. Updates systemd unit and logrotate config
-    3. Restarts the service if running
+    3. Checks and offers to fix file permissions
+    4. Restarts the service if running
+
+  uninstall:
+    1. Stops and disables the systemd service
+    2. Removes systemd unit and logrotate config
+    3. Removes /opt/zabbix-mcp (virtualenv, binaries)
+    4. Removes /etc/zabbix-mcp (config.toml)
+    5. Removes /var/log/zabbix-mcp (logs)
+    6. Removes the 'zabbix-mcp' system user
 
 Paths:
   Install dir:  /opt/zabbix-mcp
@@ -357,6 +368,77 @@ check_firewall_and_selinux() {
 }
 
 # --------------------------------------------------------------------------- #
+# Permission check — detect and optionally fix ownership issues
+# --------------------------------------------------------------------------- #
+check_permissions() {
+    info "Checking file permissions..."
+    local issues=()
+    local fix_cmds=()
+
+    # Check LOG_DIR ownership
+    if [[ -d "$LOG_DIR" ]]; then
+        local dir_owner
+        dir_owner=$(stat -c '%U:%G' "$LOG_DIR" 2>/dev/null)
+        if [[ "$dir_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
+            issues+=("$LOG_DIR is owned by $dir_owner (expected $SERVICE_USER:$SERVICE_USER)")
+            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $LOG_DIR")
+        fi
+    else
+        issues+=("$LOG_DIR does not exist")
+        fix_cmds+=("mkdir -p $LOG_DIR && chown $SERVICE_USER:$SERVICE_USER $LOG_DIR")
+    fi
+
+    # Check log file ownership (if it exists)
+    local log_file="$LOG_DIR/server.log"
+    if [[ -f "$log_file" ]]; then
+        local file_owner
+        file_owner=$(stat -c '%U:%G' "$log_file" 2>/dev/null)
+        if [[ "$file_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
+            issues+=("$log_file is owned by $file_owner (expected $SERVICE_USER:$SERVICE_USER)")
+            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $log_file")
+        fi
+    fi
+
+    # Check config ownership
+    if [[ -f "$CONFIG_DIR/config.toml" ]]; then
+        local config_owner
+        config_owner=$(stat -c '%U:%G' "$CONFIG_DIR/config.toml" 2>/dev/null)
+        if [[ "$config_owner" != "$SERVICE_USER:$SERVICE_USER" ]]; then
+            issues+=("$CONFIG_DIR/config.toml is owned by $config_owner (expected $SERVICE_USER:$SERVICE_USER)")
+            fix_cmds+=("chown $SERVICE_USER:$SERVICE_USER $CONFIG_DIR/config.toml")
+        fi
+    fi
+
+    if [[ ${#issues[@]} -eq 0 ]]; then
+        ok "File permissions OK"
+        return 0
+    fi
+
+    warn "Permission issues found:"
+    for issue in "${issues[@]}"; do
+        warn "  - $issue"
+    done
+    echo
+
+    if [[ -t 0 ]]; then
+        read -rp "$(echo -e '\e[1;33m>>>\e[0m') Fix permissions now? [Y/n] " answer
+        if [[ ! "$answer" =~ ^[Nn]$ ]]; then
+            for cmd in "${fix_cmds[@]}"; do
+                eval "$cmd"
+            done
+            ok "Permissions fixed."
+        else
+            warn "Skipped — fix manually if the service fails to start."
+        fi
+    else
+        warn "Non-interactive mode — fix manually:"
+        for cmd in "${fix_cmds[@]}"; do
+            warn "  $cmd"
+        done
+    fi
+}
+
+# --------------------------------------------------------------------------- #
 # Health check after installation
 # --------------------------------------------------------------------------- #
 check_health() {
@@ -399,6 +481,10 @@ check_health() {
 # Embedded: systemd unit
 # --------------------------------------------------------------------------- #
 install_systemd_unit() {
+    if [[ ! -d /etc/systemd/system ]]; then
+        warn "No systemd detected — skipping unit installation."
+        return 0
+    fi
     info "Installing systemd unit..."
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<'UNIT'
 [Unit]
@@ -417,9 +503,9 @@ ExecStart=/opt/zabbix-mcp/venv/bin/zabbix-mcp-server \
 Restart=on-failure
 RestartSec=5
 
-# Logging
-StandardOutput=append:/var/log/zabbix-mcp/server.log
-StandardError=append:/var/log/zabbix-mcp/server.log
+# Logging — application writes to log_file from config.toml directly.
+# Startup errors (before logging init) go to journal:
+#   journalctl -u zabbix-mcp-server
 
 # Security hardening
 NoNewPrivileges=yes
@@ -438,7 +524,11 @@ ReadWritePaths=/var/log/zabbix-mcp
 WantedBy=multi-user.target
 UNIT
     if command -v systemctl &>/dev/null; then
-        spin "Reloading systemd" systemctl daemon-reload
+        if spin "Reloading systemd" systemctl daemon-reload; then
+            :
+        else
+            warn "systemctl daemon-reload failed — if running in a container, this is expected."
+        fi
     else
         warn "systemctl not found - skipping daemon-reload (no systemd on this system)."
     fi
@@ -448,6 +538,10 @@ UNIT
 # Embedded: logrotate
 # --------------------------------------------------------------------------- #
 install_logrotate() {
+    if [[ ! -d /etc/logrotate.d ]]; then
+        warn "No logrotate detected — skipping logrotate configuration."
+        return 0
+    fi
     info "Installing logrotate config..."
     cat > "/etc/logrotate.d/${SERVICE_NAME}" <<'LOGROTATE'
 /var/log/zabbix-mcp/*.log {
@@ -543,16 +637,22 @@ do_install() {
     # Find suitable Python
     find_python
 
-    # Service user
+    # Service user + group
     if ! id "$SERVICE_USER" &>/dev/null; then
         info "Creating system user '$SERVICE_USER'..."
-        useradd --system --shell /usr/sbin/nologin --home-dir "$INSTALL_DIR" "$SERVICE_USER"
+        if ! getent group "$SERVICE_USER" &>/dev/null; then
+            groupadd --system "$SERVICE_USER"
+        fi
+        useradd --system --shell /usr/sbin/nologin --home-dir "$INSTALL_DIR" \
+            --gid "$SERVICE_USER" "$SERVICE_USER"
     fi
 
     # Directories
     info "Creating directories..."
     mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$LOG_DIR"
     chown "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR"
+    touch "$LOG_DIR/server.log"
+    chown "$SERVICE_USER:$SERVICE_USER" "$LOG_DIR/server.log"
 
     # Package
     install_package
@@ -574,6 +674,9 @@ do_install() {
     # systemd + logrotate
     install_systemd_unit
     install_logrotate
+
+    # Verify permissions (catches issues from re-runs or partial earlier installs)
+    check_permissions
 
     # Firewall & SELinux checks
     local active_port active_host
@@ -688,6 +791,9 @@ do_update() {
     install_systemd_unit
     install_logrotate
 
+    # Check and fix file permissions (catches issues from failed earlier installs)
+    check_permissions
+
     # Restart service if running
     if command -v systemctl &>/dev/null; then
         if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
@@ -714,6 +820,96 @@ do_update() {
 }
 
 # --------------------------------------------------------------------------- #
+# Uninstall — complete removal
+# --------------------------------------------------------------------------- #
+do_uninstall() {
+    info "=== Zabbix MCP Server - Uninstall ==="
+    echo
+
+    warn "This will permanently remove:"
+    echo "  - Systemd service:  ${SERVICE_NAME}.service"
+    echo "  - Install dir:      $INSTALL_DIR (virtualenv, binaries)"
+    echo "  - Config dir:       $CONFIG_DIR (config.toml)"
+    echo "  - Log dir:          $LOG_DIR (server.log and rotated logs)"
+    echo "  - Logrotate config: /etc/logrotate.d/${SERVICE_NAME}"
+    echo "  - System user:      $SERVICE_USER"
+    echo
+
+    local answer
+    if [[ -t 0 ]]; then
+        read -rp "$(echo -e '\e[1;31m>>>\e[0m') Are you sure? Type 'yes' to confirm: " answer
+    else
+        read -r answer
+    fi
+
+    if [[ "$answer" != "yes" ]]; then
+        info "Uninstall cancelled."
+        exit 0
+    fi
+
+    echo
+
+    # Stop and disable service
+    if command -v systemctl &>/dev/null; then
+        if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+            spin "Stopping $SERVICE_NAME" systemctl stop "$SERVICE_NAME"
+        fi
+        if systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null; then
+            spin "Disabling $SERVICE_NAME" systemctl disable "$SERVICE_NAME"
+        fi
+    fi
+
+    # Remove systemd unit
+    if [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
+        rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
+        ok "Removed systemd unit"
+        if command -v systemctl &>/dev/null; then
+            systemctl daemon-reload &>/dev/null || true
+        fi
+    fi
+
+    # Remove logrotate config
+    if [[ -f "/etc/logrotate.d/${SERVICE_NAME}" ]]; then
+        rm -f "/etc/logrotate.d/${SERVICE_NAME}"
+        ok "Removed logrotate config"
+    fi
+
+    # Remove install directory (venv, binaries)
+    if [[ -d "$INSTALL_DIR" ]]; then
+        rm -rf "$INSTALL_DIR"
+        ok "Removed $INSTALL_DIR"
+    fi
+
+    # Remove config directory
+    if [[ -d "$CONFIG_DIR" ]]; then
+        rm -rf "$CONFIG_DIR"
+        ok "Removed $CONFIG_DIR"
+    fi
+
+    # Remove log directory
+    if [[ -d "$LOG_DIR" ]]; then
+        rm -rf "$LOG_DIR"
+        ok "Removed $LOG_DIR"
+    fi
+
+    # Remove system user
+    if id "$SERVICE_USER" &>/dev/null; then
+        if userdel "$SERVICE_USER" 2>/dev/null; then
+            ok "Removed system user '$SERVICE_USER'"
+        else
+            warn "Could not remove user '$SERVICE_USER' — remove manually: userdel $SERVICE_USER"
+        fi
+    fi
+
+    echo
+    ok "=== Uninstall complete ==="
+    echo
+    echo "  Note: The git repository ($SCRIPT_DIR) was NOT removed."
+    echo "  You can safely delete it manually if no longer needed."
+    echo
+}
+
+# --------------------------------------------------------------------------- #
 # Main — parse arguments
 # --------------------------------------------------------------------------- #
 COMMAND=""
@@ -728,7 +924,7 @@ for arg in "$@"; do
         --install-python)
             AUTO_INSTALL_PYTHON=true
             ;;
-        install|update|upgrade)
+        install|update|upgrade|uninstall)
             COMMAND="$arg"
             ;;
         *)
@@ -754,6 +950,9 @@ need_root
 case "$COMMAND" in
     update|upgrade)
         do_update
+        ;;
+    uninstall)
+        do_uninstall
         ;;
     install)
         do_install
