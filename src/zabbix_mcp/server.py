@@ -1517,8 +1517,10 @@ def run_server(
                 uvicorn_kwargs["ssl_keyfile"] = config.server.tls_key_file
                 logger.info("TLS enabled (cert: %s)", config.server.tls_cert_file)
 
+            logger.info("#### Zabbix MCP Server started successfully ####")
             uvicorn.run(asgi_app, **uvicorn_kwargs)
         else:
+            logger.info("#### Zabbix MCP Server started successfully (stdio) ####")
             mcp.run(transport="stdio")
     finally:
         client_manager.close()
