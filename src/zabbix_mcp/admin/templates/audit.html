@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Audit Log</h1>
+        <p class="page-subtitle">Track all admin and API activity</p>
+    </div>
+    <a href="/admin/audit/export?format=csv" class="btn btn-ghost">&#x1F4E5; Export CSV</a>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+    <input type="date" id="filter-from" name="date_from" class="form-input" placeholder="From"
+           value="{{ filters.date_from | default('') }}"
+           hx-get="/admin/audit"
+           hx-trigger="change"
+           hx-target="#audit-table"
+           hx-include="[name='date_to'], [name='action'], [name='search']"
+           hx-swap="innerHTML">
+    <input type="date" id="filter-to" name="date_to" class="form-input" placeholder="To"
+           value="{{ filters.date_to | default('') }}"
+           hx-get="/admin/audit"
+           hx-trigger="change"
+           hx-target="#audit-table"
+           hx-include="[name='date_from'], [name='action'], [name='search']"
+           hx-swap="innerHTML">
+    <select name="action" class="form-select"
+            hx-get="/admin/audit"
+            hx-trigger="change"
+            hx-target="#audit-table"
+            hx-include="[name='date_from'], [name='date_to'], [name='search']"
+            hx-swap="innerHTML">
+        <option value="">All Actions</option>
+        <option value="login" {% if filters.action == 'login' %}selected{% endif %}>Login</option>
+        <option value="logout" {% if filters.action == 'logout' %}selected{% endif %}>Logout</option>
+        <option value="token.create" {% if filters.action == 'token.create' %}selected{% endif %}>Token Create</option>
+        <option value="token.revoke" {% if filters.action == 'token.revoke' %}selected{% endif %}>Token Revoke</option>
+        <option value="token.delete" {% if filters.action == 'token.delete' %}selected{% endif %}>Token Delete</option>
+        <option value="user.create" {% if filters.action == 'user.create' %}selected{% endif %}>User Create</option>
+        <option value="user.delete" {% if filters.action == 'user.delete' %}selected{% endif %}>User Delete</option>
+        <option value="settings.update" {% if filters.action == 'settings.update' %}selected{% endif %}>Settings Update</option>
+        <option value="api.call" {% if filters.action == 'api.call' %}selected{% endif %}>API Call</option>
+    </select>
+    <input type="search" name="search" class="form-input search-input" placeholder="Search user, target, details..."
+           value="{{ filters.search | default('') }}"
+           hx-get="/admin/audit"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#audit-table"
+           hx-include="[name='date_from'], [name='date_to'], [name='action']"
+           hx-swap="innerHTML">
+</div>
+
+<!-- Audit Table -->
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th class="sortable">Timestamp</th>
+                <th>Action</th>
+                <th class="sortable">User</th>
+                <th>Target</th>
+                <th>Details</th>
+                <th>IP</th>
+            </tr>
+        </thead>
+        <tbody id="audit-table">
+            {% if entries %}
+            {% for entry in entries %}
+            <tr>
+                <td class="text-sm text-muted" style="white-space:nowrap;">{{ entry.timestamp }}</td>
+                <td>
+                    {% if entry.action.startswith('token.') %}
+                    <span class="badge badge-warning">{{ entry.action }}</span>
+                    {% elif entry.action.startswith('user.') %}
+                    <span class="badge badge-primary">{{ entry.action }}</span>
+                    {% elif entry.action == 'login' %}
+                    <span class="badge badge-success">{{ entry.action }}</span>
+                    {% elif entry.action == 'logout' %}
+                    <span class="badge badge-muted">{{ entry.action }}</span>
+                    {% elif entry.action.startswith('settings.') %}
+                    <span class="badge badge-danger">{{ entry.action }}</span>
+                    {% else %}
+                    <span class="badge badge-muted">{{ entry.action }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ entry.user }}</td>
+                <td class="text-sm">{{ entry.target }}</td>
+                <td class="text-sm text-muted" style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ entry.details }}">{{ entry.details }}</td>
+                <td class="monospace text-sm">{{ entry.ip }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center text-muted" style="padding:24px;">No audit log entries found</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if has_more %}
+<div class="load-more">
+    <button class="btn btn-ghost"
+            hx-get="/admin/audit?offset={{ offset }}&limit=50"
+            hx-target="#audit-table"
+            hx-swap="beforeend"
+            hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='search']">
+        Load more entries
+    </button>
+</div>
+{% endif %}
+{% endblock %}

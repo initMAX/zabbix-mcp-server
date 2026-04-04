@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Edit Template: {{ template.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ template.name if template.id else 'New Template' }}</h1>
+        <p class="page-subtitle">Edit HTML report template</p>
+    </div>
+    <a href="/admin/templates" class="btn btn-ghost">&larr; Back to Templates</a>
+</div>
+
+{% if not template.id %}
+<!-- Name/description for new templates -->
+<div class="card mb-4" style="max-width:640px;">
+    <div class="form-group">
+        <label class="form-label" for="template-name">Template Name</label>
+        <input type="text" id="template-name" name="name" class="form-input" value="{{ template.name | default('') }}" placeholder="My Report Template" required>
+    </div>
+    <div class="form-group mb-0">
+        <label class="form-label" for="template-desc">Description</label>
+        <input type="text" id="template-desc" name="description" class="form-input" value="{{ template.description | default('') }}" placeholder="Brief description of this template">
+    </div>
+</div>
+{% endif %}
+
+<!-- Split-view Editor -->
+<div class="editor-container">
+    <!-- Left: Code editor -->
+    <div class="editor-pane">
+        <div class="editor-toolbar">
+            <button class="btn btn-primary btn-sm" id="save-btn"
+                    hx-post="/admin/templates/{{ template.id or 'create' }}/save"
+                    hx-include="#template-editor, #template-name, #template-desc"
+                    hx-swap="none">Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="updatePreview()">Preview</button>
+            <div style="flex:1;"></div>
+            <select class="form-select" style="width:auto; min-width:160px; padding:4px 28px 4px 8px; font-size:0.82rem;" onchange="insertVariable(this.value); this.selectedIndex=0;">
+                <option value="">Insert variable...</option>
+                <option value="{{ '{{' }} host_name {{ '}}' }}">host_name</option>
+                <option value="{{ '{{' }} host_ip {{ '}}' }}">host_ip</option>
+                <option value="{{ '{{' }} problems {{ '}}' }}">problems</option>
+                <option value="{{ '{{' }} period_from {{ '}}' }}">period_from</option>
+                <option value="{{ '{{' }} period_to {{ '}}' }}">period_to</option>
+                <option value="{{ '{{' }} graphs {{ '}}' }}">graphs</option>
+                <option value="{{ '{{' }} inventory {{ '}}' }}">inventory</option>
+                <option value="{{ '{{' }} generated_at {{ '}}' }}">generated_at</option>
+            </select>
+        </div>
+        <textarea class="editor-textarea" id="template-editor" name="content" spellcheck="false">{{ template.content | default('<!DOCTYPE html>\n<html>\n<head>\n    <title>Report</title>\n</head>\n<body>\n    <h1>Report for {{ host_name }}</h1>\n</body>\n</html>') }}</textarea>
+    </div>
+
+    <!-- Right: Preview -->
+    <div class="editor-pane">
+        <div class="editor-toolbar">
+            <span class="text-sm text-muted">Preview</span>
+        </div>
+        <iframe class="editor-preview" id="preview-frame"
+                {% if template.id %}src="/admin/templates/{{ template.id }}/preview"{% endif %}></iframe>
+    </div>
+</div>
+
+<!-- Variables Reference -->
+<div class="variables-panel mt-4" id="variables-panel">
+    <div class="variables-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span>Available Variables</span>
+        <span class="text-muted">&#x25BC;</span>
+    </div>
+    <div class="variables-body">
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} host_name {{ '}}' }}</span>
+            <span class="variable-desc">Target host name</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} host_ip {{ '}}' }}</span>
+            <span class="variable-desc">Host IP address</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} problems {{ '}}' }}</span>
+            <span class="variable-desc">List of active problems</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} period_from {{ '}}' }}</span>
+            <span class="variable-desc">Report period start</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} period_to {{ '}}' }}</span>
+            <span class="variable-desc">Report period end</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} graphs {{ '}}' }}</span>
+            <span class="variable-desc">Rendered graph images (base64)</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} inventory {{ '}}' }}</span>
+            <span class="variable-desc">Host inventory data</span>
+        </div>
+        <div class="variable-item">
+            <span class="variable-name">{{ '{{' }} generated_at {{ '}}' }}</span>
+            <span class="variable-desc">Report generation timestamp</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updatePreview() {
+    var iframe = document.getElementById('preview-frame');
+    var content = document.getElementById('template-editor').value;
+    var doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(content);
+    doc.close();
+}
+
+function insertVariable(variable) {
+    if (!variable) return;
+    var textarea = document.getElementById('template-editor');
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var text = textarea.value;
+    textarea.value = text.substring(0, start) + variable + text.substring(end);
+    textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+    textarea.focus();
+}
+
+// Keyboard shortcut: Ctrl+S to save
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        document.getElementById('save-btn').click();
+    }
+});
+</script>
+{% endblock %}

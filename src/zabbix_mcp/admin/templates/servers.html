@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Zabbix Servers{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Zabbix Servers</h1>
+        <p class="page-subtitle">Configured Zabbix server connections</p>
+    </div>
+</div>
+
+{% if servers %}
+<div class="grid-2">
+    {% for server in servers %}
+    <div class="server-card" id="server-{{ loop.index }}">
+        <div class="server-card-header">
+            <span class="server-card-name">{{ server.name }}</span>
+            <div class="server-card-badges">
+                {% if server.read_only %}
+                <span class="badge badge-warning">Read-only</span>
+                {% endif %}
+                {% if server.ssl %}
+                <span class="badge badge-success">SSL</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="server-card-url">{{ server.url }}</div>
+
+        <div class="server-card-meta">
+            <span class="status-inline" id="server-status-{{ loop.index }}">
+                {% if server.connected %}
+                <span class="status-dot status-dot-green"></span> Connected
+                {% elif server.error %}
+                <span class="status-dot status-dot-red"></span> Error
+                {% else %}
+                <span class="status-dot status-dot-yellow"></span> Unknown
+                {% endif %}
+            </span>
+            {% if server.version %}
+            <span>Zabbix {{ server.version }}</span>
+            {% endif %}
+        </div>
+
+        <div class="server-card-footer">
+            <span class="text-sm text-muted">
+                {% if server.error %}
+                {{ server.error }}
+                {% else %}
+                Last checked: {{ server.last_checked or 'Never' }}
+                {% endif %}
+            </span>
+            <button class="btn btn-ghost btn-sm"
+                    hx-post="/admin/servers/{{ loop.index }}/test"
+                    hx-target="#server-status-{{ loop.index }}"
+                    hx-swap="innerHTML"
+                    hx-indicator="this">
+                <span class="htmx-indicator spinner-sm"></span>
+                Test Connection
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <div class="empty-state">
+        <div class="empty-state-icon">&#x1F5A5;</div>
+        <div class="empty-state-text">No Zabbix servers configured</div>
+        <p class="text-muted">Add server connections in the configuration file.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

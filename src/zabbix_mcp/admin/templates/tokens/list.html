@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}MCP Tokens{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">MCP Tokens</h1>
+        <p class="page-subtitle">Manage API tokens for MCP client access</p>
+    </div>
+    <a href="/admin/tokens/create" class="btn btn-primary">&#x2B; Create Token</a>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th class="sortable">Name</th>
+                <th>Prefix</th>
+                <th>Scopes</th>
+                <th>Read-only</th>
+                <th>IP Restrictions</th>
+                <th class="sortable">Status</th>
+                <th class="sortable">Last Used</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="token-list">
+            {% if tokens %}
+            {% for token in tokens %}
+            <tr id="token-{{ token.id }}">
+                <td>
+                    <a href="/admin/tokens/{{ token.id }}" class="text-primary" style="font-weight:500;">{{ token.name }}</a>
+                </td>
+                <td>
+                    <span class="copy-group">
+                        <code class="monospace">{{ token.token_prefix }}...</code>
+                        <button class="btn-copy" onclick="copyToClipboard('{{ token.token_prefix }}', this)" title="Copy prefix">&#x1F4CB;</button>
+                    </span>
+                </td>
+                <td>
+                    {% for s in token.scopes %}
+                    <span class="badge badge-{{ s }}">{{ s }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if token.read_only %}
+                    <span class="badge badge-warning">Read-only</span>
+                    {% else %}
+                    <span class="badge badge-muted">Read/Write</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if token.ip_allowlist %}
+                    <span class="text-sm monospace">{{ token.ip_allowlist | join(', ') }}</span>
+                    {% else %}
+                    <span class="text-muted text-sm">Any</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if token.revoked %}
+                    <span class="badge badge-danger">Revoked</span>
+                    {% else %}
+                    <span class="badge badge-success">Active</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm text-muted">{{ token.last_used or 'Never' }}</td>
+                <td>
+                    <div class="actions">
+                        {% if token.revoked %}
+                        <button class="btn btn-ghost btn-sm"
+                                hx-post="/admin/tokens/{{ token.id }}/activate"
+                                hx-target="#token-{{ token.id }}"
+                                hx-swap="outerHTML">Activate</button>
+                        {% else %}
+                        <button class="btn btn-ghost btn-sm"
+                                hx-post="/admin/tokens/{{ token.id }}/revoke"
+                                hx-target="#token-{{ token.id }}"
+                                hx-swap="outerHTML">Revoke</button>
+                        {% endif %}
+                        <button class="btn btn-danger btn-sm"
+                                onclick="openModal('delete-modal-{{ token.id }}')">Delete</button>
+                    </div>
+
+                    <!-- Delete confirmation modal -->
+                    <div class="modal-overlay" id="delete-modal-{{ token.id }}" hidden>
+                        <div class="modal">
+                            <div class="modal-header">
+                                <h3 class="modal-title">Delete Token</h3>
+                                <button class="modal-close" onclick="closeModal('delete-modal-{{ token.id }}')">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                Are you sure you want to delete the token <strong>{{ token.name }}</strong>? This action cannot be undone.
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-ghost" onclick="closeModal('delete-modal-{{ token.id }}')">Cancel</button>
+                                <button class="btn btn-danger"
+                                        hx-delete="/admin/tokens/{{ token.id }}"
+                                        hx-target="#token-{{ token.id }}"
+                                        hx-swap="outerHTML swap:0.3s"
+                                        onclick="closeModal('delete-modal-{{ token.id }}')">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="8">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#x1F511;</div>
+                        <div class="empty-state-text">No tokens created yet</div>
+                        <a href="/admin/tokens/create" class="btn btn-primary">Create your first token</a>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Users</h1>
+        <p class="page-subtitle">Manage admin portal user accounts</p>
+    </div>
+    <a href="/admin/users/create" class="btn btn-primary">&#x2B; Create User</a>
+</div>
+
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th class="sortable">Username</th>
+                <th>Role</th>
+                <th class="sortable">Last Login</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if users %}
+            {% for user in users %}
+            <tr id="user-{{ user.id }}">
+                <td style="font-weight:500;">{{ user.username }}</td>
+                <td>
+                    {% if user.role == 'admin' %}
+                    <span class="badge badge-danger">admin</span>
+                    {% elif user.role == 'operator' %}
+                    <span class="badge badge-warning">operator</span>
+                    {% else %}
+                    <span class="badge badge-muted">viewer</span>
+                    {% endif %}
+                </td>
+                <td class="text-sm text-muted">{{ user.last_login or 'Never' }}</td>
+                <td>
+                    <div class="actions">
+                        <a href="/admin/users/{{ user.id }}" class="btn btn-ghost btn-sm">Edit</a>
+                        {% if user.username != current_user %}
+                        <button class="btn btn-danger btn-sm"
+                                hx-delete="/admin/users/{{ user.id }}"
+                                hx-target="#user-{{ user.id }}"
+                                hx-swap="outerHTML swap:0.3s"
+                                hx-confirm="Are you sure you want to delete user {{ user.username }}?">Delete</button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="4">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">&#x1F465;</div>
+                        <div class="empty-state-text">No users found</div>
+                        <a href="/admin/users/create" class="btn btn-primary">Create first user</a>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

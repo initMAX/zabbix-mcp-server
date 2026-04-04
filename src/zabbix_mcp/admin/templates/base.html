@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Zabbix MCP Server{% endblock %} — Admin</title>
+    <link rel="stylesheet" href="/admin/static/style.css">
+    <script src="/admin/static/htmx.min.js"></script>
+</head>
+<body hx-indicator="#loader">
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" rx="6" fill="#1f65f4"/>
+                    <path d="M8 22L14 10h4l6 12h-4l-3-6.5L12 22H8z" fill="#ffffff"/>
+                </svg>
+                <span class="logo-text">Zabbix MCP</span>
+            </div>
+        </div>
+        <ul class="nav-menu">
+            <li><a href="/admin/" class="nav-item {% if active == 'dashboard' %}active{% endif %}">
+                <span class="nav-icon">&#x1F4CA;</span> Dashboard</a></li>
+            <li><a href="/admin/tokens" class="nav-item {% if active == 'tokens' %}active{% endif %}">
+                <span class="nav-icon">&#x1F511;</span> MCP Tokens</a></li>
+            <li><a href="/admin/users" class="nav-item {% if active == 'users' %}active{% endif %}">
+                <span class="nav-icon">&#x1F465;</span> Users</a></li>
+            <li><a href="/admin/servers" class="nav-item {% if active == 'servers' %}active{% endif %}">
+                <span class="nav-icon">&#x1F5A5;</span> Zabbix Servers</a></li>
+            <li><a href="/admin/templates" class="nav-item {% if active == 'templates' %}active{% endif %}">
+                <span class="nav-icon">&#x1F4C4;</span> Report Templates</a></li>
+            <li><a href="/admin/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
+                <span class="nav-icon">&#x2699;</span> Settings</a></li>
+            <li><a href="/admin/audit" class="nav-item {% if active == 'audit' %}active{% endif %}">
+                <span class="nav-icon">&#x1F4CB;</span> Audit Log</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span class="version">v{{ version }}</span>
+        </div>
+    </nav>
+
+    <!-- Header -->
+    <header class="header">
+        <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
+        <div class="header-center">
+            <span class="server-name">{{ server_name }}</span>
+        </div>
+        <div class="header-right">
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">
+                <span class="theme-icon">&#x1F319;</span>
+            </button>
+            <div class="user-menu">
+                <span class="user-name">{{ current_user }}</span>
+                <form method="post" action="/admin/logout" style="display:inline">
+                    <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="content">
+        {% if flash_message %}
+        <div class="toast toast-{{ flash_type }}" id="toast">
+            {{ flash_message }}
+            <button onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+        </div>
+        {% endif %}
+
+        <!-- HTMX loading indicator -->
+        <div class="htmx-indicator" id="loader"></div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+    // Theme toggle
+    function toggleTheme() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        updateThemeIcon(next);
+    }
+
+    function updateThemeIcon(theme) {
+        var el = document.querySelector('.theme-icon');
+        if (el) el.innerHTML = theme === 'dark' ? '&#x1F319;' : '&#x2600;';
+    }
+
+    // Auto-detect theme on load
+    (function() {
+        var saved = localStorage.getItem('theme');
+        if (saved) {
+            document.documentElement.setAttribute('data-theme', saved);
+        } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+        var theme = document.documentElement.getAttribute('data-theme');
+        updateThemeIcon(theme);
+    })();
+
+    // Sidebar toggle (mobile)
+    function toggleSidebar() {
+        var sb = document.getElementById('sidebar');
+        if (window.innerWidth <= 768) {
+            sb.classList.toggle('open');
+        } else {
+            sb.classList.toggle('collapsed');
+        }
+    }
+
+    // Close sidebar on outside click (mobile)
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth <= 768) {
+            var sb = document.getElementById('sidebar');
+            if (sb.classList.contains('open') && !sb.contains(e.target) && !e.target.classList.contains('hamburger')) {
+                sb.classList.remove('open');
+            }
+        }
+    });
+
+    // Copy to clipboard
+    function copyToClipboard(text, btn) {
+        navigator.clipboard.writeText(text).then(function() {
+            var orig = btn.innerHTML;
+            btn.textContent = '\u2713';
+            setTimeout(function() { btn.innerHTML = orig; }, 2000);
+        });
+    }
+
+    // Auto-dismiss toasts
+    setTimeout(function() {
+        var toast = document.getElementById('toast');
+        if (toast) toast.remove();
+    }, 5000);
+
+    // Modal helpers
+    function openModal(id) {
+        document.getElementById(id).hidden = false;
+    }
+    function closeModal(id) {
+        document.getElementById(id).hidden = true;
+    }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

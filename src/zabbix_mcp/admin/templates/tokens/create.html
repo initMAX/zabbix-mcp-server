@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Create Token{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Create MCP Token</h1>
+        <p class="page-subtitle">Generate a new API token for MCP client access</p>
+    </div>
+    <a href="/admin/tokens" class="btn btn-ghost">&larr; Back to Tokens</a>
+</div>
+
+{% if created_token %}
+<!-- Token created successfully — show once -->
+<div class="token-display">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <span class="text-success" style="font-weight:600;">&#x2713; Token created successfully</span>
+        <button class="btn btn-ghost btn-sm" onclick="copyToClipboard('{{ created_token }}', this)">&#x1F4CB; Copy</button>
+    </div>
+    <div class="token-value">{{ created_token }}</div>
+    <div class="token-warning">&#x26A0; This token will not be shown again. Copy it now and store it securely.</div>
+</div>
+<a href="/admin/tokens" class="btn btn-primary">Done</a>
+
+{% else %}
+<div class="card" style="max-width:640px;">
+    <form method="post" action="/admin/tokens/create">
+        <div class="form-group">
+            <label class="form-label" for="name">Token Name</label>
+            <input type="text" id="name" name="name" class="form-input" placeholder="e.g. Claude Desktop - Production" required>
+            <div class="form-hint">A descriptive name to identify this token.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Scopes</label>
+            <div class="scope-tags">
+                <div class="scope-tag">
+                    <input type="checkbox" id="scope-all" name="scopes" value="*" onchange="toggleAllScopes(this)">
+                    <label for="scope-all">* (all)</label>
+                </div>
+                <div class="scope-tag">
+                    <input type="checkbox" id="scope-monitoring" name="scopes" value="monitoring" class="scope-checkbox">
+                    <label for="scope-monitoring">monitoring</label>
+                </div>
+                <div class="scope-tag">
+                    <input type="checkbox" id="scope-data-collection" name="scopes" value="data_collection" class="scope-checkbox">
+                    <label for="scope-data-collection">data_collection</label>
+                </div>
+                <div class="scope-tag">
+                    <input type="checkbox" id="scope-alerts" name="scopes" value="alerts" class="scope-checkbox">
+                    <label for="scope-alerts">alerts</label>
+                </div>
+                <div class="scope-tag">
+                    <input type="checkbox" id="scope-users" name="scopes" value="users" class="scope-checkbox">
+                    <label for="scope-users">users</label>
+                </div>
+                <div class="scope-tag">
+                    <input type="checkbox" id="scope-administration" name="scopes" value="administration" class="scope-checkbox">
+                    <label for="scope-administration">administration</label>
+                </div>
+            </div>
+            <div class="form-hint">Select which API scopes this token can access.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="toggle-label">
+                <span class="toggle">
+                    <input type="checkbox" name="read_only" value="1">
+                    <span class="toggle-slider"></span>
+                </span>
+                Read-only mode
+            </label>
+            <div class="form-hint">When enabled, the token can only read data, not make changes.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="ip_allowlist">IP Allowlist</label>
+            <textarea id="ip_allowlist" name="ip_allowlist" class="form-textarea" rows="3" placeholder="192.168.1.0/24&#10;10.0.0.1&#10;Leave empty for unrestricted access"></textarea>
+            <div class="form-hint">One IP address or CIDR range per line. Leave empty to allow all IPs.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="expires_at">Expiry Date</label>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <input type="date" id="expires_at" name="expires_at" class="form-input" style="width:auto; flex:1;">
+                <label class="toggle-label" style="white-space:nowrap;">
+                    <span class="toggle">
+                        <input type="checkbox" id="no-expiry" name="no_expiry" value="1" checked onchange="toggleExpiry(this)">
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Never expires
+                </label>
+            </div>
+        </div>
+
+        <div style="margin-top:24px; display:flex; gap:8px;">
+            <button type="submit" class="btn btn-primary">Create Token</button>
+            <a href="/admin/tokens" class="btn btn-ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAllScopes(el) {
+    var checkboxes = document.querySelectorAll('.scope-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.checked = false;
+        cb.disabled = el.checked;
+    });
+}
+
+function toggleExpiry(el) {
+    var dateInput = document.getElementById('expires_at');
+    dateInput.disabled = el.checked;
+    if (el.checked) dateInput.value = '';
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    toggleExpiry(document.getElementById('no-expiry'));
+});
+</script>
+{% endblock %}

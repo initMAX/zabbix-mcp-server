@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Token: {{ token.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ token.name }}</h1>
+        <p class="page-subtitle">
+            Token prefix: <code class="monospace">{{ token.token_prefix }}...</code>
+            {% if token.revoked %}
+            <span class="badge badge-danger" style="margin-left:8px;">Revoked</span>
+            {% else %}
+            <span class="badge badge-success" style="margin-left:8px;">Active</span>
+            {% endif %}
+        </p>
+    </div>
+    <a href="/admin/tokens" class="btn btn-ghost">&larr; Back to Tokens</a>
+</div>
+
+<div class="grid-2">
+    <!-- Edit Form -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Token Settings</h2>
+        </div>
+        <form method="post" action="/admin/tokens/{{ token.id }}">
+            <div class="form-group">
+                <label class="form-label" for="name">Token Name</label>
+                <input type="text" id="name" name="name" class="form-input" value="{{ token.name }}" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Scopes</label>
+                <div class="scope-tags">
+                    <div class="scope-tag">
+                        <input type="checkbox" id="scope-all" name="scopes" value="*"
+                               {% if '*' in token.scopes %}checked{% endif %}
+                               onchange="toggleAllScopes(this)">
+                        <label for="scope-all">* (all)</label>
+                    </div>
+                    {% for scope in ['monitoring', 'data_collection', 'alerts', 'users', 'administration'] %}
+                    <div class="scope-tag">
+                        <input type="checkbox" id="scope-{{ scope }}" name="scopes" value="{{ scope }}" class="scope-checkbox"
+                               {% if scope in token.scopes %}checked{% endif %}
+                               {% if '*' in token.scopes %}disabled{% endif %}>
+                        <label for="scope-{{ scope }}">{{ scope }}</label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="read_only" value="1" {% if token.read_only %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Read-only mode
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="ip_allowlist">IP Allowlist</label>
+                <textarea id="ip_allowlist" name="ip_allowlist" class="form-textarea" rows="3">{{ token.ip_allowlist | join('\n') if token.ip_allowlist else '' }}</textarea>
+                <div class="form-hint">One IP address or CIDR range per line.</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="expires_at">Expiry Date</label>
+                <input type="date" id="expires_at" name="expires_at" class="form-input" value="{{ token.expires_at or '' }}" style="width:auto;">
+            </div>
+
+            <div style="margin-top:24px;">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Stats -->
+    <div>
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="card-title">Usage Statistics</h2>
+            </div>
+            <div class="settings-row" style="grid-template-columns: 140px 1fr;">
+                <div class="settings-label">Total Calls</div>
+                <div><strong>{{ token.total_calls | default(0) }}</strong></div>
+            </div>
+            <div class="settings-row" style="grid-template-columns: 140px 1fr;">
+                <div class="settings-label">Last Used</div>
+                <div class="text-sm">{{ token.last_used or 'Never' }}</div>
+            </div>
+            <div class="settings-row" style="grid-template-columns: 140px 1fr;">
+                <div class="settings-label">Last IP</div>
+                <div class="monospace text-sm">{{ token.last_ip or 'N/A' }}</div>
+            </div>
+            <div class="settings-row" style="grid-template-columns: 140px 1fr;">
+                <div class="settings-label">Created</div>
+                <div class="text-sm">{{ token.created_at }}</div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card" style="border-color: var(--color-danger);">
+            <div class="card-header">
+                <h2 class="card-title text-danger">Danger Zone</h2>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                {% if token.revoked %}
+                <button class="btn btn-success"
+                        hx-post="/admin/tokens/{{ token.id }}/activate"
+                        hx-swap="none"
+                        onclick="location.reload()">Activate Token</button>
+                {% else %}
+                <button class="btn btn-ghost"
+                        hx-post="/admin/tokens/{{ token.id }}/revoke"
+                        hx-swap="none"
+                        hx-confirm="Are you sure you want to revoke this token?"
+                        onclick="setTimeout(function(){location.reload()}, 300)">Revoke Token</button>
+                {% endif %}
+                <button class="btn btn-danger" onclick="openModal('delete-modal')">Delete Token</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="delete-modal" hidden>
+    <div class="modal">
+        <div class="modal-header">
+            <h3 class="modal-title">Delete Token</h3>
+            <button class="modal-close" onclick="closeModal('delete-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            Are you sure you want to permanently delete the token <strong>{{ token.name }}</strong>?
+            This action cannot be undone.
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeModal('delete-modal')">Cancel</button>
+            <form method="post" action="/admin/tokens/{{ token.id }}/delete" style="display:inline;">
+                <button type="submit" class="btn btn-danger">Delete Permanently</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAllScopes(el) {
+    var checkboxes = document.querySelectorAll('.scope-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.disabled = el.checked;
+        if (el.checked) cb.checked = false;
+    });
+}
+</script>
+{% endblock %}

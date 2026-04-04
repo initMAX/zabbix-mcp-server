@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Report Templates{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Report Templates</h1>
+        <p class="page-subtitle">Manage HTML report templates for automated reports</p>
+    </div>
+    <a href="/admin/templates/create" class="btn btn-primary">&#x2B; Create Template</a>
+</div>
+
+<!-- Built-in Templates -->
+{% if builtin_templates %}
+<div class="section">
+    <h2 class="section-title">Built-in Templates</h2>
+    <div class="grid-3">
+        {% for template in builtin_templates %}
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">{{ template.name }}</h3>
+                <span class="badge badge-muted">Built-in</span>
+            </div>
+            <div class="card-body">
+                <p class="text-sm" style="margin-bottom:16px;">{{ template.description }}</p>
+                <form method="post" action="/admin/templates/{{ template.id }}/duplicate" style="display:inline;">
+                    <button type="submit" class="btn btn-ghost btn-sm">&#x1F4CB; Duplicate</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Custom Templates -->
+<div class="section">
+    <h2 class="section-title">Custom Templates</h2>
+    {% if custom_templates %}
+    <div class="grid-3">
+        {% for template in custom_templates %}
+        <div class="card" id="template-{{ template.id }}">
+            <div class="card-header">
+                <h3 class="card-title">{{ template.name }}</h3>
+                <span class="badge badge-primary">Custom</span>
+            </div>
+            <div class="card-body">
+                <p class="text-sm" style="margin-bottom:16px;">{{ template.description }}</p>
+                <div class="actions">
+                    <a href="/admin/templates/{{ template.id }}/edit" class="btn btn-ghost btn-sm">&#x270F; Edit</a>
+                    <button class="btn btn-danger btn-sm"
+                            hx-delete="/admin/templates/{{ template.id }}"
+                            hx-target="#template-{{ template.id }}"
+                            hx-swap="outerHTML swap:0.3s"
+                            hx-confirm="Are you sure you want to delete template '{{ template.name }}'?">Delete</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="empty-state">
+            <div class="empty-state-icon">&#x1F4C4;</div>
+            <div class="empty-state-text">No custom templates yet</div>
+            <p class="text-muted" style="margin-bottom:16px;">Duplicate a built-in template or create one from scratch.</p>
+            <a href="/admin/templates/create" class="btn btn-primary">Create Template</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

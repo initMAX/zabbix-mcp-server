@@ -1,0 +1,10 @@
+<div class="toast toast-{{ flash_type }}" id="toast">
+    {{ flash_message }}
+    <button onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+</div>
+<script>
+setTimeout(function() {
+    var toast = document.getElementById('toast');
+    if (toast) toast.remove();
+}, 5000);
+</script>

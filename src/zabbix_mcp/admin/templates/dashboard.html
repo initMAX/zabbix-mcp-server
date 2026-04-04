@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">System overview and recent activity</p>
+    </div>
+</div>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-icon">&#x1F511;</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.active_tokens | default(0) }}</div>
+            <div class="stat-label">Active Tokens</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">&#x1F5A5;</div>
+        <div class="stat-content">
+            <div class="stat-value">
+                {% for server in servers %}
+                <span class="status-dot {% if server.connected %}status-dot-green{% else %}status-dot-red{% endif %}"></span>
+                {% endfor %}
+                {{ stats.server_count | default(0) }}
+            </div>
+            <div class="stat-label">Zabbix Servers</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">&#x1F465;</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.admin_users | default(0) }}</div>
+            <div class="stat-label">Admin Users</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">&#x1F4C4;</div>
+        <div class="stat-content">
+            <div class="stat-value">{{ stats.report_templates | default(0) }}</div>
+            <div class="stat-label">Report Templates</div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="quick-actions">
+    <a href="/admin/tokens/create" class="btn btn-primary">&#x1F511; Create Token</a>
+    <button class="btn btn-ghost"
+            hx-post="/admin/servers/test-all"
+            hx-target="#connection-results"
+            hx-swap="innerHTML">
+        &#x1F50C; Test Connections
+    </button>
+    <div id="connection-results" style="display:inline-flex; align-items:center; gap:8px;"></div>
+</div>
+
+<!-- Recent Audit Activity -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">Recent Activity</h2>
+        <span class="text-sm text-muted">Auto-refreshes every 30s</span>
+    </div>
+    <div class="card-body">
+        <div class="table-container" style="border:none;">
+            <table hx-get="/admin/audit?limit=10&partial=1"
+                   hx-trigger="every 30s"
+                   hx-swap="innerHTML"
+                   hx-target="#recent-activity-body">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Action</th>
+                        <th>User</th>
+                        <th>Target</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-activity-body">
+                    {% if audit_entries %}
+                    {% for entry in audit_entries %}
+                    <tr>
+                        <td class="text-sm text-muted">{{ entry.timestamp }}</td>
+                        <td><span class="badge badge-primary">{{ entry.action }}</span></td>
+                        <td>{{ entry.user }}</td>
+                        <td>{{ entry.target }}</td>
+                        <td class="monospace text-sm">{{ entry.ip }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted" style="padding:24px;">No recent activity</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Server configuration and preferences</p>
+    </div>
+</div>
+
+{% if restart_required %}
+<div class="restart-banner">
+    &#x26A0; Some changes require a server restart to take effect.
+</div>
+{% endif %}
+
+<!-- Server Section -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F5A5; Server</h2>
+    <form hx-post="/admin/settings/server" hx-swap="none">
+        <div class="settings-row">
+            <div class="settings-label">
+                Server Name
+            </div>
+            <div>
+                <input type="text" name="server_name" class="form-input" value="{{ settings.server_name | default('Zabbix MCP Server') }}">
+                <div class="form-hint">Display name shown in the header.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Host <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+            </div>
+            <div>
+                <input type="text" name="host" class="form-input" value="{{ settings.host | default('0.0.0.0') }}">
+                <div class="form-hint">IP address to bind to. Requires restart.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+            </div>
+            <div>
+                <input type="number" name="port" class="form-input" value="{{ settings.port | default(8080) }}" style="width:120px;">
+                <div class="form-hint">TCP port for the MCP server. Requires restart.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Transport <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+            </div>
+            <div>
+                <select name="transport" class="form-select" style="width:auto;">
+                    <option value="sse" {% if settings.transport == 'sse' %}selected{% endif %}>SSE (Server-Sent Events)</option>
+                    <option value="stdio" {% if settings.transport == 'stdio' %}selected{% endif %}>STDIO</option>
+                    <option value="streamable-http" {% if settings.transport == 'streamable-http' %}selected{% endif %}>Streamable HTTP</option>
+                </select>
+                <div class="form-hint">MCP transport protocol. Requires restart.</div>
+            </div>
+        </div>
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Server Settings</button>
+        </div>
+    </form>
+</div>
+
+<!-- Security Section -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F512; Security</h2>
+    <form hx-post="/admin/settings/security" hx-swap="none">
+        <div class="settings-row">
+            <div class="settings-label">
+                Authentication
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="auth_enabled" value="1" {% if settings.auth_enabled %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Enable token authentication
+                </label>
+                <div class="form-hint">When disabled, all MCP requests are accepted without a token.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Rate Limiting
+            </div>
+            <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" name="rate_limit" class="form-input" value="{{ settings.rate_limit | default(100) }}" style="width:100px;">
+                    <span class="text-muted">requests per minute</span>
+                </div>
+                <div class="form-hint">Maximum API requests per token per minute. 0 = unlimited.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Session Timeout
+            </div>
+            <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" name="session_timeout" class="form-input" value="{{ settings.session_timeout | default(3600) }}" style="width:120px;">
+                    <span class="text-muted">seconds</span>
+                </div>
+                <div class="form-hint">Admin portal session timeout duration.</div>
+            </div>
+        </div>
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Security Settings</button>
+        </div>
+    </form>
+</div>
+
+<!-- Reporting Section -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F4CA; Reporting</h2>
+    <form hx-post="/admin/settings/reporting" hx-swap="none">
+        <div class="settings-row">
+            <div class="settings-label">
+                Default Template
+            </div>
+            <div>
+                <select name="default_template" class="form-select" style="width:auto; min-width:200px;">
+                    {% for tmpl in report_templates %}
+                    <option value="{{ tmpl.id }}" {% if tmpl.id == settings.default_template %}selected{% endif %}>{{ tmpl.name }}</option>
+                    {% endfor %}
+                </select>
+                <div class="form-hint">Default report template used when none is specified.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Graph Width
+            </div>
+            <div>
+                <input type="number" name="graph_width" class="form-input" value="{{ settings.graph_width | default(800) }}" style="width:120px;">
+                <div class="form-hint">Default width for rendered graph images (pixels).</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Graph Height
+            </div>
+            <div>
+                <input type="number" name="graph_height" class="form-input" value="{{ settings.graph_height | default(200) }}" style="width:120px;">
+                <div class="form-hint">Default height for rendered graph images (pixels).</div>
+            </div>
+        </div>
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Reporting Settings</button>
+        </div>
+    </form>
+</div>
+
+<!-- Admin Section -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x2699; Admin Portal</h2>
+    <form hx-post="/admin/settings/admin" hx-swap="none">
+        <div class="settings-row">
+            <div class="settings-label">
+                Admin Path <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+            </div>
+            <div>
+                <input type="text" name="admin_path" class="form-input" value="{{ settings.admin_path | default('/admin') }}" style="width:200px;">
+                <div class="form-hint">URL path prefix for the admin portal. Requires restart.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Audit Logging
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="audit_enabled" value="1" {% if settings.audit_enabled %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Enable audit logging
+                </label>
+                <div class="form-hint">Log all admin portal and API actions.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Audit Retention
+            </div>
+            <div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <input type="number" name="audit_retention" class="form-input" value="{{ settings.audit_retention | default(90) }}" style="width:100px;">
+                    <span class="text-muted">days</span>
+                </div>
+                <div class="form-hint">Number of days to retain audit log entries.</div>
+            </div>
+        </div>
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Admin Settings</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

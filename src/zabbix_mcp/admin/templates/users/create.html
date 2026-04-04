@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Create User{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Create User</h1>
+        <p class="page-subtitle">Add a new admin portal user account</p>
+    </div>
+    <a href="/admin/users" class="btn btn-ghost">&larr; Back to Users</a>
+</div>
+
+<div class="card" style="max-width:480px;">
+    <form method="post" action="/admin/users/create" autocomplete="off">
+        <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input type="text" id="username" name="username" class="form-input" placeholder="Enter username" required autocomplete="off">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input type="password" id="password" name="password" class="form-input" placeholder="Enter password" required autocomplete="new-password" oninput="checkPasswordStrength(this.value)">
+            <div class="password-strength">
+                <div class="password-strength-bar" id="password-bar"></div>
+            </div>
+            <div class="form-hint" id="password-hint">Use at least 8 characters with mixed case, numbers, and symbols.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label" for="role">Role</label>
+            <select id="role" name="role" class="form-select" required>
+                <option value="viewer">Viewer — Read-only access</option>
+                <option value="operator">Operator — Manage tokens and view settings</option>
+                <option value="admin" selected>Admin — Full access</option>
+            </select>
+            <div class="form-hint">Determines what actions the user can perform in the admin portal.</div>
+        </div>
+
+        <div style="margin-top:24px; display:flex; gap:8px;">
+            <button type="submit" class="btn btn-primary">Create User</button>
+            <a href="/admin/users" class="btn btn-ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function checkPasswordStrength(password) {
+    var bar = document.getElementById('password-bar');
+    var hint = document.getElementById('password-hint');
+    var score = 0;
+
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+    bar.className = 'password-strength-bar';
+    if (password.length === 0) {
+        bar.style.width = '0';
+        hint.textContent = 'Use at least 8 characters with mixed case, numbers, and symbols.';
+    } else if (score <= 2) {
+        bar.classList.add('strength-weak');
+        hint.textContent = 'Weak password';
+        hint.style.color = 'var(--color-danger)';
+    } else if (score <= 3) {
+        bar.classList.add('strength-medium');
+        hint.textContent = 'Medium strength';
+        hint.style.color = 'var(--color-warning)';
+    } else {
+        bar.classList.add('strength-strong');
+        hint.textContent = 'Strong password';
+        hint.style.color = 'var(--color-success)';
+    }
+}
+</script>
+{% endblock %}
