@@ -577,7 +577,7 @@ install_package() {
     fi
 
     spin "Upgrading pip" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip --quiet
-    spin "Installing zabbix-mcp-server from ${SCRIPT_DIR}" "$INSTALL_DIR/venv/bin/pip" install "$SCRIPT_DIR" --quiet
+    spin "Installing zabbix-mcp-server from ${SCRIPT_DIR}" "$INSTALL_DIR/venv/bin/pip" install --upgrade "$SCRIPT_DIR" --quiet
 
     # Resolve "auto" reporting flag:
     #   install: default ON (include reporting)
@@ -602,7 +602,7 @@ install_package() {
             apt-get install -y libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev &>/dev/null || \
                 warn "Some system libraries for reporting may be missing. Install: apt-get install libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0"
         fi
-        spin "Installing PDF reporting dependencies" "$INSTALL_DIR/venv/bin/pip" install "$SCRIPT_DIR[reporting]" --quiet
+        spin "Installing PDF reporting dependencies" "$INSTALL_DIR/venv/bin/pip" install --upgrade "$SCRIPT_DIR[reporting]" --quiet
     fi
 
     local version
