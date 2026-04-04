@@ -21,19 +21,30 @@ from zabbix_mcp.admin.config_writer import (
 logger = logging.getLogger("zabbix_mcp.admin")
 
 # Settings that require a server restart to take effect
-RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file"}
+RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file", "log_file"}
+
+# List fields — split comma-separated into TOML arrays
+LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_import_dirs", "tools", "disabled_tools"}
+
+# Boolean fields — checkbox present = True, absent = False
+BOOL_KEYS = {"compact_output", "enabled"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
     "server": {
         "toml_section": "server",
-        "allowed_keys": {"host", "port", "transport", "log_level", "compact_output"},
-        "min_role": "operator",
+        "allowed_keys": {"host", "port", "transport", "log_level", "log_file", "compact_output"},
+        "min_role": "admin",
     },
-    "security": {
+    "tls_access": {
         "toml_section": "server",
-        "allowed_keys": {"rate_limit"},
-        "min_role": "operator",
+        "allowed_keys": {"tls_cert_file", "tls_key_file", "cors_origins", "allowed_hosts", "allowed_import_dirs", "rate_limit"},
+        "min_role": "admin",
+    },
+    "tools": {
+        "toml_section": "server",
+        "allowed_keys": {"tools", "disabled_tools"},
+        "min_role": "admin",
     },
     "reporting": {
         "toml_section": "server",
@@ -42,8 +53,8 @@ SECTION_CONFIG = {
     },
     "admin": {
         "toml_section": "admin",
-        "allowed_keys": {"port", "enabled"},
-        "min_role": "admin",  # only admin can modify admin section
+        "allowed_keys": {"enabled", "port"},
+        "min_role": "admin",
     },
 }
 
@@ -54,20 +65,31 @@ async def settings_view(request: Request) -> Response:
     if not session:
         return RedirectResponse("/login", status_code=303)
 
-    # Read current config — flatten sections so template can use settings.host etc.
-    settings = {}
+    # Read current config — keep server and admin sections separate
+    settings: dict = {}
+    has_legacy_token = False
+
     if TOMLKIT_AVAILABLE:
         try:
             doc = load_config_document(admin_app.config_path)
             server_cfg = dict(doc.get("server", {}))
             admin_cfg = dict(doc.get("admin", {}))
+
+            # Detect legacy auth_token
+            if server_cfg.get("auth_token"):
+                has_legacy_token = True
+
             # Remove sensitive values
             server_cfg.pop("auth_token", None)
             # Remove users sub-table from admin display
             admin_cfg.pop("users", None)
-            # Merge all into flat dict
+
+            # Merge server fields directly
             settings.update(server_cfg)
-            settings.update(admin_cfg)
+
+            # Admin fields — prefix to avoid collision (both have "port")
+            settings["admin_enabled"] = admin_cfg.get("enabled", False)
+            settings["admin_port"] = admin_cfg.get("port", 9090)
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 
@@ -75,6 +97,7 @@ async def settings_view(request: Request) -> Response:
         "active": "settings",
         "settings": settings,
         "restart_required_fields": RESTART_REQUIRED,
+        "has_legacy_token": has_legacy_token,
         "can_edit": session.role in ("admin", "operator"),
     })
 
@@ -102,30 +125,37 @@ async def settings_update(request: Request) -> Response:
 
     try:
         doc = load_config_document(admin_app.config_path)
-        config_section = doc.get(config_section_name, {})
+
+        if config_section_name not in doc:
+            import tomlkit
+            doc.add(config_section_name, tomlkit.table())
+
+        config_section = doc[config_section_name]
 
         needs_restart = False
-        for key, value in form.items():
-            if key.startswith("_"):
-                continue
 
-            # SECURITY: reject keys not in allowlist
-            if key not in allowed_keys:
-                logger.warning("Rejected setting key '%s' in section '%s' (not in allowlist)", key, section)
-                continue
-
-            # Type conversion
-            if value == "true":
-                value = True
-            elif value == "false":
-                value = False
-            elif value.isdigit():
-                value = int(value)
-
-            if value == "" and key in config_section and config_section[key] is None:
-                continue
-
-            config_section[key] = value
+        for key in allowed_keys:
+            if key in BOOL_KEYS:
+                config_section[key] = key in form
+            elif key in LIST_KEYS:
+                raw = str(form.get(key, "")).strip()
+                if raw:
+                    config_section[key] = [s.strip() for s in raw.split(",") if s.strip()]
+                else:
+                    # Remove key if empty (use default)
+                    if key in config_section:
+                        del config_section[key]
+            elif key in form:
+                value = str(form.get(key, "")).strip()
+                if value == "":
+                    # Empty string — remove key to use default
+                    if key in config_section:
+                        del config_section[key]
+                    continue
+                # Type conversion
+                if value.isdigit():
+                    value = int(value)
+                config_section[key] = value
 
             if key in RESTART_REQUIRED:
                 needs_restart = True

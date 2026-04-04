@@ -15,25 +15,22 @@
 </div>
 {% endif %}
 
-<!-- Server Section -->
+{% if has_legacy_token %}
+<div class="alert alert-warning" style="margin-bottom: 24px; padding: 12px 16px; border-radius: 8px; background: var(--color-warning-bg, rgba(255,170,0,0.1)); border: 1px solid var(--color-warning, #fa0);">
+    &#x26A0;&#xFE0F; Legacy <code>auth_token</code> detected in config. Manage authentication via <a href="/tokens">MCP Tokens</a> page.
+</div>
+{% endif %}
+
+<!-- Section 1: Server -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x1F5A5; Server</h2>
     <form hx-post="/settings/server" hx-swap="none">
         <div class="settings-row">
             <div class="settings-label">
-                Server Name
-            </div>
-            <div>
-                <input type="text" name="server_name" class="form-input" value="{{ settings.server_name | default('Zabbix MCP Server') }}">
-                <div class="form-hint">Display name shown in the header.</div>
-            </div>
-        </div>
-        <div class="settings-row">
-            <div class="settings-label">
                 Host <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
-                <input type="text" name="host" class="form-input" value="{{ settings.host | default('0.0.0.0') }}">
+                <input type="text" name="host" class="form-input" value="{{ settings.host | default('127.0.0.1') }}">
                 <div class="form-hint">IP address to bind to. Requires restart.</div>
             </div>
         </div>
@@ -42,21 +39,61 @@
                 Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
-                <input type="number" name="port" class="form-input" value="{{ settings.port | default(8080) }}" style="width:120px;">
+                <input type="number" name="port" class="form-input" value="{{ settings.port | default(8080) }}" min="1" max="65535" style="width:120px;">
                 <div class="form-hint">TCP port for the MCP server. Requires restart.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Transport <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+                Transport
             </div>
             <div>
                 <select name="transport" class="form-select" style="width:auto;">
+                    <option value="http" {% if settings.transport == 'http' %}selected{% endif %}>HTTP</option>
                     <option value="sse" {% if settings.transport == 'sse' %}selected{% endif %}>SSE (Server-Sent Events)</option>
-                    <option value="stdio" {% if settings.transport == 'stdio' %}selected{% endif %}>STDIO</option>
-                    <option value="streamable-http" {% if settings.transport == 'streamable-http' %}selected{% endif %}>Streamable HTTP</option>
+                    <option value="stdio" {% if settings.transport == 'stdio' or not settings.transport %}selected{% endif %}>STDIO</option>
                 </select>
-                <div class="form-hint">MCP transport protocol. Requires restart.</div>
+                <div class="form-hint">MCP transport protocol.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Log Level
+            </div>
+            <div>
+                <select name="log_level" class="form-select" style="width:auto;">
+                    {% set current_log_level = settings.log_level | default('info') | lower %}
+                    <option value="debug" {% if current_log_level == 'debug' %}selected{% endif %}>debug</option>
+                    <option value="info" {% if current_log_level == 'info' %}selected{% endif %}>info</option>
+                    <option value="warning" {% if current_log_level == 'warning' %}selected{% endif %}>warning</option>
+                    <option value="error" {% if current_log_level == 'error' %}selected{% endif %}>error</option>
+                    <option value="critical" {% if current_log_level == 'critical' %}selected{% endif %}>critical</option>
+                </select>
+                <div class="form-hint">Logging verbosity level.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Log File <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+            </div>
+            <div>
+                <input type="text" name="log_file" class="form-input" value="{{ settings.log_file | default('') }}" placeholder="/var/log/zabbix-mcp/server.log">
+                <div class="form-hint">Path to log file. Empty = stderr only. Requires restart.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Compact Output
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="compact_output" value="true" {% if settings.compact_output is not defined or settings.compact_output %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Enable compact output
+                </label>
+                <div class="form-hint">Strip extra whitespace from API responses to reduce token usage.</div>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
@@ -67,90 +104,140 @@
     </form>
 </div>
 
-<!-- Security Section -->
+<!-- Section 2: TLS & Access -->
 <div class="settings-section">
-    <h2 class="settings-section-title">&#x1F512; Security</h2>
-    <form hx-post="/settings/security" hx-swap="none">
+    <h2 class="settings-section-title">&#x1F512; TLS &amp; Access</h2>
+    <form hx-post="/settings/tls_access" hx-swap="none">
         <div class="settings-row">
             <div class="settings-label">
-                Authentication
+                TLS Certificate <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
-                <label class="toggle-label">
-                    <span class="toggle">
-                        <input type="checkbox" name="auth_enabled" value="1" {% if settings.auth_enabled %}checked{% endif %}>
-                        <span class="toggle-slider"></span>
-                    </span>
-                    Enable token authentication
-                </label>
-                <div class="form-hint">When disabled, all MCP requests are accepted without a token.</div>
+                <input type="text" name="tls_cert_file" class="form-input" value="{{ settings.tls_cert_file | default('') }}" placeholder="/etc/ssl/certs/mcp.crt">
+                <div class="form-hint">Path to TLS certificate file (PEM). Requires restart.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Rate Limiting
+                TLS Key <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+            </div>
+            <div>
+                <input type="text" name="tls_key_file" class="form-input" value="{{ settings.tls_key_file | default('') }}" placeholder="/etc/ssl/private/mcp.key">
+                <div class="form-hint">Path to TLS private key file (PEM). Requires restart.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                CORS Origins
+            </div>
+            <div>
+                <textarea name="cors_origins" class="form-input" rows="3" placeholder="https://example.com, https://app.example.com">{{ settings.cors_origins | join(', ') if settings.cors_origins else '' }}</textarea>
+                <div class="form-hint">Comma-separated list of allowed CORS origins.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Allowed Hosts
+            </div>
+            <div>
+                <textarea name="allowed_hosts" class="form-input" rows="3" placeholder="192.168.1.0/24, 10.0.0.1">{{ settings.allowed_hosts | join(', ') if settings.allowed_hosts else '' }}</textarea>
+                <div class="form-hint">Comma-separated IP addresses or CIDR ranges. Empty = allow all.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Allowed Import Dirs
+            </div>
+            <div>
+                <textarea name="allowed_import_dirs" class="form-input" rows="3" placeholder="/opt/zabbix/import, /tmp/imports">{{ settings.allowed_import_dirs | join(', ') if settings.allowed_import_dirs else '' }}</textarea>
+                <div class="form-hint">Comma-separated directory paths allowed for source_file imports.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Rate Limit
             </div>
             <div>
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <input type="number" name="rate_limit" class="form-input" value="{{ settings.rate_limit | default(100) }}" style="width:100px;">
+                    <input type="number" name="rate_limit" class="form-input" value="{{ settings.rate_limit | default(300) }}" min="0" style="width:120px;">
                     <span class="text-muted">requests per minute</span>
                 </div>
                 <div class="form-hint">Maximum API requests per token per minute. 0 = unlimited.</div>
             </div>
         </div>
-        <div class="settings-row">
-            <div class="settings-label">
-                Session Timeout
-            </div>
-            <div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <input type="number" name="session_timeout" class="form-input" value="{{ settings.session_timeout | default(3600) }}" style="width:120px;">
-                    <span class="text-muted">seconds</span>
-                </div>
-                <div class="form-hint">Admin portal session timeout duration.</div>
-            </div>
-        </div>
         {% if current_user_role != 'viewer' %}
         <div style="margin-top:16px;">
-            <button type="submit" class="btn btn-primary btn-sm">Save Security Settings</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save TLS &amp; Access Settings</button>
         </div>
         {% endif %}
     </form>
 </div>
 
-<!-- Reporting Section -->
+<!-- Section 3: Tool Exposure -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F527; Tool Exposure</h2>
+    <form hx-post="/settings/tools" hx-swap="none">
+        <div class="settings-row">
+            <div class="settings-label">
+                Enabled Tools
+            </div>
+            <div>
+                <textarea name="tools" class="form-input" rows="2" placeholder="monitoring, data_collection, alerts">{{ settings.tools | join(', ') if settings.tools else '' }}</textarea>
+                <div class="form-hint">Comma-separated tool group names to enable. Empty = all enabled.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Disabled Tools
+            </div>
+            <div>
+                <textarea name="disabled_tools" class="form-input" rows="2" placeholder="administration, users">{{ settings.disabled_tools | join(', ') if settings.disabled_tools else '' }}</textarea>
+                <div class="form-hint">Comma-separated tool group names to disable.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label"></div>
+            <div>
+                <div class="form-hint" style="font-style:italic;">Available groups: <code>monitoring</code>, <code>data_collection</code>, <code>alerts</code>, <code>users</code>, <code>administration</code></div>
+            </div>
+        </div>
+        {% if current_user_role != 'viewer' %}
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Tool Settings</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Section 4: Reporting -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x1F4CA; Reporting</h2>
     <form hx-post="/settings/reporting" hx-swap="none">
         <div class="settings-row">
             <div class="settings-label">
-                Default Template
+                Company Name
             </div>
             <div>
-                <select name="default_template" class="form-select" style="width:auto; min-width:200px;">
-                    {% for tmpl in report_templates %}
-                    <option value="{{ tmpl.id }}" {% if tmpl.id == settings.default_template %}selected{% endif %}>{{ tmpl.name }}</option>
-                    {% endfor %}
-                </select>
-                <div class="form-hint">Default report template used when none is specified.</div>
+                <input type="text" name="report_company" class="form-input" value="{{ settings.report_company | default('') }}" placeholder="Your Company">
+                <div class="form-hint">Company name displayed in generated reports.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Graph Width
+                Report Subtitle
             </div>
             <div>
-                <input type="number" name="graph_width" class="form-input" value="{{ settings.graph_width | default(800) }}" style="width:120px;">
-                <div class="form-hint">Default width for rendered graph images (pixels).</div>
+                <input type="text" name="report_subtitle" class="form-input" value="{{ settings.report_subtitle | default('IT Monitoring Service') }}">
+                <div class="form-hint">Subtitle displayed on report cover pages.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Graph Height
+                Report Logo
             </div>
             <div>
-                <input type="number" name="graph_height" class="form-input" value="{{ settings.graph_height | default(200) }}" style="width:120px;">
-                <div class="form-hint">Default height for rendered graph images (pixels).</div>
+                <input type="text" name="report_logo" class="form-input" value="{{ settings.report_logo | default('') }}" placeholder="/opt/zabbix-mcp/logo.png">
+                <div class="form-hint">File path to company logo image used in reports.</div>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
@@ -161,44 +248,32 @@
     </form>
 </div>
 
-<!-- Admin Section -->
+<!-- Section 5: Admin Portal -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x2699; Admin Portal</h2>
     <form hx-post="/settings/admin" hx-swap="none">
         <div class="settings-row">
             <div class="settings-label">
-                Admin Path <span class="restart-icon" title="Requires restart">&#x26A0;</span>
-            </div>
-            <div>
-                <input type="text" name="admin_path" class="form-input" value="{{ settings.admin_path | default('/admin') }}" style="width:200px;">
-                <div class="form-hint">URL path prefix for the admin portal. Requires restart.</div>
-            </div>
-        </div>
-        <div class="settings-row">
-            <div class="settings-label">
-                Audit Logging
+                Enabled
             </div>
             <div>
                 <label class="toggle-label">
                     <span class="toggle">
-                        <input type="checkbox" name="audit_enabled" value="1" {% if settings.audit_enabled %}checked{% endif %}>
+                        <input type="checkbox" name="enabled" value="true" {% if settings.admin_enabled %}checked{% endif %}>
                         <span class="toggle-slider"></span>
                     </span>
-                    Enable audit logging
+                    Enable admin portal
                 </label>
-                <div class="form-hint">Log all admin portal and API actions.</div>
+                <div class="form-hint">Controls whether the admin web interface is started.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Audit Retention
+                Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <input type="number" name="audit_retention" class="form-input" value="{{ settings.audit_retention | default(90) }}" style="width:100px;">
-                    <span class="text-muted">days</span>
-                </div>
-                <div class="form-hint">Number of days to retain audit log entries.</div>
+                <input type="number" name="port" class="form-input" value="{{ settings.admin_port | default(9090) }}" min="1" max="65535" style="width:120px;">
+                <div class="form-hint">TCP port for the admin portal. Requires restart.</div>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
