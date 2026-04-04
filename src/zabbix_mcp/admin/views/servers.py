@@ -56,9 +56,21 @@ async def servers_view(request: Request) -> Response:
             "error": error_msg,
         })
 
+    # Detect if config has servers not in live registry (restart needed)
+    restart_needed = False
+    try:
+        doc = load_config_document(admin_app.config_path)
+        config_servers = set(doc.get("zabbix", {}).keys())
+        live_servers = set(client_manager.server_names)
+        if config_servers != live_servers:
+            restart_needed = True
+    except Exception:
+        pass
+
     return admin_app.render("servers.html", request, {
         "active": "servers",
         "servers": servers,
+        "restart_needed": restart_needed,
     })
 
 
@@ -198,3 +210,30 @@ async def server_test(request: Request) -> Response:
             f'<span class="status-dot status-dot-red"></span> Error'
             f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-danger);">{msg}</span>'
         )
+
+
+async def server_restart(request: Request) -> Response:
+    """Restart the MCP server service (systemctl restart)."""
+    admin_app = request.app.state.admin_app
+    session = admin_app.require_auth(request)
+    if not session or session.role != "admin":
+        return RedirectResponse("/servers", status_code=303)
+
+    import subprocess
+    try:
+        subprocess.run(
+            ["systemctl", "restart", "zabbix-mcp-server"],
+            check=True, capture_output=True, timeout=10,
+        )
+        logger.info("MCP server restarted by %s", session.user)
+        from zabbix_mcp.admin.audit_writer import write_audit
+        client_ip = request.client.host if request.client else ""
+        write_audit("server_restart", user=session.user, ip=client_ip)
+    except FileNotFoundError:
+        logger.warning("systemctl not found — cannot restart (Docker/container?)")
+    except subprocess.CalledProcessError as e:
+        logger.error("Restart failed: %s", e.stderr.decode() if e.stderr else e)
+    except Exception as e:
+        logger.error("Restart failed: %s", e)
+
+    return RedirectResponse("/servers", status_code=303)
