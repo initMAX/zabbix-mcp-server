@@ -33,7 +33,7 @@ DEFAULT_PORT=8080
 PYTHON_BIN=""
 DRY_RUN=false
 AUTO_INSTALL_PYTHON=false
-INSTALL_REPORTING=false
+INSTALL_REPORTING=auto
 
 # --------------------------------------------------------------------------- #
 # Read port from config.toml (falls back to DEFAULT_PORT)
@@ -131,15 +131,16 @@ Commands:
 
 Options:
   --dry-run           Check prerequisites without installing anything
-  --install-python    Automatically install Python if no suitable version found
-  --with-reporting    Install PDF reporting dependencies (weasyprint, jinja2)
-  -h, --help          Show this help message
+  --install-python      Automatically install Python if no suitable version found
+  --without-reporting   Skip PDF reporting dependencies (weasyprint, jinja2)
+  --with-reporting      Force-install PDF reporting even on update without it
+  -h, --help            Show this help message
 
 Examples:
-  sudo ./deploy/install.sh                       # fresh install
-  sudo ./deploy/install.sh --with-reporting      # fresh install + PDF reports
-  sudo ./deploy/install.sh update                # update in place
-  sudo ./deploy/install.sh update --with-reporting  # update + enable PDF reports
+  sudo ./deploy/install.sh                       # fresh install (includes reporting)
+  sudo ./deploy/install.sh --without-reporting   # fresh install without PDF reports
+  sudo ./deploy/install.sh update                # update (keeps reporting if installed)
+  sudo ./deploy/install.sh update --with-reporting  # update + add PDF reports
   sudo ./deploy/install.sh uninstall             # complete removal
   sudo ./deploy/install.sh --dry-run             # verify prerequisites
 
@@ -577,8 +578,21 @@ install_package() {
     spin "Upgrading pip" "$INSTALL_DIR/venv/bin/pip" install --upgrade pip --quiet
     spin "Installing zabbix-mcp-server from ${SCRIPT_DIR}" "$INSTALL_DIR/venv/bin/pip" install "$SCRIPT_DIR" --quiet
 
-    # Install optional reporting dependencies if requested
-    if $INSTALL_REPORTING; then
+    # Resolve "auto" reporting flag:
+    #   install: default ON (include reporting)
+    #   update:  detect whether reporting is already installed
+    if [[ "$INSTALL_REPORTING" == "auto" ]]; then
+        if [[ -d "$INSTALL_DIR/venv" ]] && "$INSTALL_DIR/venv/bin/python" -c "import weasyprint" 2>/dev/null; then
+            INSTALL_REPORTING=true   # already installed → keep it
+        elif [[ "$COMMAND" == "install" ]]; then
+            INSTALL_REPORTING=true   # fresh install → include by default
+        else
+            INSTALL_REPORTING=false  # update without existing reporting → don't add
+        fi
+    fi
+
+    # Install reporting dependencies
+    if [[ "$INSTALL_REPORTING" == "true" ]]; then
         info "Installing PDF reporting system libraries..."
         if [[ -f /etc/redhat-release ]]; then
             dnf install -y cairo pango gdk-pixbuf2 libffi-devel &>/dev/null || \
@@ -950,6 +964,9 @@ for arg in "$@"; do
             ;;
         --with-reporting)
             INSTALL_REPORTING=true
+            ;;
+        --without-reporting)
+            INSTALL_REPORTING=false
             ;;
         install|update|upgrade|uninstall)
             COMMAND="$arg"
