@@ -1679,3 +1679,37 @@ tbody tr:last-child td {
     margin-top: 4px;
     opacity: 0.6;
 }
+
+/* ---------- Theme Switcher (3 buttons: light/auto/dark) ---------- */
+.theme-switcher,
+.theme-switcher-login {
+    display: inline-flex;
+    gap: 2px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 2px;
+}
+.theme-btn {
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    opacity: 0.5;
+    transition: opacity 0.2s, background 0.2s;
+    line-height: 1;
+}
+.theme-btn:hover { opacity: 0.8; }
+.theme-btn.active {
+    opacity: 1;
+    background: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-sm);
+}
+.theme-switcher-login {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
