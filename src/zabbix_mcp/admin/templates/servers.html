@@ -113,6 +113,8 @@
             <span class="status-inline" id="server-status-{{ server.name }}">
                 {% if server.status == "online" %}
                 <span class="status-dot status-dot-green"></span> Connected
+                {% elif server.status == "pending" %}
+                <span class="status-dot status-dot-yellow"></span> Pending restart
                 {% elif server.status == "error" %}
                 <span class="status-dot status-dot-red"></span> Error
                 {% else %}

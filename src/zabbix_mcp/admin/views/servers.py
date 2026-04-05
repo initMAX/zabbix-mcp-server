@@ -34,38 +34,67 @@ async def servers_view(request: Request) -> Response:
 
     client_manager = admin_app.client_manager
     servers = []
+    restart_needed = False
 
-    for name in client_manager.server_names:
-        srv_config = client_manager.get_server_config(name)
+    # Read config to get latest saved values (may differ from live)
+    config_zabbix = {}
+    try:
+        doc = load_config_document(admin_app.config_path)
+        config_zabbix = {k: dict(v) for k, v in doc.get("zabbix", {}).items()}
+    except Exception:
+        pass
+
+    # Build server list — prefer config values for URL etc., live status from client_manager
+    all_names = set(client_manager.server_names) | set(config_zabbix.keys())
+
+    for name in sorted(all_names):
+        cfg = config_zabbix.get(name, {})
+        live_config = None
         try:
-            version = client_manager.get_version(name)
-            status = "online"
-            error_msg = None
-        except Exception as e:
-            version = None
-            status = "error"
-            error_msg = str(e)
+            live_config = client_manager.get_server_config(name)
+        except Exception:
+            pass
+
+        # Use config URL (latest saved), fall back to live
+        url = cfg.get("url", live_config.url if live_config else "")
+        read_only = cfg.get("read_only", live_config.read_only if live_config else True)
+        verify_ssl = cfg.get("verify_ssl", live_config.verify_ssl if live_config else True)
+
+        # Status from live connection
+        status = "unknown"
+        version = None
+        error_msg = None
+        if name in client_manager.server_names:
+            try:
+                version = client_manager.get_version(name)
+                status = "online"
+            except Exception as e:
+                status = "error"
+                error_msg = str(e)
+
+            # Detect config drift (URL changed etc.)
+            if live_config and cfg.get("url") and cfg["url"] != live_config.url:
+                restart_needed = True
+        else:
+            # Server in config but not in live registry
+            status = "pending"
+            error_msg = "Not loaded — restart required"
+            restart_needed = True
 
         servers.append({
             "name": name,
-            "url": srv_config.url,
+            "url": url,
             "status": status,
             "version": version,
-            "read_only": srv_config.read_only,
-            "verify_ssl": srv_config.verify_ssl,
+            "read_only": read_only,
+            "verify_ssl": verify_ssl,
             "error": error_msg,
         })
 
-    # Detect if config has servers not in live registry (restart needed)
-    restart_needed = False
-    try:
-        doc = load_config_document(admin_app.config_path)
-        config_servers = set(doc.get("zabbix", {}).keys())
-        live_servers = set(client_manager.server_names)
-        if config_servers != live_servers:
+    # Also check if live has servers not in config (deleted)
+    for name in client_manager.server_names:
+        if name not in config_zabbix:
             restart_needed = True
-    except Exception:
-        pass
 
     return admin_app.render("servers.html", request, {
         "active": "servers",
