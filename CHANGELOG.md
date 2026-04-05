@@ -96,6 +96,19 @@
 - **Template preview iframe click block** — hidden iframe intercepted pointer events after closing preview modal; now resets iframe src on close
 - **Server create silent rejection** — invalid name/URL redirected without error message; now shows flash notification
 - **User create form data lost** — validation errors cleared username and role selection; now preserves form state
+- **Installer config corruption on repeated runs** — `setup_admin` and `migrate_legacy_token` used string append, causing duplicate `[admin.users.admin]` and `[tokens.legacy]` sections on repeated `install.sh update` runs; rewritten to use tomlkit for idempotent, safe config writes
+- **Installer shows 0.0.0.0 in output** — replaced with detected host IP addresses (IPv4 + IPv6 with bracket notation); credentials box and endpoints now show actual reachable IPs
+- **Installer output box broken with long IPs** — credentials and token boxes used fixed-width ASCII borders; now dynamically sized based on content length
+- **Installer `apt-get install` for reporting libs** — added `apt-get update` before installing weasyprint system dependencies; fixes reporting install on systems with stale/empty package index
+- **Installer reporting libs missing `libpangocairo`** — added `libpangocairo-1.0-0` to Debian/Ubuntu reporting dependencies
+
+### Added
+
+- **`generate-token` installer command** — `sudo ./deploy/install.sh generate-token <name>` generates a random MCP bearer token, writes the SHA-256 hash to config.toml, and displays the raw token once with colored output (token highlighted in white, hash in gray, warning in red)
+- **`test-config` / `-T` installer command** — validates config.toml syntax (TOML parsing) and semantics (port range, transport, URLs, API tokens, TLS pairs); warns about admin portal enabled without users; runs without root
+- **Config backup before modification** — installer creates timestamped backup (`config.toml.bak.YYYYMMDD_HHMMSS`) before any config modification during install or update
+- **`extensions` tool group** — new filterable group containing `graph_render`, `anomaly_detect`, `capacity_forecast`, `report_generate`, `action_prepare`, `action_confirm`, `zabbix_raw_api_call`, `health_check`; can be disabled via `disabled_tools = ["extensions"]` in config or per-token scopes
+- **Extensions orange badge** — distinct orange color (`#fb923c`) for the extensions group in token scope badges, drag-and-drop tool UI, and settings tool exposure — visually separates server-side analytics from standard Zabbix API tools
 
 ## v1.15 — 2026-04-04
 
