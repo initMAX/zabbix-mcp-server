@@ -1990,3 +1990,12 @@ tbody tr:last-child td {
     transform: scale(1.05);
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
+
+/* ---------- Pulsing status dot (checking) ---------- */
+.status-dot-pulse {
+    animation: dotPulse 1.5s ease-in-out infinite;
+}
+@keyframes dotPulse {
+    0%, 100% { background: var(--text-muted); box-shadow: 0 0 0 0 rgba(148,163,184,0.4); }
+    50% { background: var(--color-primary); box-shadow: 0 0 0 4px rgba(31,101,244,0.2); }
+}
