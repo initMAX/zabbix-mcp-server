@@ -322,7 +322,7 @@ The installer generates an admin password automatically during `install` or `upd
 sudo ./deploy/install.sh set-admin-password
 ```
 
-**Access:** Open `http://localhost:9090/` in your browser.
+**Access:** Open your admin portal URL (e.g. `http://your-server:9090/`) in your browser.
 
 **Features:**
 - MCP token management (create, revoke, scope control)
@@ -347,7 +347,7 @@ This generates a random token, writes the hash to `config.toml`, and displays th
 
 **Option B: Admin portal**
 
-Open `http://localhost:9090/` → MCP Tokens → Create Token. The portal generates the token and shows it once.
+Open your admin portal URL (e.g. `http://your-server:9090/`) → MCP Tokens → Create Token. The portal generates the token and shows it once.
 
 **Option C: Manual (no install required)**
 
