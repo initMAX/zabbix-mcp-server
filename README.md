@@ -580,14 +580,34 @@ codex mcp add zabbix --url http://your-server:8080/mcp
 # HTTP transport, with token (reads token from environment variable)
 export ZABBIX_MCP_TOKEN="zmcp_your-token-here"
 codex mcp add zabbix --url http://your-server:8080/mcp --bearer-token-env-var ZABBIX_MCP_TOKEN
+
+# SSE transport, no token
+codex mcp add zabbix --url http://your-server:8080/sse
 ```
 
 Or add directly to `~/.codex/config.toml`:
 
+HTTP transport, no token:
+
 ```toml
 [mcp_servers.zabbix]
 url = "http://your-server:8080/mcp"
-bearer_token_env_var = "ZABBIX_MCP_TOKEN"  # optional — remove if no token
+```
+
+HTTP transport, with token:
+
+```toml
+[mcp_servers.zabbix]
+url = "http://your-server:8080/mcp"
+http_headers = { Authorization = "Bearer zmcp_your-token-here" }
+```
+
+SSE transport, with token:
+
+```toml
+[mcp_servers.zabbix]
+url = "http://your-server:8080/sse"
+http_headers = { Authorization = "Bearer zmcp_your-token-here" }
 ```
 
 ##### Other clients
