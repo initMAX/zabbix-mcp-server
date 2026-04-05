@@ -40,7 +40,7 @@ ASSETS_DIR = Path("/etc/zabbix-mcp/assets")
 TLS_DIR = Path("/etc/zabbix-mcp/tls")
 
 # Extension allow-lists
-LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}
+LOGO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg"}  # SVG: sanitized on upload (script tags stripped)
 TLS_CERT_EXTENSIONS = {".pem", ".crt", ".cert"}
 TLS_KEY_EXTENSIONS = {".pem", ".key"}
 
@@ -111,6 +111,16 @@ async def upload_logo(request: Request) -> Response:
     if len(content) == 0:
         logger.warning("Logo upload: empty file by %s", session.user)
         return RedirectResponse("/settings", status_code=303)
+
+    # SVG security: strip script tags and event handlers
+    ext = Path(filename).suffix.lower()
+    if ext == ".svg":
+        import re as _re
+        svg_text = content.decode("utf-8", errors="replace")
+        svg_text = _re.sub(r"<script[^>]*>.*?</script>", "", svg_text, flags=_re.DOTALL | _re.IGNORECASE)
+        svg_text = _re.sub(r"\bon\w+\s*=\s*[\"'][^\"']*[\"']", "", svg_text, flags=_re.IGNORECASE)
+        content = svg_text.encode("utf-8")
+        logger.info("SVG sanitized: stripped script tags and event handlers")
 
     safe_name = _sanitize_filename(filename)
     dest = ASSETS_DIR / safe_name

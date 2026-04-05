@@ -134,7 +134,7 @@ html {
 body {
     font-family: var(--font-sans);
     color: var(--text-primary);
-    background: linear-gradient(135deg, var(--bg-primary), var(--bg-secondary));
+    background: var(--bg-primary);
     min-height: 100vh;
     line-height: 1.5;
 }

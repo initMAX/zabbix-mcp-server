@@ -192,6 +192,13 @@ async def template_edit(request: Request) -> Response:
 
     tmpl_file = tmpl["template_file"]
     file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
+
+    # SECURITY: validate path is within allowed directories (prevents path traversal via config)
+    resolved = file_path.resolve()
+    if not (str(resolved).startswith(str(CUSTOM_TEMPLATE_DIR.resolve())) or str(resolved).startswith(str(TEMPLATE_DIR.resolve()))):
+        logger.warning("Template path outside allowed directory: %s", resolved)
+        return RedirectResponse("/templates", status_code=303)
+
     content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
 
     if request.method == "POST":
@@ -334,7 +341,11 @@ async def template_delete(request: Request) -> Response:
         # Delete file
         tmpl_file = tmpl.get("template_file", "")
         file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
-        if file_path.exists() and str(file_path) != str(TEMPLATE_DIR):
+        # SECURITY: only delete files within allowed directories
+        resolved_del = file_path.resolve()
+        if not str(resolved_del).startswith(str(CUSTOM_TEMPLATE_DIR.resolve())):
+            logger.warning("Blocked deletion outside custom template dir: %s", resolved_del)
+        elif file_path.exists():
             try:
                 file_path.unlink()
             except Exception as e:

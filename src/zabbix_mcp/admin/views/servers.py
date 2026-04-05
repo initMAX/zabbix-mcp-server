@@ -290,6 +290,10 @@ async def server_test_new(request: Request) -> Response:
     api_token = str(form.get("api_token", "")).strip()
     verify_ssl = form.get("verify_ssl") == "1"
 
+    # SECURITY: validate URL scheme (SSRF prevention)
+    if not url.startswith(("http://", "https://")):
+        return HTMLResponse('<span class="text-danger">URL must start with http:// or https://</span>')
+
     if not url or not api_token:
         return HTMLResponse('<span class="text-danger">URL and API token are required</span>')
 

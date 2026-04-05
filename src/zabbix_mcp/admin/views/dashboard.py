@@ -45,23 +45,39 @@ async def dashboard(request: Request) -> Response:
     except Exception:
         pass
 
-    # Zabbix server status
+    # Zabbix server status — include both live and config-only servers
     servers = []
-    for name in client_manager.server_names:
-        srv_config = client_manager.get_server_config(name)
-        try:
-            version = client_manager.get_version(name)
-            status = "online"
-        except Exception:
-            version = "unknown"
-            status = "error"
-        servers.append({
-            "name": name,
-            "url": srv_config.url,
-            "status": status,
-            "version": version,
-            "read_only": srv_config.read_only,
-        })
+    config_servers = set()
+    try:
+        if TOMLKIT_AVAILABLE:
+            doc2 = load_config_document(admin_app.config_path)
+            config_servers = set(doc2.get("zabbix", {}).keys())
+    except Exception:
+        pass
+
+    all_server_names = sorted(set(client_manager.server_names) | config_servers)
+    for name in all_server_names:
+        if name in client_manager.server_names:
+            srv_config = client_manager.get_server_config(name)
+            try:
+                version = client_manager.get_version(name)
+                status = "online"
+            except Exception:
+                version = "unknown"
+                status = "error"
+            # Check config drift
+            cfg = {}
+            if name in config_servers:
+                try:
+                    cfg = dict(doc2.get("zabbix", {}).get(name, {}))
+                except Exception:
+                    pass
+            if cfg.get("url") and cfg["url"] != srv_config.url:
+                status = "changed"  # config differs from live
+            servers.append({"name": name, "status": status})
+        else:
+            # In config but not live — pending restart
+            servers.append({"name": name, "status": "pending"})
 
     # Count report templates
     report_template_count = 0

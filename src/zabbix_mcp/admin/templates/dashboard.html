@@ -23,9 +23,9 @@
         <div class="stat-content">
             <div class="stat-value">
                 {% for server in servers %}
-                <span class="status-dot {% if server.status == 'online' %}status-dot-green{% else %}status-dot-red{% endif %}"></span>
+                <span class="status-dot {% if server.status == 'online' %}status-dot-green{% elif server.status in ('pending', 'changed') %}status-dot-yellow{% else %}status-dot-red{% endif %}" title="{{ server.name }}"></span>
                 {% endfor %}
-                {{ stats.server_count | default(0) }}
+                {{ servers | length }}
             </div>
             <div class="stat-label">Zabbix Servers</div>
         </div>

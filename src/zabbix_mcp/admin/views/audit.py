@@ -61,7 +61,10 @@ async def audit_view(request: Request) -> Response:
         return RedirectResponse("/login", status_code=303)
 
     action_filter = request.query_params.get("action")
-    limit = int(request.query_params.get("limit", "200"))
+    try:
+        limit = min(int(request.query_params.get("limit", "200")), 10000)
+    except (ValueError, TypeError):
+        limit = 200
     search = request.query_params.get("search")
     date_from = request.query_params.get("date_from")
     date_to = request.query_params.get("date_to")
