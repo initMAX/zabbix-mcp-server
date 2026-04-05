@@ -197,6 +197,11 @@ class LoginRateLimiter:
         if ip not in self._attempts:
             self._attempts[ip] = []
         self._attempts[ip].append(now)
+        # Periodic cleanup: remove stale IPs to prevent memory leak
+        if len(self._attempts) > 500:
+            stale = [k for k, v in self._attempts.items() if not v or now - v[-1] > self.WINDOW]
+            for k in stale:
+                del self._attempts[k]
 
     def reset(self, ip: str) -> None:
         """Reset attempts after successful login."""

@@ -370,7 +370,8 @@ function renderServerChips() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    toggleExpiry(document.getElementById('no-expiry'));
+    var noExpiryEl = document.getElementById('no-expiry');
+    if (noExpiryEl) toggleExpiry(noExpiryEl);
     renderScopeBubbles();
     renderServerChips();
 });

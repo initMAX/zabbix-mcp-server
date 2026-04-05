@@ -22,7 +22,7 @@
             {% if edit_mode %}
             <input type="text" id="username" name="username" class="form-input" value="{{ edit_username }}" readonly style="opacity:0.7;">
             {% else %}
-            <input type="text" id="username" name="username" class="form-input" placeholder="Enter username" required autocomplete="off">
+            <input type="text" id="username" name="username" class="form-input" placeholder="Enter username" required autocomplete="off" value="{{ form_username or '' }}">
             {% endif %}
         </div>
 
@@ -57,9 +57,9 @@
         <div class="form-group">
             <label class="form-label" for="role">Role</label>
             <select id="role" name="role" class="form-select" required>
-                <option value="viewer" {% if edit_role == 'viewer' %}selected{% endif %}>Viewer — Read-only access</option>
-                <option value="operator" {% if edit_role == 'operator' %}selected{% endif %}>Operator — Manage tokens and templates</option>
-                <option value="admin" {% if edit_role == 'admin' or not edit_mode %}selected{% endif %}>Admin — Full access</option>
+                <option value="viewer" {% if edit_role == 'viewer' or form_role == 'viewer' %}selected{% endif %}>Viewer — Read-only access</option>
+                <option value="operator" {% if edit_role == 'operator' or form_role == 'operator' %}selected{% endif %}>Operator — Manage tokens and templates</option>
+                <option value="admin" {% if edit_role == 'admin' or form_role == 'admin' or not edit_mode %}selected{% endif %}>Admin — Full access</option>
             </select>
             <div class="form-hint">Determines what actions the user can perform in the admin portal.</div>
         </div>

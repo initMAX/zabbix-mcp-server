@@ -75,7 +75,7 @@
     <div class="modal-card" style="max-width:900px; height:80vh;">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; padding:16px 24px;">
             <h3>Rendered Preview</h3>
-            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('preview-modal').style.display='none'">&times;</button>
+            <button class="btn btn-ghost btn-sm" onclick="var m=document.getElementById('preview-modal'); m.style.display='none'; document.getElementById('preview-frame').src='about:blank';">&times;</button>
         </div>
         <iframe id="preview-frame" style="width:100%; height:calc(100% - 60px); border:none; background:white; border-radius:0 0 var(--radius-lg) var(--radius-lg);"></iframe>
     </div>

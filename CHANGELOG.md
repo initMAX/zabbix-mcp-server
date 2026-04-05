@@ -76,6 +76,26 @@
 - **Installer pip upgrade** — `pip install --upgrade` ensures version upgrades actually install new code
 - **Legacy token persistence** — migrated `auth_token` written to `[tokens.legacy]` in config.toml
 - **Config writer Docker support** — fallback to direct write when atomic rename fails on Docker bind mounts
+- **Installer password hash corruption** — heredoc shell expansion destroyed `$`-containing scrypt hashes; installer now uses Python writer for safe config writes
+- **Installer code injection** — `_hash_password` shell function interpolated passwords into Python source code; now passes via stdin
+- **Installer `set-admin-password` hash corruption** — sed replacement expanded `$` in scrypt hashes; replaced with Python-based config writer
+- **Report generation crash** — `report_generate` tool passed `period` string but data fetchers expected `period_from`/`period_to` epoch timestamps; now converts period to epochs
+- **Systemd blocks admin portal writes** — `ProtectSystem=strict` with `ReadWritePaths` missing `/etc/zabbix-mcp`; admin portal config writes, uploads, and TLS operations failed silently on bare-metal installs
+- **Server edit 500 error on race condition** — `server_edit` POST returned no response when server was deleted between GET and POST
+- **Token ID collision** — two tokens with similar names (e.g. "CI Pipeline" and "CI_Pipeline") produced the same config key, silently overwriting the first
+- **Docker volume persistence** — logo and TLS uploads stored in container filesystem were lost on recreation; added named volumes for assets and TLS
+- **Installer re-exec lost CLI flags** — `--with-reporting` and `--without-reporting` flags dropped during git-pull re-execution
+- **Dashboard audit target empty** — template used `entry.target` but audit entries have `target_type` + `target_id` fields
+- **Installer password validation incomplete** — `set-admin-password` prompt promised uppercase + digit validation but only checked length
+- **Config directory world-readable** — `/etc/zabbix-mcp` created with 755; now 750 with `zabbix-mcp` ownership
+- **Installer `git reset` to wrong branch** — update always reset to `origin/main` regardless of current branch
+- **Rate limiter memory leak** — `_PostRateLimitMiddleware` and `LoginRateLimiter` dicts grew unbounded; added periodic cleanup
+- **Audit log encoding** — `open()` without `encoding="utf-8"` could fail on non-UTF-8 locales
+- **Template preview path traversal** — GET preview path missing `is_relative_to()` validation present in edit/delete paths
+- **Token create JS error** — `toggleExpiry` called on null element after successful token creation replaced the form DOM
+- **Template preview iframe click block** — hidden iframe intercepted pointer events after closing preview modal; now resets iframe src on close
+- **Server create silent rejection** — invalid name/URL redirected without error message; now shows flash notification
+- **User create form data lost** — validation errors cleared username and role selection; now preserves form state
 
 ## v1.15 — 2026-04-04
 

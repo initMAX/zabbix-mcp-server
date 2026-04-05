@@ -106,10 +106,10 @@ async def server_create(request: Request) -> Response:
     verify_ssl = "verify_ssl" in form
 
     if not name or not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", name):
-        return RedirectResponse("/servers", status_code=303)
+        return admin_app.flash_redirect("/servers", "Invalid server name. Must start with a letter and contain only letters, digits, dashes, and underscores.", "danger")
 
     if not url.startswith(("http://", "https://")):
-        return RedirectResponse("/servers", status_code=303)
+        return admin_app.flash_redirect("/servers", "Invalid URL. Must start with http:// or https://.", "danger")
 
     try:
         server_data = {
@@ -179,6 +179,8 @@ async def server_edit(request: Request) -> Response:
             write_audit("server_edit", user=session.user, target_type="server", target_id=server_name, ip=client_ip)
             admin_app.restart_needed = True
             return admin_app.flash_redirect("/servers", f"Server '{server_name}' updated. Restart required.")
+        else:
+            return admin_app.flash_redirect("/servers", f"Server '{server_name}' not found in config.", "danger")
     except Exception as e:
         logger.error("Failed to update server: %s", e)
         return admin_app.flash_redirect("/servers", f"Failed to update server: {e}", "danger")

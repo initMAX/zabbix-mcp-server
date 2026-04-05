@@ -158,6 +158,13 @@ async def token_create(request: Request) -> Response:
     if not token_id or not token_id[0].isalpha():
         token_id = "t_" + token_id
 
+    # Check for ID collision with existing tokens
+    existing_token = admin_app.token_store.get_token(token_id)
+    if existing_token is not None:
+        ctx = {"active": "tokens", "error": f"A token with ID '{token_id}' already exists. Choose a different name."}
+        ctx.update(_get_global_context(admin_app))
+        return admin_app.render("tokens/create.html", request, ctx)
+
     # Write to config.toml
     from datetime import datetime, timezone
     token_data = {

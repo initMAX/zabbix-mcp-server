@@ -64,6 +64,11 @@ class _PostRateLimitMiddleware:
                 if key not in self._requests:
                     self._requests[key] = []
                 self._requests[key] = [t for t in self._requests[key] if now - t < self.window]
+                # Periodic cleanup: remove stale keys to prevent memory leak
+                if len(self._requests) > 1000:
+                    stale = [k for k, v in self._requests.items() if not v or now - v[-1] > self.window]
+                    for k in stale:
+                        del self._requests[k]
                 if len(self._requests[key]) >= self.max_requests:
                     resp = Response("Rate limit exceeded. Max 30 POST requests per minute.", status_code=429)
                     await resp(scope, receive, send)

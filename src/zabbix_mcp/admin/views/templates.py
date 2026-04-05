@@ -272,7 +272,11 @@ async def template_preview(request: Request) -> Response:
             if tmpl and tmpl.get("template_file"):
                 tmpl_file = tmpl["template_file"]
                 file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
-                if file_path.exists():
+                # SECURITY: validate path is within allowed directories
+                resolved = file_path.resolve()
+                if not (resolved.is_relative_to(CUSTOM_TEMPLATE_DIR.resolve()) or resolved.is_relative_to(TEMPLATE_DIR.resolve())):
+                    logger.warning("Template preview path outside allowed directory: %s", resolved)
+                elif file_path.exists():
                     html_content = file_path.read_text(encoding="utf-8")
 
     if not html_content:

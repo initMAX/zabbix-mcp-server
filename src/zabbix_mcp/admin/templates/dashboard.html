@@ -80,7 +80,7 @@
                         <td class="text-sm text-muted">{{ entry.timestamp }}</td>
                         <td><span class="badge badge-primary">{{ entry.action }}</span></td>
                         <td>{{ entry.user }}</td>
-                        <td>{{ entry.target }}</td>
+                        <td>{{ entry.target_type }}{% if entry.target_id %} {{ entry.target_id }}{% endif %}</td>
                         <td class="monospace text-sm">{{ entry.ip }}</td>
                     </tr>
                     {% endfor %}

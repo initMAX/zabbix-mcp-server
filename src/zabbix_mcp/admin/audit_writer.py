@@ -64,7 +64,7 @@ def write_audit(
                 _rotate_audit_log(AUDIT_LOG_PATH)
             except OSError:
                 pass
-        with open(AUDIT_LOG_PATH, "a") as f:
+        with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as e:
         import logging

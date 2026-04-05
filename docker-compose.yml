@@ -34,6 +34,8 @@ services:
       - ADMIN_PORT=${ADMIN_PORT:-9090}
     volumes:
       - ./config.toml:/etc/zabbix-mcp/config.toml
+      - assets:/etc/zabbix-mcp/assets
+      - tls:/etc/zabbix-mcp/tls
       - logs:/var/log/zabbix-mcp
     healthcheck:
       test: ["CMD", "/opt/zabbix-mcp/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${MCP_PORT:-8080}/health')"]
@@ -43,4 +45,6 @@ services:
       start_period: 10s
 
 volumes:
+  assets:
+  tls:
   logs:

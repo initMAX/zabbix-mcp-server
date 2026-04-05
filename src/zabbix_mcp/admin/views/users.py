@@ -67,27 +67,29 @@ async def user_create(request: Request) -> Response:
     password = str(form.get("password", ""))
     role = str(form.get("role", "viewer"))
 
+    form_ctx = {"active": "users", "form_username": username, "form_role": role}
+
     if not username or len(username) < 2:
         return admin_app.render("users/create.html", request, {
-            "active": "users",
+            **form_ctx,
             "error": "Username must be at least 2 characters.",
         })
 
     if len(password) < 10:
         return admin_app.render("users/create.html", request, {
-            "active": "users",
+            **form_ctx,
             "error": "Password must be at least 10 characters.",
         })
 
     if not any(c.isupper() for c in password):
         return admin_app.render("users/create.html", request, {
-            "active": "users",
+            **form_ctx,
             "error": "Password must contain at least one uppercase letter.",
         })
 
     if not any(c.isdigit() for c in password):
         return admin_app.render("users/create.html", request, {
-            "active": "users",
+            **form_ctx,
             "error": "Password must contain at least one digit.",
         })
 

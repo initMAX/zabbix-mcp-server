@@ -121,7 +121,10 @@ sudo ./deploy/install.sh [COMMAND] [OPTIONS]
 | `update` | Update existing installation, preserve config |
 | `uninstall` | Complete removal — service, config, logs, virtualenv, system user |
 | `--dry-run` | Check prerequisites without installing |
+| `set-admin-password` | Reset admin portal password |
 | `--install-python` | Auto-install Python 3.12 if no suitable version found |
+| `--with-reporting` | Install PDF reporting dependencies (default on fresh install) |
+| `--without-reporting` | Skip PDF reporting dependencies |
 | `-h`, `--help` | Show full help |
 
 ### File paths
@@ -132,6 +135,8 @@ sudo ./deploy/install.sh [COMMAND] [OPTIONS]
 | `/etc/zabbix-mcp/config.toml` | Server configuration |
 | `/var/log/zabbix-mcp/server.log` | Log file |
 | `/etc/systemd/system/zabbix-mcp-server.service` | Systemd unit |
+| `/etc/zabbix-mcp/assets/` | Uploaded logos |
+| `/etc/zabbix-mcp/tls/` | TLS certificates and keys |
 | `/etc/logrotate.d/zabbix-mcp-server` | Logrotate config |
 
 ---
@@ -181,6 +186,7 @@ Available environment variables:
 ```bash
 MCP_HOST=127.0.0.1    # Host interface to bind (default: 127.0.0.1, use 0.0.0.0 for all)
 MCP_PORT=8080          # Port inside container and on host (default: 8080)
+ADMIN_PORT=9090        # Admin portal port (default: 9090)
 MCP_AUTH_TOKEN=...     # Bearer token for authentication (optional but recommended)
 ```
 
@@ -226,8 +232,9 @@ docker compose down -v
 ### Docker details
 
 - **Base image:** `python:3.13.5-slim` (multi-stage build)
-- **Config:** `config.toml` mounted read-only at `/etc/zabbix-mcp/config.toml`
-- **Logs:** stored in a Docker volume (`logs`)
+- **Config:** `config.toml` mounted at `/etc/zabbix-mcp/config.toml`
+- **Assets/TLS:** stored in Docker named volumes (`assets`, `tls`)
+- **Logs:** stored in a Docker named volume (`logs`)
 - **Health check:** built-in Docker HEALTHCHECK hitting `/health` every 30s
 - **Restart policy:** `unless-stopped`
 - **Security:** runs as non-root user `zabbix-mcp`
@@ -314,7 +321,7 @@ The installer generates an admin password automatically during `install` or `upd
 sudo ./deploy/install.sh set-admin-password
 ```
 
-**Access:** Open `http://localhost:9090/admin/` in your browser.
+**Access:** Open `http://localhost:9090/` in your browser.
 
 **Features:**
 - MCP token management (create, revoke, scope control)

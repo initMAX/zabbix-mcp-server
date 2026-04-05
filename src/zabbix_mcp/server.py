@@ -1406,10 +1406,20 @@ def _register_tools(
                     return json.dumps({"error": f"Invalid report_type. Must be one of: {', '.join(valid_types)}"})
 
                 try:
+                    # Convert period string (e.g. "30d") to epoch timestamps
+                    import re as _re
+                    _period_match = _re.match(r"^(\d+)([dhm])$", period or "30d")
+                    if not _period_match:
+                        return json.dumps({"error": "Invalid period format. Use e.g. '7d', '30d', '90d'."})
+                    _amount, _unit = int(_period_match.group(1)), _period_match.group(2)
+                    _delta = {"d": 86400, "h": 3600, "m": 60}[_unit] * _amount
+                    _period_to = int(time.time())
+                    _period_from = _period_to - _delta
+
                     fetcher = getattr(data_fetcher, f"fetch_{report_type}_data")
                     context = await asyncio.to_thread(
                         fetcher, client_manager, srv,
-                        {"hostgroupid": hostgroupid, "period": period, "company": company or report_engine.company_name},
+                        {"hostgroupid": hostgroupid, "period": period, "period_from": _period_from, "period_to": _period_to, "company": company or report_engine.company_name},
                     )
                     pdf_bytes = await asyncio.to_thread(
                         report_engine.generate_report, report_type, context,
