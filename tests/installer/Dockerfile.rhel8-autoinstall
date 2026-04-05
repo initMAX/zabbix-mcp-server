@@ -1,6 +1,6 @@
-# RHEL 8 / Rocky 8 — test --install-python flag
+# RHEL 8 — test --install-python flag
 # System has only python3.9, installer should auto-install python3.12
-FROM rockylinux:8
+FROM almalinux:8
 
 RUN dnf install -y python39 && dnf clean all
 
