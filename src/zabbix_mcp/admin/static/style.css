@@ -1772,3 +1772,35 @@ tbody tr:last-child td {
     width: 0%;
     transition: width 0.3s ease;
 }
+
+/* ---------- Number input spinners (dark mode visibility) ---------- */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    filter: invert(1);
+}
+[data-theme="light"] input[type="number"]::-webkit-inner-spin-button,
+[data-theme="light"] input[type="number"]::-webkit-outer-spin-button {
+    filter: none;
+}
+
+/* ---------- Date input icon (dark mode) ---------- */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+}
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: none;
+}
+
+/* ---------- Select dropdown arrow (dark mode) ---------- */
+.form-select {
+    color-scheme: dark;
+}
+[data-theme="light"] .form-select {
+    color-scheme: light;
+}
+
+/* ---------- Nav menu top spacing fix ---------- */
+.nav-menu {
+    padding-top: 8px;
+}

@@ -5,15 +5,9 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Settings</h1>
-        <p class="page-subtitle">Server configuration and preferences</p>
+        <p class="page-subtitle">Global configuration for MCP server and admin portal</p>
     </div>
 </div>
-
-{% if restart_required %}
-<div class="restart-banner">
-    &#x26A0; Some changes require a server restart to take effect.
-</div>
-{% endif %}
 
 {% if has_legacy_token %}
 <div class="alert alert-warning" style="margin-bottom: 24px; padding: 12px 16px; border-radius: 8px; background: var(--color-warning-bg, rgba(255,170,0,0.1)); border: 1px solid var(--color-warning, #fa0);">
@@ -21,55 +15,50 @@
 </div>
 {% endif %}
 
-<!-- Section 1: Server -->
+<!-- Section 1: MCP Server -->
 <div class="settings-section">
-    <h2 class="settings-section-title">&#x1F5A5; Server</h2>
-    <form hx-post="/settings/server" hx-swap="none">
+    <h2 class="settings-section-title">&#x1F5A5; MCP Server</h2>
+    <form method="post" action="/settings/server">
         <div class="settings-row">
             <div class="settings-label">
-                Host <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+                MCP Listen Host <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
                 <input type="text" name="host" class="form-input" value="{{ settings.host | default('127.0.0.1') }}">
-                <div class="form-hint">IP address to bind to. Requires restart.</div>
+                <div class="form-hint">IP address for MCP and admin portal. <code>127.0.0.1</code> = localhost only, <code>0.0.0.0</code> = all interfaces. Requires restart.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+                MCP Listen Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
                 <input type="number" name="port" class="form-input" value="{{ settings.port | default(8080) }}" min="1" max="65535" style="width:120px;">
-                <div class="form-hint">TCP port for the MCP server. Requires restart.</div>
+                <div class="form-hint">TCP port for the MCP protocol endpoint (<code>/mcp</code>). Requires restart.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Transport
-            </div>
+            <div class="settings-label">Transport</div>
             <div>
                 <select name="transport" class="form-select" style="width:auto;">
-                    <option value="http" {% if settings.transport == 'http' %}selected{% endif %}>HTTP</option>
+                    <option value="http" {% if settings.transport == 'http' %}selected{% endif %}>HTTP (Streamable HTTP — recommended)</option>
                     <option value="sse" {% if settings.transport == 'sse' %}selected{% endif %}>SSE (Server-Sent Events)</option>
-                    <option value="stdio" {% if settings.transport == 'stdio' or not settings.transport %}selected{% endif %}>STDIO</option>
+                    <option value="stdio" {% if settings.transport == 'stdio' or not settings.transport %}selected{% endif %}>STDIO (subprocess mode)</option>
                 </select>
-                <div class="form-hint">MCP transport protocol.</div>
+                <div class="form-hint">MCP transport protocol. HTTP is recommended for network clients.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Log Level
-            </div>
+            <div class="settings-label">Log Level</div>
             <div>
+                {% set current_log_level = settings.log_level | default('info') | lower %}
                 <select name="log_level" class="form-select" style="width:auto;">
-                    {% set current_log_level = settings.log_level | default('info') | lower %}
                     <option value="debug" {% if current_log_level == 'debug' %}selected{% endif %}>debug</option>
                     <option value="info" {% if current_log_level == 'info' %}selected{% endif %}>info</option>
                     <option value="warning" {% if current_log_level == 'warning' %}selected{% endif %}>warning</option>
                     <option value="error" {% if current_log_level == 'error' %}selected{% endif %}>error</option>
                     <option value="critical" {% if current_log_level == 'critical' %}selected{% endif %}>critical</option>
                 </select>
-                <div class="form-hint">Logging verbosity level.</div>
             </div>
         </div>
         <div class="settings-row">
@@ -78,27 +67,24 @@
             </div>
             <div>
                 <input type="text" name="log_file" class="form-input" value="{{ settings.log_file | default('') }}" placeholder="/var/log/zabbix-mcp/server.log">
-                <div class="form-hint">Path to log file. Empty = stderr only. Requires restart.</div>
+                <div class="form-hint">Path to log file. Empty = stderr only. Note: changing this path also requires updating logrotate config manually.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Compact Output
-            </div>
+            <div class="settings-label">Compact Output</div>
             <div>
                 <label class="toggle-label">
                     <span class="toggle">
                         <input type="checkbox" name="compact_output" value="true" {% if settings.compact_output is not defined or settings.compact_output %}checked{% endif %}>
                         <span class="toggle-slider"></span>
                     </span>
-                    Enable compact output
+                    Return only key fields from get methods (reduces LLM token usage)
                 </label>
-                <div class="form-hint">Strip extra whitespace from API responses to reduce token usage.</div>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
         <div style="margin-top:16px;">
-            <button type="submit" class="btn btn-primary btn-sm">Save Server Settings</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save MCP Server Settings</button>
         </div>
         {% endif %}
     </form>
@@ -106,15 +92,25 @@
 
 <!-- Section 2: TLS & Access -->
 <div class="settings-section">
-    <h2 class="settings-section-title">&#x1F512; TLS &amp; Access</h2>
-    <form hx-post="/settings/tls_access" hx-swap="none">
+    <h2 class="settings-section-title">&#x1F512; TLS &amp; Network Security</h2>
+    {% set tls_active = settings.tls_cert_file and settings.tls_key_file %}
+    <div style="margin-bottom:16px;">
+        {% if tls_active %}
+        <span class="badge badge-success">TLS Enabled</span>
+        <span class="text-sm text-muted" style="margin-left:8px;">HTTPS active for both MCP endpoint and admin portal</span>
+        {% else %}
+        <span class="badge badge-muted">TLS Not Configured</span>
+        <span class="text-sm text-muted" style="margin-left:8px;">MCP and admin portal running over plain HTTP</span>
+        {% endif %}
+    </div>
+    <form method="post" action="/settings/tls_access">
         <div class="settings-row">
             <div class="settings-label">
                 TLS Certificate <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
                 <input type="text" name="tls_cert_file" class="form-input" value="{{ settings.tls_cert_file | default('') }}" placeholder="/etc/ssl/certs/mcp.crt">
-                <div class="form-hint">Path to TLS certificate file (PEM). Requires restart.</div>
+                <div class="form-hint">Path to PEM certificate file. Applies to both MCP (:{{ settings.port | default(8080) }}) and admin portal (:{{ settings.admin_port | default(9090) }}). Requires restart.</div>
             </div>
         </div>
         <div class="settings-row">
@@ -123,51 +119,43 @@
             </div>
             <div>
                 <input type="text" name="tls_key_file" class="form-input" value="{{ settings.tls_key_file | default('') }}" placeholder="/etc/ssl/private/mcp.key">
-                <div class="form-hint">Path to TLS private key file (PEM). Requires restart.</div>
+                <div class="form-hint">Path to PEM private key file. Both fields must be set to enable TLS. Requires restart.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                CORS Origins
-            </div>
+            <div class="settings-label">CORS Origins</div>
             <div>
-                <textarea name="cors_origins" class="form-input" rows="3" placeholder="https://example.com, https://app.example.com">{{ settings.cors_origins | join(', ') if settings.cors_origins else '' }}</textarea>
-                <div class="form-hint">Comma-separated list of allowed CORS origins.</div>
+                <textarea name="cors_origins" class="form-input" rows="2" placeholder="https://example.com, https://app.example.com">{{ settings.cors_origins | join(', ') if settings.cors_origins else '' }}</textarea>
+                <div class="form-hint">Comma-separated list of allowed CORS origins. Empty = CORS disabled.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Allowed Hosts
-            </div>
+            <div class="settings-label">IP Allowlist</div>
             <div>
-                <textarea name="allowed_hosts" class="form-input" rows="3" placeholder="192.168.1.0/24, 10.0.0.1">{{ settings.allowed_hosts | join(', ') if settings.allowed_hosts else '' }}</textarea>
-                <div class="form-hint">Comma-separated IP addresses or CIDR ranges. Empty = allow all.</div>
+                <textarea name="allowed_hosts" class="form-input" rows="2" placeholder="192.168.1.0/24, 10.0.0.1">{{ settings.allowed_hosts | join(', ') if settings.allowed_hosts else '' }}</textarea>
+                <div class="form-hint">Comma-separated IP/CIDR ranges. Empty = allow all.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Allowed Import Dirs
-            </div>
+            <div class="settings-label">Import Directories</div>
             <div>
-                <textarea name="allowed_import_dirs" class="form-input" rows="3" placeholder="/opt/zabbix/import, /tmp/imports">{{ settings.allowed_import_dirs | join(', ') if settings.allowed_import_dirs else '' }}</textarea>
-                <div class="form-hint">Comma-separated directory paths allowed for source_file imports.</div>
+                <textarea name="allowed_import_dirs" class="form-input" rows="2" placeholder="/opt/zabbix/import, /tmp/imports">{{ settings.allowed_import_dirs | join(', ') if settings.allowed_import_dirs else '' }}</textarea>
+                <div class="form-hint">Directories allowed for <code>source_file</code> imports. Empty = disabled.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Rate Limit
-            </div>
+            <div class="settings-label">Rate Limit</div>
             <div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="number" name="rate_limit" class="form-input" value="{{ settings.rate_limit | default(300) }}" min="0" style="width:120px;">
-                    <span class="text-muted">requests per minute</span>
+                    <span class="text-muted">requests/min per token</span>
                 </div>
-                <div class="form-hint">Maximum API requests per token per minute. 0 = unlimited.</div>
+                <div class="form-hint">0 = unlimited.</div>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
         <div style="margin-top:16px;">
-            <button type="submit" class="btn btn-primary btn-sm">Save TLS &amp; Access Settings</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save TLS &amp; Security Settings</button>
         </div>
         {% endif %}
     </form>
@@ -176,30 +164,24 @@
 <!-- Section 3: Tool Exposure -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x1F527; Tool Exposure</h2>
-    <form hx-post="/settings/tools" hx-swap="none">
+    <form method="post" action="/settings/tools">
         <div class="settings-row">
-            <div class="settings-label">
-                Enabled Tools
-            </div>
+            <div class="settings-label">Enabled Tools</div>
             <div>
                 <textarea name="tools" class="form-input" rows="2" placeholder="monitoring, data_collection, alerts">{{ settings.tools | join(', ') if settings.tools else '' }}</textarea>
-                <div class="form-hint">Comma-separated tool group names to enable. Empty = all enabled.</div>
+                <div class="form-hint">Empty = all tools enabled. Comma-separated group names.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Disabled Tools
-            </div>
+            <div class="settings-label">Disabled Tools</div>
             <div>
                 <textarea name="disabled_tools" class="form-input" rows="2" placeholder="administration, users">{{ settings.disabled_tools | join(', ') if settings.disabled_tools else '' }}</textarea>
-                <div class="form-hint">Comma-separated tool group names to disable.</div>
+                <div class="form-hint">Comma-separated group names to exclude.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label"></div>
-            <div>
-                <div class="form-hint" style="font-style:italic;">Available groups: <code>monitoring</code>, <code>data_collection</code>, <code>alerts</code>, <code>users</code>, <code>administration</code></div>
-            </div>
+            <div class="form-hint" style="font-style:italic;">Available groups: <code>monitoring</code>, <code>data_collection</code>, <code>alerts</code>, <code>users</code>, <code>administration</code></div>
         </div>
         {% if current_user_role != 'viewer' %}
         <div style="margin-top:16px;">
@@ -211,33 +193,32 @@
 
 <!-- Section 4: Reporting -->
 <div class="settings-section">
-    <h2 class="settings-section-title">&#x1F4CA; Reporting</h2>
-    <form hx-post="/settings/reporting" hx-swap="none">
+    <h2 class="settings-section-title">&#x1F4CA; PDF Reports &amp; Branding</h2>
+    <form method="post" action="/settings/reporting">
         <div class="settings-row">
-            <div class="settings-label">
-                Company Name
-            </div>
+            <div class="settings-label">Company Name</div>
             <div>
-                <input type="text" name="report_company" class="form-input" value="{{ settings.report_company | default('') }}" placeholder="Your Company">
-                <div class="form-hint">Company name displayed in generated reports.</div>
+                <input type="text" name="report_company" class="form-input" value="{{ settings.report_company | default('') }}" placeholder="initMAX s.r.o.">
+                <div class="form-hint">Displayed in report headers (e.g. "Company / Availability Report").</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Report Subtitle
-            </div>
+            <div class="settings-label">Report Subtitle</div>
             <div>
                 <input type="text" name="report_subtitle" class="form-input" value="{{ settings.report_subtitle | default('IT Monitoring Service') }}">
-                <div class="form-hint">Subtitle displayed on report cover pages.</div>
+                <div class="form-hint">Shown below the company logo in reports.</div>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">
-                Report Logo
-            </div>
+            <div class="settings-label">Report Logo</div>
             <div>
-                <input type="text" name="report_logo" class="form-input" value="{{ settings.report_logo | default('') }}" placeholder="/opt/zabbix-mcp/logo.png">
-                <div class="form-hint">File path to company logo image used in reports.</div>
+                <input type="text" name="report_logo" class="form-input" value="{{ settings.report_logo | default('') }}" placeholder="/etc/zabbix-mcp/logo.png">
+                <div class="form-hint">Path to PNG/JPG/SVG logo for report headers. Note: logrotate does not manage this file — place it in a persistent location.</div>
+                {% if settings.report_logo %}
+                <div class="text-sm" style="margin-top:4px;">
+                    <span class="badge badge-success">Logo configured</span>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
@@ -250,12 +231,10 @@
 
 <!-- Section 5: Admin Portal -->
 <div class="settings-section">
-    <h2 class="settings-section-title">&#x2699; Admin Portal</h2>
-    <form hx-post="/settings/admin" hx-swap="none">
+    <h2 class="settings-section-title">&#x2699;&#xFE0F; Admin Portal</h2>
+    <form method="post" action="/settings/admin">
         <div class="settings-row">
-            <div class="settings-label">
-                Enabled
-            </div>
+            <div class="settings-label">Enabled</div>
             <div>
                 <label class="toggle-label">
                     <span class="toggle">
@@ -264,16 +243,16 @@
                     </span>
                     Enable admin portal
                 </label>
-                <div class="form-hint">Controls whether the admin web interface is started.</div>
+                <div class="form-hint">When disabled, only the MCP endpoint runs. All config data stays in config.toml.</div>
             </div>
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
+                Admin Port <span class="restart-icon" title="Requires restart">&#x26A0;</span>
             </div>
             <div>
                 <input type="number" name="port" class="form-input" value="{{ settings.admin_port | default(9090) }}" min="1" max="65535" style="width:120px;">
-                <div class="form-hint">TCP port for the admin portal. Requires restart.</div>
+                <div class="form-hint">Separate port for admin UI. Shares host and TLS with MCP server. Requires restart.</div>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
