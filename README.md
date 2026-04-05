@@ -163,13 +163,13 @@ All available options with detailed descriptions are documented in [`config.exam
 The config file contains **two different types of tokens** that serve different purposes:
 
 ```
-┌─────────────┐  MCP token (Bearer)  ┌─────────────────┐   api_token     ┌────────────────┐
-│  MCP Client ├──────────────────────►  MCP Server     ├─────────────────►  Zabbix Server  │
-│  (AI / IDE) │    (optional)        │  (zabbix-mcp)   │   (required)    │                │
-└─────────────┘                      │                 │                 └────────────────┘
-                                     │  Admin Portal   │
-                                     │  :9090 (opt.)   │
-                                     └─────────────────┘
+┌──────────────┐  MCP token (Bearer)  ┌────────────────────┐   api_token     ┌─────────────────┐
+│  MCP Client  ├──────────────────────►  MCP Server        ├─────────────────►  Zabbix Server  │
+│  (AI / IDE)  │    (optional)        │  (zabbix-mcp)      │   (required)    │                 │
+└──────────────┘                      │                    │                 └─────────────────┘
+                                      │  Admin Portal      │
+                                      │  :9090 (optional)  │
+                                      └────────────────────┘
 ```
 
 **`api_token`** (in `[zabbix.*]`) — **required** — authenticates the MCP server to your Zabbix instance. This is a [Zabbix API token](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens) that you create in the Zabbix frontend.
