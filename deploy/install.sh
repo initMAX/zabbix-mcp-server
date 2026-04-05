@@ -72,6 +72,36 @@ ok()    { echo -e "\e[1;32m>>>\e[0m $*"; }
 warn()  { echo -e "\e[1;33m>>>\e[0m $*"; }
 error() { echo -e "\e[1;31m>>>\e[0m $*" >&2; }
 
+# Detect host IP addresses (IPv4 + IPv6)
+_get_host_ips() {
+    local ips=()
+    if command -v hostname &>/dev/null; then
+        while read -r ip; do
+            [[ -n "$ip" ]] && ips+=("$ip")
+        done <<< "$(hostname -I 2>/dev/null | tr ' ' '\n')"
+    fi
+    if [[ ${#ips[@]} -eq 0 ]] && command -v ip &>/dev/null; then
+        while read -r ip; do
+            [[ -n "$ip" ]] && ips+=("$ip")
+        done <<< "$(ip -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)"
+    fi
+    # Fallback to localhost
+    if [[ ${#ips[@]} -eq 0 ]]; then
+        ips=("127.0.0.1")
+    fi
+    printf '%s\n' "${ips[@]}"
+}
+
+# Format IP:port as URL (brackets for IPv6)
+_format_url() {
+    local ip="$1" port="$2"
+    if [[ "$ip" == *:* ]]; then
+        echo "http://[${ip}]:${port}"
+    else
+        echo "http://${ip}:${port}"
+    fi
+}
+
 # Run a command with a spinner — usage: spin "message" command [args...]
 spin() {
     local msg="$1"; shift
@@ -461,7 +491,11 @@ check_health() {
     local curl_host="127.0.0.1"
     local url="http://${curl_host}:${port}/health"
 
-    info "Server configured on ${configured_host}:${port}"
+    local display_host="$configured_host"
+    if [[ "$display_host" == "0.0.0.0" ]]; then
+        display_host=$(_get_host_ips | head -1)
+    fi
+    info "Server configured on ${display_host}:${port}"
 
     if ! command -v curl &>/dev/null; then
         warn "curl is not installed — skipping health check."
@@ -749,10 +783,27 @@ do_install() {
     echo "  5. View logs:        tail -f $LOG_DIR/server.log"
     echo "  6. Health check:     curl http://localhost:$active_port/health"
     echo
-    echo "  Endpoints (from config.toml — ${active_host}:${active_port}):"
-    echo "    MCP endpoint:   http://localhost:$active_port/mcp"
-    echo "    Health check:   http://localhost:$active_port/health"
-    echo "    Admin portal:   http://localhost:9090"
+    echo "  Endpoints (listening on ${active_host}:${active_port}):"
+    if [[ "$active_host" == "0.0.0.0" ]]; then
+        local _first=true
+        while read -r _ip; do
+            [[ -z "$_ip" ]] && continue
+            local _mcp_url _admin_url
+            _mcp_url=$(_format_url "$_ip" "$active_port")
+            _admin_url=$(_format_url "$_ip" 9090)
+            if $_first; then
+                echo "    MCP endpoint:   ${_mcp_url}/mcp"
+                echo "    Admin portal:   ${_admin_url}"
+                _first=false
+            else
+                echo "                    ${_mcp_url}/mcp"
+                echo "                    ${_admin_url}"
+            fi
+        done <<< "$(_get_host_ips)"
+    else
+        echo "    MCP endpoint:   http://${active_host}:${active_port}/mcp"
+        echo "    Admin portal:   http://${active_host}:9090"
+    fi
     echo
     echo "  Changelog:    https://github.com/initMAX/zabbix-mcp-server/blob/main/CHANGELOG.md"
     echo "  (new features, security fixes, new config options)"
@@ -1049,15 +1100,21 @@ with open(config_file, 'w') as f:
 
     chown "$SERVICE_USER:$SERVICE_USER" "$config_file"
 
+    # Detect primary IP for admin portal URL
+    local admin_ip
+    admin_ip=$(_get_host_ips | head -1)
+    local admin_url
+    admin_url=$(_format_url "$admin_ip" 9090)
+
     echo
     echo -e "  \e[1;32m╔══════════════════════════════════════════════════╗\e[0m"
     echo -e "  \e[1;32m║          Admin Portal Credentials                ║\e[0m"
     echo -e "  \e[1;32m╠══════════════════════════════════════════════════╣\e[0m"
-    echo -e "  \e[1;32m║\e[0m  URL:      http://localhost:9090                  \e[1;32m║\e[0m"
-    echo -e "  \e[1;32m║\e[0m  Username: \e[1madmin\e[0m                                 \e[1;32m║\e[0m"
-    echo -e "  \e[1;32m║\e[0m  Password: \e[1m$admin_password\e[0m                      \e[1;32m║\e[0m"
-    echo -e "  \e[1;32m║\e[0m                                                  \e[1;32m║\e[0m"
-    echo -e "  \e[1;32m║\e[0m  Save this password — it will not be shown again \e[1;32m║\e[0m"
+    echo -e "  \e[1;32m║\e[0m  URL:      \e[1m$admin_url\e[0m"
+    echo -e "  \e[1;32m║\e[0m  Username: \e[1madmin\e[0m"
+    echo -e "  \e[1;32m║\e[0m  Password: \e[1m$admin_password\e[0m"
+    echo -e "  \e[1;32m║\e[0m"
+    echo -e "  \e[1;32m║\e[0m  Save this password — it will not be shown again"
     echo -e "  \e[1;32m╚══════════════════════════════════════════════════╝\e[0m"
     echo
 }
