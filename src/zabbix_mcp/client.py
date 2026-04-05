@@ -181,10 +181,21 @@ class ClientManager:
             return obj(params)
         return obj(**params)
 
-    def check_connection(self, server: str) -> None:
-        """Verify connectivity to a Zabbix server (for health checks)."""
+    def check_connection(self, server: str) -> dict:
+        """Verify connectivity and token auth to a Zabbix server.
+
+        Returns dict with 'api_ok' and 'token_ok' status.
+        Raises on connection failure.
+        """
         client = self._get_client(server)
-        client.api_version()
+        client.api_version()  # public endpoint — verifies API reachability
+        # Test token auth with an authenticated call (host.get with limit=1)
+        # user.checkAuthentication doesn't work with API tokens in Zabbix 7.0+
+        try:
+            client.host.get(limit=1, output=["hostid"])
+            return {"api_ok": True, "token_ok": True}
+        except Exception:
+            return {"api_ok": True, "token_ok": False}
 
     def get_version(self, server: str) -> str:
         """Return the Zabbix API version string for the given server (cached)."""

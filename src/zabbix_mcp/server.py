@@ -1051,6 +1051,13 @@ def _make_tool_handler(
         try:
             server_name = client_manager.resolve_server(server_name)
 
+            # Check token authorization (servers, scopes, read_only)
+            from zabbix_mcp.token_store import check_token_authorization
+            _tool_prefix = method_def.tool_name.rsplit("_", 1)[0] if "_" in method_def.tool_name else method_def.tool_name
+            _auth_err = check_token_authorization(server_name, tool_prefix=_tool_prefix, is_write=not method_def.read_only)
+            if _auth_err:
+                return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
+
             if not method_def.read_only:
                 client_manager.check_write(server_name)
 
@@ -1138,6 +1145,8 @@ def _register_tools(
     When *disabled_tools* is set, tools whose prefix matches an entry
     are excluded. This is applied after the allowlist filter.
     """
+    from zabbix_mcp.token_store import check_token_authorization
+
     server_names = client_manager.server_names
     count = 0
 
@@ -1213,6 +1222,13 @@ def _register_tools(
                 method_lower in _KNOWN_READ_ONLY
                 or any(method_lower.endswith(s) for s in _READ_ONLY_SUFFIXES)
             )
+
+            # Token authorization: server + scope + read_only
+            _prefix = method.split(".")[0].lower() if "." in method else ""
+            _auth_err = check_token_authorization(server_name, tool_prefix=_prefix, is_write=not is_read_only)
+            if _auth_err:
+                return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
+
             if not is_read_only:
                 client_manager.check_write(server_name)
 
@@ -1273,6 +1289,9 @@ def _register_tools(
         that multimodal AI models can display and interpret directly. Use graph_get
         to find graph IDs first."""
         srv = client_manager.resolve_server(server or client_manager.default_server)
+        _auth_err = check_token_authorization(srv, tool_prefix="graph")
+        if _auth_err:
+            return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
         return await asyncio.to_thread(
             graph_render, client_manager, srv,
             graphid=graphid, period=period, width=width, height=height,
@@ -1297,6 +1316,9 @@ def _register_tools(
         Uses z-score analysis on trend data to find hosts that deviate significantly
         from the group average. Requires at least 2 hosts with data."""
         srv = client_manager.resolve_server(server or client_manager.default_server)
+        _auth_err = check_token_authorization(srv, tool_prefix="host")
+        if _auth_err:
+            return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
         return await asyncio.to_thread(
             anomaly_detect, client_manager, srv,
             item_key=item_key, hostgroupid=hostgroupid, hostid=hostid,
@@ -1321,6 +1343,9 @@ def _register_tools(
         on historical trend data. Returns predicted date, daily growth rate,
         and R-squared confidence. Useful for capacity planning (disk, CPU, memory)."""
         srv = client_manager.resolve_server(server or client_manager.default_server)
+        _auth_err = check_token_authorization(srv, tool_prefix="host")
+        if _auth_err:
+            return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
         return await asyncio.to_thread(
             capacity_forecast, client_manager, srv,
             hostid=hostid, item_key=item_key, threshold=threshold, period=period,
@@ -1372,6 +1397,9 @@ def _register_tools(
                 (bandwidth/traffic), backup (daily success/fail matrix)."""
                 from zabbix_mcp.reporting import data_fetcher
                 srv = client_manager.resolve_server(server or client_manager.default_server)
+                _auth_err = check_token_authorization(srv, tool_prefix="host")
+                if _auth_err:
+                    return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
 
                 valid_types = tuple(_REPORT_TEMPLATES.keys())
                 if report_type not in valid_types:
@@ -1423,6 +1451,13 @@ def _register_tools(
         of what will happen and a confirmation token. Use action_confirm with the
         token to actually execute it. Tokens expire after 5 minutes."""
         srv = client_manager.resolve_server(server or client_manager.default_server)
+
+        # Token authorization: server + write permission
+        _prefix = action.split(".")[0].lower() if "." in action else ""
+        _auth_err = check_token_authorization(srv, tool_prefix=_prefix, is_write=True)
+        if _auth_err:
+            return json.dumps({"error": True, "message": _auth_err, "type": "AuthorizationError"})
+
         try:
             client_manager.check_write(srv)
         except ReadOnlyError as e:
@@ -1438,12 +1473,18 @@ def _register_tools(
         for t in expired:
             del _pending_actions[t]
 
+        # Bind to caller token for security (prevent cross-token confirmation)
+        from zabbix_mcp.token_store import current_token_info as _cti
+        _caller_token = _cti.get()
+        _caller_id = _caller_token.id if _caller_token else None
+
         _pending_actions[token] = {
             "action": action,
             "params": params,
             "server": srv,
             "expires": expires,
             "created_at": datetime.now(timezone.utc).isoformat(),
+            "caller_token_id": _caller_id,
         }
 
         return json.dumps({
@@ -1467,11 +1508,20 @@ def _register_tools(
         confirmation_token: Annotated[str, Field(description="Token from action_prepare response")],
     ) -> str:
         """Execute a previously prepared action. The confirmation token must match
-        an active (non-expired) prepared action."""
+        an active (non-expired) prepared action and be from the same caller."""
         if confirmation_token not in _pending_actions:
             return json.dumps({"error": "Invalid or expired confirmation token."})
 
-        action_data = _pending_actions.pop(confirmation_token)
+        action_data = _pending_actions[confirmation_token]
+
+        # Verify caller identity matches the preparer
+        from zabbix_mcp.token_store import current_token_info as _cti
+        _caller_token = _cti.get()
+        _caller_id = _caller_token.id if _caller_token else None
+        if action_data.get("caller_token_id") != _caller_id:
+            return json.dumps({"error": "Confirmation token was prepared by a different caller. Access denied."})
+
+        _pending_actions.pop(confirmation_token)
 
         if action_data["expires"] < time.time():
             return json.dumps({"error": "Confirmation token has expired. Prepare the action again."})
@@ -1567,6 +1617,9 @@ def run_server(
     port: int = 8080,
 ) -> None:
     """Create and run the MCP server."""
+    # Store runtime port for admin portal MCP health check
+    object.__setattr__(config, '_runtime_port', port)
+
     client_manager = ClientManager(config)
 
     # Determine URL scheme based on TLS configuration
@@ -1825,6 +1878,22 @@ def run_server(
                 asgi_app = mcp.streamable_http_app()
             else:
                 asgi_app = mcp.sse_app()
+
+            # Capture client IP in context var for token IP allowlist checks
+            from zabbix_mcp.token_store import current_client_ip as _cip_var, current_token_info as _cti_var
+            _inner_app = asgi_app
+            async def _client_ip_middleware(scope, receive, send):
+                _cti_var.set(None)
+                if scope["type"] in ("http", "websocket") and "client" in scope and scope["client"]:
+                    _cip_var.set(scope["client"][0])
+                else:
+                    _cip_var.set(None)
+                try:
+                    await _inner_app(scope, receive, send)
+                finally:
+                    _cti_var.set(None)
+                    _cip_var.set(None)
+            asgi_app = _client_ip_middleware
 
             # Apply IP allowlist middleware if configured
             if config.server.allowed_hosts:

@@ -122,10 +122,11 @@ async def server_create(request: Request) -> Response:
         logger.info("Zabbix server '%s' added by %s", name, session.user)
         client_ip = request.client.host if request.client else ""
         write_audit("server_create", user=session.user, target_type="server", target_id=name, ip=client_ip)
+        admin_app.restart_needed = True
+        return admin_app.flash_redirect("/servers", f"Server '{name}' added. Restart required.")
     except Exception as e:
         logger.error("Failed to add server: %s", e)
-
-    return RedirectResponse("/servers", status_code=303)
+        return admin_app.flash_redirect("/servers", f"Failed to add server: {e}", "danger")
 
 
 async def server_edit(request: Request) -> Response:
@@ -176,10 +177,11 @@ async def server_edit(request: Request) -> Response:
             logger.info("Zabbix server '%s' updated by %s", server_name, session.user)
             client_ip = request.client.host if request.client else ""
             write_audit("server_edit", user=session.user, target_type="server", target_id=server_name, ip=client_ip)
+            admin_app.restart_needed = True
+            return admin_app.flash_redirect("/servers", f"Server '{server_name}' updated. Restart required.")
     except Exception as e:
         logger.error("Failed to update server: %s", e)
-
-    return RedirectResponse("/servers", status_code=303)
+        return admin_app.flash_redirect("/servers", f"Failed to update server: {e}", "danger")
 
 
 async def server_delete(request: Request) -> Response:
@@ -195,10 +197,11 @@ async def server_delete(request: Request) -> Response:
         logger.info("Zabbix server '%s' deleted by %s", server_name, session.user)
         client_ip = request.client.host if request.client else ""
         write_audit("server_delete", user=session.user, target_type="server", target_id=server_name, ip=client_ip)
+        admin_app.restart_needed = True
+        return admin_app.flash_redirect("/servers", f"Server '{server_name}' deleted. Restart required.")
     except Exception as e:
         logger.error("Failed to delete server: %s", e)
-
-    return RedirectResponse("/servers", status_code=303)
+        return admin_app.flash_redirect("/servers", f"Failed to delete server: {e}", "danger")
 
 
 async def server_test(request: Request) -> Response:
@@ -214,13 +217,20 @@ async def server_test(request: Request) -> Response:
     from starlette.responses import HTMLResponse
     import html as _html
     try:
-        await asyncio.to_thread(client_manager.check_connection, server_name)
+        result = await asyncio.to_thread(client_manager.check_connection, server_name)
         version = _html.escape(client_manager.get_version(server_name))
-        return HTMLResponse(
-            f'<span class="status-dot status-dot-green"></span> Connected'
-            f'<span style="margin-left:8px;">Zabbix {version}</span>'
-            f'<span class="test-ok" style="margin-left:8px; color:var(--color-success); animation: fadeOut 2s forwards;">&#x2713;</span>'
-        )
+        if result.get("token_ok"):
+            return HTMLResponse(
+                f'<span class="status-dot status-dot-green"></span> Connected'
+                f'<span style="margin-left:8px;">Zabbix {version}</span>'
+                f'<span class="test-ok" style="margin-left:8px; color:var(--color-success); animation: fadeOut 2s forwards;">&#x2713;</span>'
+            )
+        else:
+            return HTMLResponse(
+                f'<span class="status-dot status-dot-yellow"></span> API online'
+                f'<span style="margin-left:8px;">Zabbix {version}</span>'
+                f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-warning);">&#x26A0; Token invalid or expired</span>'
+            )
     except Exception as e:
         msg = _html.escape(str(e)[:100])
         return HTMLResponse(
@@ -236,24 +246,49 @@ async def server_restart(request: Request) -> Response:
     if not session or session.role != "admin":
         return RedirectResponse("/servers", status_code=303)
 
-    import subprocess
+    import subprocess, os, signal
+    restarted = False
+
+    # Try systemctl first (bare-metal / systemd)
     try:
         subprocess.run(
             ["systemctl", "restart", "zabbix-mcp-server"],
             check=True, capture_output=True, timeout=10,
         )
-        logger.info("MCP server restarted by %s", session.user)
-        from zabbix_mcp.admin.audit_writer import write_audit
-        client_ip = request.client.host if request.client else ""
-        write_audit("server_restart", user=session.user, ip=client_ip)
+        restarted = True
     except FileNotFoundError:
-        logger.warning("systemctl not found — cannot restart (Docker/container?)")
+        pass
     except subprocess.CalledProcessError as e:
-        logger.error("Restart failed: %s", e.stderr.decode() if e.stderr else e)
+        logger.error("systemctl restart failed: %s", e.stderr.decode() if e.stderr else e)
     except Exception as e:
-        logger.error("Restart failed: %s", e)
+        logger.error("systemctl restart failed: %s", e)
 
-    return RedirectResponse("/servers", status_code=303)
+    # Fallback: Docker — send SIGTERM to PID 1, container policy will restart
+    if not restarted:
+        try:
+            logger.info("Sending SIGTERM to PID 1 (Docker restart)...")
+            admin_app.restart_needed = False
+            from zabbix_mcp.admin.audit_writer import write_audit
+            client_ip = request.client.host if request.client else ""
+            write_audit("server_restart", user=session.user, ip=client_ip)
+            # Kill PID 1 after a short delay so the response can be sent
+            import threading
+            def _kill():
+                import time
+                time.sleep(1)
+                os.kill(1, signal.SIGTERM)
+            threading.Thread(target=_kill, daemon=True).start()
+            return JSONResponse({"status": "restarting"})
+        except Exception as e:
+            logger.error("Docker restart failed: %s", e)
+            return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+
+    admin_app.restart_needed = False
+    logger.info("MCP server restarted by %s", session.user)
+    from zabbix_mcp.admin.audit_writer import write_audit
+    client_ip = request.client.host if request.client else ""
+    write_audit("server_restart", user=session.user, ip=client_ip)
+    return JSONResponse({"status": "restarted"})
 
 
 async def server_test_new(request: Request) -> Response:
@@ -263,17 +298,36 @@ async def server_test_new(request: Request) -> Response:
 
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)
-    if not session:
-        return HTMLResponse("Unauthorized", status_code=401)
+    if not session or session.role != "admin":
+        return HTMLResponse("Unauthorized — admin role required", status_code=403)
 
     form = await request.form()
     url = str(form.get("url", "")).strip()
     api_token = str(form.get("api_token", "")).strip()
     verify_ssl = form.get("verify_ssl") == "1"
 
-    # SECURITY: validate URL scheme (SSRF prevention)
+    # SECURITY: validate URL scheme and block internal/private addresses (SSRF prevention)
     if not url.startswith(("http://", "https://")):
         return HTMLResponse('<span class="text-danger">URL must start with http:// or https://</span>')
+
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    hostname = parsed.hostname or ""
+    # Block obvious internal targets
+    _blocked = ("localhost", "127.0.0.1", "::1", "0.0.0.0", "metadata.google", "169.254.169.254")
+    if any(hostname == b or hostname.endswith("." + b) for b in _blocked):
+        return HTMLResponse('<span class="text-danger">URL points to a blocked internal address</span>')
+
+    # SECURITY: resolve hostname and check if it's internal (prevents DNS rebinding / SSRF redirect bypass)
+    import socket
+    try:
+        resolved_ip = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)[0][4][0]
+        from ipaddress import ip_address as _ip
+        addr = _ip(resolved_ip)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return HTMLResponse('<span class="text-danger">URL resolves to a private/internal IP address</span>')
+    except (socket.gaierror, ValueError):
+        pass  # Let ZabbixAPI handle DNS errors
 
     if not url or not api_token:
         return HTMLResponse('<span class="text-danger">URL and API token are required</span>')

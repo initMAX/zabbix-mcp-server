@@ -81,7 +81,7 @@
                 </td>
                 <td>{{ entry.user }}</td>
                 <td class="text-sm">{% if entry.target_type %}{{ entry.target_type }}: {{ entry.target_id }}{% endif %}</td>
-                <td class="text-sm text-muted" style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ entry.details }}">{{ entry.details }}</td>
+                <td class="text-sm text-muted" style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" tabindex="0" data-tooltip="{{ entry.details }}">{{ entry.details }}</td>
                 <td class="monospace text-sm">{{ entry.ip }}</td>
             </tr>
             {% endfor %}

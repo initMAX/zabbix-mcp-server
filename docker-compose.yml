@@ -33,7 +33,7 @@ services:
       - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN:-}
       - ADMIN_PORT=${ADMIN_PORT:-9090}
     volumes:
-      - ./config.toml:/etc/zabbix-mcp/config.toml:ro
+      - ./config.toml:/etc/zabbix-mcp/config.toml
       - logs:/var/log/zabbix-mcp
     healthcheck:
       test: ["CMD", "/opt/zabbix-mcp/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${MCP_PORT:-8080}/health')"]

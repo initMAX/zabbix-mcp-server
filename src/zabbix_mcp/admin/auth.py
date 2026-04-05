@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import os
 import secrets
+import threading
 import time
 import logging
 from dataclasses import dataclass
@@ -102,45 +103,54 @@ class SessionManager:
     def __init__(self, signing_key: str) -> None:
         self._sessions: dict[str, Session] = {}
         self._signing_key = signing_key
+        self._lock = threading.RLock()
 
     def create_session(self, user: str, role: str, ip: str) -> str:
         """Create a new session, return session token."""
-        self.cleanup_expired()
+        with self._lock:
+            self._cleanup_expired_unlocked()
 
-        token = secrets.token_urlsafe(48)
-        now = time.time()
-        session = Session(
-            user=user,
-            role=role,
-            token=token,
-            created_at=now,
-            expires_at=now + self.SESSION_DURATION,
-            ip=ip,
-        )
-        self._sessions[token] = session
-        logger.info("Created session for user '%s' from %s", user, ip)
-        return token
+            token = secrets.token_urlsafe(48)
+            now = time.time()
+            session = Session(
+                user=user,
+                role=role,
+                token=token,
+                created_at=now,
+                expires_at=now + self.SESSION_DURATION,
+                ip=ip,
+            )
+            self._sessions[token] = session
+            logger.info("Created session for user '%s' from %s", user, ip)
+            return token
 
     def validate_session(self, token: str) -> Session | None:
         """Validate a session token. Returns Session if valid."""
-        session = self._sessions.get(token)
-        if session is None:
-            return None
+        with self._lock:
+            session = self._sessions.get(token)
+            if session is None:
+                return None
 
-        if time.time() > session.expires_at:
-            del self._sessions[token]
-            return None
+            if time.time() > session.expires_at:
+                del self._sessions[token]
+                return None
 
-        return session
+            return session
 
     def destroy_session(self, token: str) -> None:
         """Logout - remove session."""
-        session = self._sessions.pop(token, None)
-        if session is not None:
-            logger.info("Destroyed session for user '%s'", session.user)
+        with self._lock:
+            session = self._sessions.pop(token, None)
+            if session is not None:
+                logger.info("Destroyed session for user '%s'", session.user)
 
     def cleanup_expired(self) -> None:
-        """Remove expired sessions."""
+        """Remove expired sessions (public entry — acquires lock)."""
+        with self._lock:
+            self._cleanup_expired_unlocked()
+
+    def _cleanup_expired_unlocked(self) -> None:
+        """Remove expired sessions (caller must hold self._lock)."""
         now = time.time()
         expired = [
             token for token, session in self._sessions.items()

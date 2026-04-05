@@ -32,10 +32,32 @@
             <div class="form-group">
                 <label class="form-label">Scopes</label>
                 <input type="hidden" name="scopes" id="scopes-input" value="{{ token.scopes | join(',') }}">
-                <div class="scope-chips" id="scope-chips-container">
-                    <!-- rendered by JS -->
+                <div class="form-hint" style="margin-bottom:8px;">Click groups or individual tools to toggle access. Drag between zones or click to toggle.</div>
+                <input type="text" class="form-input" placeholder="Search tools and groups..."
+                       oninput="filterTokenBubbles(this.value)" style="margin-bottom:12px;">
+                <div class="tool-zones">
+                    <div class="tool-zone tool-zone-allowed" id="zone-allowed"
+                         ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                         ondragleave="this.classList.remove('drag-over')"
+                         ondrop="dropScope(event, 'allowed'); this.classList.remove('drag-over')">
+                        <div class="tool-zone-header">&#x2705; Allowed</div>
+                        <div class="tool-zone-bubbles" id="allowed-bubbles"></div>
+                    </div>
+                    <div class="tool-zone tool-zone-disabled" id="zone-denied"
+                         ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                         ondragleave="this.classList.remove('drag-over')"
+                         ondrop="dropScope(event, 'denied'); this.classList.remove('drag-over')">
+                        <div class="tool-zone-header">&#x274C; Denied</div>
+                        <div class="tool-zone-bubbles" id="denied-bubbles"></div>
+                    </div>
                 </div>
-                <div class="form-hint">Click groups to toggle access. Globally disabled groups cannot be enabled per-token.</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Allowed Zabbix Servers</label>
+                <input type="hidden" name="allowed_servers" id="allowed-servers-input" value="{{ token.allowed_servers | join(',') if token.allowed_servers else '*' }}">
+                <div class="scope-chips" id="server-chips" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;"><!-- rendered by JS --></div>
+                <div class="form-hint">Click to toggle which Zabbix servers this token can access. <strong>Blue</strong> = active selection.</div>
             </div>
 
             <div class="form-group">
@@ -62,7 +84,16 @@
 
             <div class="form-group">
                 <label class="form-label" for="expires_at">Expiry Date</label>
-                <input type="text" id="expires_at" name="expires_at" class="form-input flatpickr-date" value="{{ token.expires_at or '' }}" style="width:auto;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <input type="text" id="expires_at" name="expires_at" class="form-input flatpickr-date" value="{{ token.expires_at or '' }}" style="width:auto; flex:1;">
+                    <label class="toggle-label" style="white-space:nowrap;">
+                        <span class="toggle">
+                            <input type="checkbox" id="no-expiry" name="no_expiry" value="1" {% if not token.expires_at %}checked{% endif %} onchange="toggleExpiry(this)">
+                            <span class="toggle-slider"></span>
+                        </span>
+                        Never expires
+                    </label>
+                </div>
             </div>
 
             {% if current_user_role != 'viewer' %}
@@ -143,88 +174,270 @@
 
 {% block scripts %}
 <script>
-var SCOPE_GROUPS = ['monitoring', 'data_collection', 'alerts', 'users', 'administration'];
-var SCOPE_DESCRIPTIONS = {
-    'monitoring': 'Hosts, problems, triggers, items, events, history, trends, SLA',
-    'data_collection': 'Templates, template groups, value maps, dashboards',
-    'alerts': 'Actions, media types, alert history, scripts',
-    'users': 'Users, user groups, roles, tokens, macros, MFA',
-    'administration': 'Settings, proxies, housekeeping, audit, configuration'
-};
-var globalDisabledGroups = {{ disabled_groups | tojson if disabled_groups else '[]' }};
+var TOOL_DATA = {{ tool_data | tojson if tool_data else '[]' }};
+var globalDisabledTools = {{ disabled_tools_list | tojson if disabled_tools_list else '[]' }};
+var expandedDisabled = {{ expanded_disabled | tojson if expanded_disabled else '[]' }};
+
 var selectedScopes = (document.getElementById('scopes-input').value || '').split(',').filter(Boolean);
 
-function isScopeSelected(name) {
-    return selectedScopes.indexOf(name) !== -1 || selectedScopes.indexOf('*') !== -1;
+function isGloballyDisabled(name) {
+    return globalDisabledTools.indexOf(name) !== -1 || expandedDisabled.indexOf(name) !== -1;
 }
 
-function toggleScope(name) {
-    if (globalDisabledGroups.indexOf(name) !== -1) return;
+function isScopeAllowed(name) {
+    if (isGloballyDisabled(name)) return false;
+    if (selectedScopes.indexOf('*') !== -1) return true;
+    return selectedScopes.indexOf(name) !== -1;
+}
 
-    if (name === '*') {
-        if (selectedScopes.indexOf('*') !== -1) {
-            selectedScopes = [];
-        } else {
-            selectedScopes = ['*'];
+function isGroupAllowed(groupName) {
+    if (isGloballyDisabled(groupName)) return false;
+    if (selectedScopes.indexOf('*') !== -1) return true;
+    return selectedScopes.indexOf(groupName) !== -1;
+}
+
+function findParentGroup(toolName) {
+    for (var i = 0; i < TOOL_DATA.length; i++) {
+        if (TOOL_DATA[i].tools && TOOL_DATA[i].tools.indexOf(toolName) !== -1) return TOOL_DATA[i];
+    }
+    return null;
+}
+
+function toggleScope(name, type) {
+    if (isGloballyDisabled(name)) return;
+    // Expand wildcard to explicit groups
+    if (selectedScopes.indexOf('*') !== -1) {
+        var allGroups = [];
+        TOOL_DATA.forEach(function(g) {
+            if (!isGloballyDisabled(g.name)) allGroups.push(g.name);
+        });
+        selectedScopes = allGroups;
+    }
+
+    var idx = selectedScopes.indexOf(name);
+    if (idx !== -1) {
+        // Directly in scopes — remove it
+        selectedScopes.splice(idx, 1);
+        if (type === 'group') {
+            // Removing a group: also remove its individual tool entries
+            var group = TOOL_DATA.find(function(g) { return g.name === name; });
+            if (group && group.tools) {
+                group.tools.forEach(function(t) {
+                    var ti = selectedScopes.indexOf(t);
+                    if (ti !== -1) selectedScopes.splice(ti, 1);
+                });
+            }
         }
     } else {
-        var wIdx = selectedScopes.indexOf('*');
-        if (wIdx !== -1) {
-            selectedScopes = SCOPE_GROUPS.filter(function(g) {
-                return g !== name && globalDisabledGroups.indexOf(g) === -1;
+        // Not directly in scopes — check if allowed via parent group
+        var parentGroup = (type !== 'group') ? findParentGroup(name) : null;
+        if (parentGroup && selectedScopes.indexOf(parentGroup.name) !== -1) {
+            // Explode group: remove group, add all siblings except this tool
+            selectedScopes.splice(selectedScopes.indexOf(parentGroup.name), 1);
+            parentGroup.tools.forEach(function(t) {
+                if (t !== name && !isGloballyDisabled(t) && selectedScopes.indexOf(t) === -1) {
+                    selectedScopes.push(t);
+                }
             });
         } else {
-            var idx = selectedScopes.indexOf(name);
-            if (idx !== -1) {
-                selectedScopes.splice(idx, 1);
-            } else {
-                selectedScopes.push(name);
+            // Not allowed — add it
+            selectedScopes.push(name);
+            if (type === 'group') {
+                // Adding a group: remove redundant individual tool entries
+                var group = TOOL_DATA.find(function(g) { return g.name === name; });
+                if (group && group.tools) {
+                    group.tools.forEach(function(t) {
+                        var ti = selectedScopes.indexOf(t);
+                        if (ti !== -1) selectedScopes.splice(ti, 1);
+                    });
+                }
             }
-            var allSelected = SCOPE_GROUPS.every(function(g) {
-                return globalDisabledGroups.indexOf(g) !== -1 || selectedScopes.indexOf(g) !== -1;
-            });
-            if (allSelected) selectedScopes = ['*'];
         }
     }
-    document.getElementById('scopes-input').value = selectedScopes.join(',');
-    renderScopeChips();
+
+    // Collapse back to wildcard if all groups are selected with no individual overrides
+    var allEnabled = TOOL_DATA.every(function(g) {
+        return isGloballyDisabled(g.name) || selectedScopes.indexOf(g.name) !== -1;
+    });
+    var hasIndividual = selectedScopes.some(function(s) {
+        return TOOL_DATA.every(function(g) { return g.name !== s; }) && s !== '*';
+    });
+    if (allEnabled && !hasIndividual) selectedScopes = ['*'];
+
+    syncScopes();
 }
 
-function renderScopeChips() {
-    var container = document.getElementById('scope-chips-container');
-    var html = '';
+function dropScope(e, zone) {
+    e.preventDefault();
+    var name = e.dataTransfer.getData('text/plain');
+    var type = e.dataTransfer.getData('text/type') || 'tool';
+    if (!name || isGloballyDisabled(name)) return;
+    if (zone === 'allowed') {
+        if (!isScopeAllowed(name)) toggleScope(name, type);
+    } else {
+        if (isScopeAllowed(name)) toggleScope(name, type);
+    }
+}
 
-    var allSelected = selectedScopes.indexOf('*') !== -1;
-    html += '<span class="scope-chip' + (allSelected ? ' selected' : '') + '" ' +
-            'title="All tool groups" onclick="toggleScope(\'*\')">' +
-            '* (all)<span class="scope-badge">' + (allSelected ? ' \u2705' : '') + '</span></span>';
+function syncScopes() {
+    document.getElementById('scopes-input').value = selectedScopes.join(',');
+    renderScopeBubbles();
+}
 
-    SCOPE_GROUPS.forEach(function(group) {
-        var isGlobalDisabled = globalDisabledGroups.indexOf(group) !== -1;
-        var isSelected = !isGlobalDisabled && isScopeSelected(group);
-        var cls = 'scope-chip';
-        if (isGlobalDisabled) cls += ' globally-disabled';
-        else if (isSelected) cls += ' selected';
+function makeScopeBubble(name, type, desc, groupName) {
+    var el = document.createElement('span');
+    var globalDis = isGloballyDisabled(name);
+    var parentGroupDis = groupName && isGloballyDisabled(groupName);
+    var effectivelyDisabled = globalDis || parentGroupDis;
 
-        var title = SCOPE_DESCRIPTIONS[group] || group;
-        if (isGlobalDisabled) title += ' (disabled globally in Settings)';
+    if (effectivelyDisabled) {
+        el.className = 'tool-bubble tool-bubble-global-disabled';
+        el.dataset.tooltip = desc + ' — Globally disabled in Settings. Enable it there first.';
+        el.draggable = false;
+        el.style.cursor = 'not-allowed';
+    } else {
+        el.className = 'tool-bubble ' + (type === 'group' ? 'tool-bubble-group' : 'tool-bubble-tool');
+        el.dataset.tooltip = desc;
+        el.draggable = true;
+        el.onclick = function() { toggleScope(name, type); };
+        el.ondragstart = function(ev) {
+            ev.dataTransfer.setData('text/plain', name);
+            ev.dataTransfer.setData('text/type', type);
+            el.classList.add('dragging');
+        };
+        el.ondragend = function() { el.classList.remove('dragging'); };
+    }
 
-        html += '<span class="' + cls + '" title="' + title + '" ' +
-                'onclick="toggleScope(\'' + group + '\')">' +
-                group.replace(/_/g, ' ');
-        if (isGlobalDisabled) {
-            html += '<span class="scope-badge" style="opacity:1;">\u26A0\uFE0F</span>';
+    el.dataset.name = name;
+    el.dataset.type = type;
+
+    var label = name.replace(/_/g, ' ');
+    if (effectivelyDisabled) {
+        el.textContent = '\u26A0\uFE0F ' + label;
+    } else {
+        el.textContent = label;
+    }
+    return el;
+}
+
+function renderScopeBubbles() {
+    var allowedEl = document.getElementById('allowed-bubbles');
+    var deniedEl = document.getElementById('denied-bubbles');
+    allowedEl.innerHTML = '';
+    deniedEl.innerHTML = '';
+
+    var isAll = selectedScopes.indexOf('*') !== -1;
+
+    TOOL_DATA.forEach(function(group) {
+        var gDisabled = isGloballyDisabled(group.name);
+        var gAllowed = !gDisabled && (isAll || selectedScopes.indexOf(group.name) !== -1);
+
+        var gBubble = makeScopeBubble(group.name, 'group', group.desc, null);
+        if (gDisabled) {
+            gBubble.classList.add('disabled');
+            deniedEl.appendChild(gBubble);
+        } else if (gAllowed) {
+            allowedEl.appendChild(gBubble);
         } else {
-            html += '<span class="scope-badge">' + (isSelected ? ' \u2705' : ' \u274C') + '</span>';
+            gBubble.classList.add('disabled');
+            deniedEl.appendChild(gBubble);
         }
-        html += '</span>';
+
+        if (group.tools) {
+            group.tools.forEach(function(toolName) {
+                var tDisabled = gDisabled || isGloballyDisabled(toolName);
+                var tAllowed = !tDisabled && (gAllowed || selectedScopes.indexOf(toolName) !== -1);
+                var bubble = makeScopeBubble(toolName, 'tool', group.name + ' \u2192 ' + toolName, group.name);
+                if (tDisabled) {
+                    bubble.classList.add('disabled');
+                    deniedEl.appendChild(bubble);
+                } else if (tAllowed) {
+                    allowedEl.appendChild(bubble);
+                } else {
+                    bubble.classList.add('disabled');
+                    deniedEl.appendChild(bubble);
+                }
+            });
+        }
     });
 
-    container.innerHTML = html;
+    if (!allowedEl.children.length) {
+        allowedEl.textContent = '';
+        var msg = document.createElement('span');
+        msg.className = 'text-muted';
+        msg.style.padding = '12px';
+        msg.textContent = 'No tools allowed';
+        allowedEl.appendChild(msg);
+    }
+    if (!deniedEl.children.length) {
+        deniedEl.textContent = '';
+        var msg2 = document.createElement('span');
+        msg2.className = 'text-muted';
+        msg2.style.padding = '12px';
+        msg2.textContent = 'No tools denied';
+        deniedEl.appendChild(msg2);
+    }
+}
+
+function filterTokenBubbles(q) {
+    q = q.toLowerCase();
+    document.querySelectorAll('.tool-bubble').forEach(function(b) {
+        var text = (b.textContent + ' ' + (b.title || '')).toLowerCase();
+        b.style.display = text.indexOf(q) !== -1 ? '' : 'none';
+    });
+}
+
+function toggleExpiry(el) {
+    var dateInput = document.getElementById('expires_at');
+    dateInput.disabled = el.checked;
+    if (el.checked) {
+        dateInput.value = '';
+    } else if (!dateInput.value) {
+        var d = new Date();
+        d.setDate(d.getDate() + 1);
+        dateInput.value = d.toISOString().slice(0, 10);
+        if (dateInput._flatpickr) dateInput._flatpickr.setDate(dateInput.value);
+    }
+}
+
+// --- Allowed Servers ---
+var ZABBIX_SERVERS = {{ zabbix_servers | tojson if zabbix_servers else '[]' }};
+var selectedServers = (document.getElementById('allowed-servers-input').value || '*').split(',').filter(Boolean);
+
+function toggleServer(name) {
+    if (name === '*') {
+        selectedServers = selectedServers.indexOf('*') !== -1 ? [] : ['*'];
+    } else {
+        var wIdx = selectedServers.indexOf('*');
+        if (wIdx !== -1) {
+            selectedServers = ZABBIX_SERVERS.filter(function(s) { return s !== name; });
+        } else {
+            var idx = selectedServers.indexOf(name);
+            if (idx !== -1) selectedServers.splice(idx, 1);
+            else selectedServers.push(name);
+            if (selectedServers.length === ZABBIX_SERVERS.length) selectedServers = ['*'];
+        }
+    }
+    document.getElementById('allowed-servers-input').value = selectedServers.join(',');
+    renderServerChips();
+}
+
+function renderServerChips() {
+    var c = document.getElementById('server-chips');
+    var allSel = selectedServers.indexOf('*') !== -1;
+    var html = '<span class="tool-bubble ' + (allSel ? 'tool-bubble-group' : 'tool-bubble-tool') + '" style="cursor:pointer;" onclick="toggleServer(\'*\')">' +
+               '* (all servers)</span>';
+    ZABBIX_SERVERS.forEach(function(s) {
+        var sel = allSel || selectedServers.indexOf(s) !== -1;
+        html += '<span class="tool-bubble ' + (sel ? 'tool-bubble-group' : 'tool-bubble-tool') + '" style="cursor:pointer;' + (sel ? '' : ' opacity:0.5;') + '" onclick="toggleServer(\'' + s + '\')">' + s + '</span>';
+    });
+    c.innerHTML = html;
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    renderScopeChips();
+    renderScopeBubbles();
+    renderServerChips();
+    toggleExpiry(document.getElementById('no-expiry'));
 });
 </script>
 {% endblock %}

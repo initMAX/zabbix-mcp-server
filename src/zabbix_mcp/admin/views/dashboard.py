@@ -118,5 +118,5 @@ async def dashboard(request: Request) -> Response:
             "report_templates": report_template_count,
         },
         "servers": servers,
-        "recent_audit": recent_audit[:10],
+        "audit_entries": recent_audit[:10],
     })

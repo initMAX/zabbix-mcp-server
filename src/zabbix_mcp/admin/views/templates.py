@@ -197,7 +197,9 @@ async def template_edit(request: Request) -> Response:
 
     # SECURITY: validate path is within allowed directories (prevents path traversal via config)
     resolved = file_path.resolve()
-    if not (str(resolved).startswith(str(CUSTOM_TEMPLATE_DIR.resolve())) or str(resolved).startswith(str(TEMPLATE_DIR.resolve()))):
+    _custom_dir = CUSTOM_TEMPLATE_DIR.resolve()
+    _tmpl_dir = TEMPLATE_DIR.resolve()
+    if not (resolved.is_relative_to(_custom_dir) or resolved.is_relative_to(_tmpl_dir)):
         logger.warning("Template path outside allowed directory: %s", resolved)
         return RedirectResponse("/templates", status_code=303)
 
@@ -345,9 +347,10 @@ async def template_delete(request: Request) -> Response:
         # Delete file
         tmpl_file = tmpl.get("template_file", "")
         file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
-        # SECURITY: only delete files within allowed directories
+        # SECURITY: only delete files within allowed directories (proper ancestry check)
         resolved_del = file_path.resolve()
-        if not str(resolved_del).startswith(str(CUSTOM_TEMPLATE_DIR.resolve())):
+        _del_dir = CUSTOM_TEMPLATE_DIR.resolve()
+        if not resolved_del.is_relative_to(_del_dir):
             logger.warning("Blocked deletion outside custom template dir: %s", resolved_del)
         elif file_path.exists():
             try:
@@ -361,7 +364,10 @@ async def template_delete(request: Request) -> Response:
             logger.info("Report template '%s' deleted by %s", template_id, session.user)
             from zabbix_mcp.admin.audit_writer import write_audit
             write_audit("template_delete", user=session.user, target_type="template", target_id=template_id, ip=request.client.host if request.client else "")
+            admin_app.restart_needed = True
+            return admin_app.flash_redirect("/templates", f"Template '{template_id}' deleted. Restart required.")
         except Exception as e:
             logger.error("Failed to delete template: %s", e)
+            return admin_app.flash_redirect("/templates", f"Failed to delete template: {e}", "danger")
 
     return RedirectResponse("/templates", status_code=303)

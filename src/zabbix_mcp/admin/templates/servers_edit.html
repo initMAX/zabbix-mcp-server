@@ -15,15 +15,15 @@
 </div>
 
 <div class="card" style="max-width:640px;">
-    <form method="post" action="/servers/{{ edit_server_name }}/edit" id="edit-server-form">
+    <form method="post" action="/servers/{{ edit_server_name | urlencode }}/edit" id="edit-server-form">
         <div class="form-group">
             <label class="form-label">Zabbix URL</label>
             <input type="url" name="url" id="srv-url" class="form-input" value="{{ server.url | default('') }}" required>
         </div>
         <div class="form-group">
             <label class="form-label">API Token</label>
-            <input type="text" name="api_token" id="srv-token" class="form-input" value="{{ server.api_token | default('') }}" placeholder="Leave empty to keep current">
-            <small class="text-muted">Leave empty to keep the current token</small>
+            <input type="password" name="api_token" id="srv-token" class="form-input" value="" placeholder="Leave empty to keep current" autocomplete="off">
+            <small class="text-muted">Leave empty to keep the current token. Current: <code>{{ server.api_token[:8] }}...{{ server.api_token[-4:] }}</code></small>
         </div>
         <div class="form-group" style="display:flex; gap:24px;">
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
@@ -45,19 +45,52 @@
 </div>
 
 <script>
+function _setTestResult(container, dotClass, text) {
+    // Safe DOM construction — no innerHTML from server responses
+    container.textContent = '';
+    if (dotClass) {
+        var dot = document.createElement('span');
+        dot.className = 'status-dot ' + dotClass;
+        container.appendChild(dot);
+    }
+    var msg = document.createElement('span');
+    msg.textContent = text;
+    container.appendChild(msg);
+}
+
+function _parseTestResponse(container, responseText) {
+    // Parse known safe patterns from server HTML response using textContent
+    var tmp = document.createElement('div');
+    tmp.textContent = ''; // never set innerHTML with server data
+    // Extract status from response text patterns (server uses html.escape)
+    if (responseText.indexOf('status-dot-green') !== -1) {
+        var versionMatch = responseText.match(/Zabbix ([^<]*)/);
+        var ver = versionMatch ? versionMatch[1] : '';
+        _setTestResult(container, 'status-dot-green', 'Connected' + (ver ? ' — Zabbix ' + ver : ''));
+    } else if (responseText.indexOf('status-dot-yellow') !== -1) {
+        _setTestResult(container, 'status-dot-yellow', 'API online — Token invalid or expired');
+    } else if (responseText.indexOf('status-dot-red') !== -1) {
+        var errMatch = responseText.match(/color:var\(--color-danger\)[^>]*>([^<]*)/);
+        _setTestResult(container, 'status-dot-red', 'Error' + (errMatch ? ': ' + errMatch[1] : ''));
+    } else {
+        // Fallback: display as plain text (safe)
+        container.textContent = responseText.replace(/<[^>]*>/g, '');
+    }
+}
+
 function testEditServer() {
     var url = document.getElementById('srv-url').value;
     var token = document.getElementById('srv-token').value;
     var ssl = document.getElementById('srv-ssl').checked;
     var result = document.getElementById('edit-test-result');
-    result.innerHTML = '<span class="text-muted">Testing...</span>';
+    _setTestResult(result, '', 'Testing...');
 
     // If token is empty, we can't test with a new token — test existing connection
     if (!token) {
         fetch('/servers/{{ edit_server_name }}/test', {method: 'POST'})
             .then(function(r) { return r.text(); })
-            .then(function(html) { result.innerHTML = html; })
-            .catch(function() { result.innerHTML = '<span class="text-danger">Test failed</span>'; });
+            .then(function(html) { _parseTestResponse(result, html); })
+            .catch(function() { _setTestResult(result, '', 'Test failed'); });
         return;
     }
 
@@ -67,8 +100,8 @@ function testEditServer() {
         body: 'url=' + encodeURIComponent(url) + '&api_token=' + encodeURIComponent(token) + '&verify_ssl=' + (ssl ? '1' : '0'),
     })
     .then(function(r) { return r.text(); })
-    .then(function(html) { result.innerHTML = html; })
-    .catch(function() { result.innerHTML = '<span class="text-danger">Test failed</span>'; });
+    .then(function(html) { _parseTestResponse(result, html); })
+    .catch(function() { _setTestResult(result, '', 'Test failed'); });
 }
 </script>
 {% endblock %}

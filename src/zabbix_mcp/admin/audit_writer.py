@@ -18,10 +18,24 @@
 """Audit log writer — appends JSON entries to the audit log file."""
 
 import json
+import os
 import time
 from pathlib import Path
 
 AUDIT_LOG_PATH = Path("/var/log/zabbix-mcp/audit.log")
+
+MAX_AUDIT_SIZE = 50 * 1024 * 1024  # 50 MB
+
+
+def _rotate_audit_log(path: Path) -> None:
+    """Simple audit log rotation."""
+    backup = str(path) + ".1"
+    old_backup = str(path) + ".2"
+    if os.path.exists(old_backup):
+        os.unlink(old_backup)
+    if os.path.exists(backup):
+        os.rename(backup, old_backup)
+    os.rename(str(path), backup)
 
 
 def write_audit(
@@ -44,6 +58,12 @@ def write_audit(
     }
     try:
         AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        # Rotate if audit log exceeds size limit
+        if AUDIT_LOG_PATH.exists() and AUDIT_LOG_PATH.stat().st_size > MAX_AUDIT_SIZE:
+            try:
+                _rotate_audit_log(AUDIT_LOG_PATH)
+            except OSError:
+                pass
         with open(AUDIT_LOG_PATH, "a") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as e:

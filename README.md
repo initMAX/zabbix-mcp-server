@@ -290,7 +290,11 @@ sudo journalctl -u zabbix-mcp-server -f
 
 ### Admin Portal
 
-Web-based administration portal for managing MCP tokens, users, report templates, and server settings. Runs on a separate port (default: 9090).
+Web-based administration portal for managing MCP tokens, users, report templates, and server settings. Runs on a **separate port** (default: 9090) — the MCP port (8080) serves only the MCP protocol, no admin UI.
+
+<p align="center">
+  <img src="docs/admin-login.png" alt="Admin Portal Login" width="600">
+</p>
 
 ```toml
 [admin]
@@ -300,21 +304,28 @@ port = 9090
 
 The installer generates an admin password automatically. To reset: `sudo ./deploy/install.sh set-admin-password`
 
+<p align="center">
+  <img src="docs/admin-dashboard.png" alt="Admin Portal Dashboard" width="800">
+</p>
+
 **Features:**
 
 | Feature | Description |
 |---|---|
-| MCP Tokens | Create, revoke, scope control (per tool group), IP restrictions, expiry |
-| Users | Admin / operator / viewer roles for portal access |
-| Zabbix Servers | Connection status, version, test connection button |
-| Report Templates | Built-in + custom templates, split-view HTML editor with live preview |
-| Settings | All config.toml sections editable via UI (restart-required items marked) |
-| Audit Log | All admin actions logged, filterable, CSV export |
-| Design | initMAX branded, dark/light mode (auto-detect), Rubik font |
+| Dashboard | System overview with MCP health status (green/red dot), Zabbix server connectivity with async token validation, uptime, recent audit activity |
+| MCP Tokens | Create, revoke, per-token scope control (group + individual tool level), **per-token Zabbix server binding**, IP restrictions, expiry, read-only flag; legacy token migration with tooltip |
+| Tool Exposure | Drag & drop bubble UI for enabling/disabling tools globally and per-token; groups + individual tool prefixes; globally disabled tools shown as locked in token scopes |
+| Zabbix Servers | Connection status with **API + token validation** (detects "API online but token invalid"), version display, test connection, add/edit/delete |
+| Users | Admin / operator / viewer roles; password complexity enforcement (10+ chars, uppercase, digit) |
+| Report Templates | Built-in + custom templates, GrapesJS visual editor with Zabbix blocks, HTML code editor, variable picker, server-side Jinja2 preview |
+| Settings | All config.toml sections editable — MCP Server, TLS & Security, Tool Exposure (allowlist + denylist), PDF Reports & Branding, Admin Portal |
+| Audit Log | All admin actions logged (JSON lines), filterable by date/action/user, CSV export |
+| Restart Management | Blikající "Restart needed" badge in header after config changes; click to restart with progress bar polling until MCP is back online |
+| Design | initMAX branded, dark/light/auto mode, Rubik font, instant CSS tooltips, responsive mobile layout |
 
-Changes made in the portal are written back to `config.toml` (preserving comments). Non-restart settings apply via hot-reload.
+All changes are written back to `config.toml` (preserving comments and formatting via tomlkit). Every config change triggers a "Restart needed" indicator.
 
-> **Security:** Admin portal shares host and TLS certificates with the MCP server. Only the port is separate — firewall it independently.
+> **Port separation:** MCP endpoint (`/mcp`, `/health`) runs exclusively on the MCP port (default 8080). Admin portal runs exclusively on the admin port (default 9090). No admin API is exposed on the MCP port. Firewall both ports independently.
 
 ### Docker
 
@@ -327,7 +338,7 @@ cp .env.example .env                    # optional: customize port, host, auth t
 docker compose up -d
 ```
 
-The config file is mounted read-only into the container. Logs are stored in a Docker volume.
+The config file is mounted read-write into the container (admin portal writes changes back). Logs are stored in a Docker volume.
 
 **Customizing the port and host interface** — create a `.env` file (copy from `.env.example`) and set:
 

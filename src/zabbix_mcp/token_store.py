@@ -21,6 +21,7 @@ Reads token definitions from config.toml [tokens.*] sections.
 Each token has: name, token_hash, scopes, read_only, allowed_ips, expires_at.
 """
 
+import contextvars
 import hashlib
 import hmac
 import json
@@ -35,6 +36,40 @@ from mcp.server.auth.provider import AccessToken
 
 logger = logging.getLogger("zabbix_mcp.token_store")
 
+# Context variable to hold the current token info during a request
+current_token_info: contextvars.ContextVar[Any] = contextvars.ContextVar("current_token_info", default=None)
+# Context variable to hold client IP for token IP allowlist checks
+current_client_ip: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_client_ip", default=None)
+
+
+def check_token_authorization(server_name: str, *, tool_prefix: str = "", is_write: bool = False) -> str | None:
+    """Check current token's authorization for a server + tool + write operation.
+
+    Returns an error message string if denied, or None if allowed.
+    """
+    token = current_token_info.get()
+    if token is None:
+        return None  # No token auth active (e.g. stdio mode)
+
+    # Check allowed_servers
+    if token.allowed_servers and "*" not in token.allowed_servers:
+        if server_name not in token.allowed_servers:
+            return f"Token '{token.name}' is not authorized for server '{server_name}'. Allowed: {', '.join(token.allowed_servers)}"
+
+    # Check token-level read_only
+    if is_write and token.read_only:
+        return f"Token '{token.name}' is read-only. Write operations are not allowed."
+
+    # Check scopes (if not wildcard)
+    if token.scopes and "*" not in token.scopes and tool_prefix:
+        from zabbix_mcp.config import TOOL_GROUPS, _expand_tool_groups
+        # Expand scopes: groups → individual prefixes
+        allowed_prefixes = set(_expand_tool_groups(token.scopes))
+        if tool_prefix not in allowed_prefixes:
+            return f"Token '{token.name}' scope does not include '{tool_prefix}'. Allowed scopes: {', '.join(token.scopes)}"
+
+    return None
+
 
 @dataclass
 class TokenInfo:
@@ -47,6 +82,7 @@ class TokenInfo:
     scopes: list[str] = field(default_factory=lambda: ["*"])  # ["monitoring", "alerts"] or ["*"]
     read_only: bool = True
     allowed_ips: list[str] | None = None  # CIDR ranges
+    allowed_servers: list[str] = field(default_factory=lambda: ["*"])  # ["production"] or ["*"] for all
     expires_at: str | None = None  # ISO 8601
     is_legacy: bool = False
     revoked: bool = False
@@ -110,6 +146,7 @@ class TokenStore:
                 scopes=cfg.get("scopes", ["*"]),
                 read_only=cfg.get("read_only", True),
                 allowed_ips=allowed_ips,
+                allowed_servers=cfg.get("allowed_servers", ["*"]),
                 expires_at=cfg.get("expires_at"),
                 is_legacy=cfg.get("is_legacy", False),
                 revoked=not cfg.get("is_active", True),
@@ -261,11 +298,13 @@ class MultiTokenVerifier:
 
         Returns AccessToken with scopes from the token definition.
         """
-        # Note: we don't have client_ip here from the MCP auth flow,
-        # IP checking can be done at the middleware level instead.
-        info = self._store.verify(token)
+        # Read client IP from context (set by ASGI middleware)
+        client_ip = current_client_ip.get()
+        info = self._store.verify(token, client_ip=client_ip)
         if info is None:
             return None
+        # Store token info in context for server restriction checks in tool handlers
+        current_token_info.set(info)
         return AccessToken(
             token=token,
             client_id=info.name,

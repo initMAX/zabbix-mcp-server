@@ -198,7 +198,7 @@ a:hover {
 .sidebar-header {
     height: var(--header-height);
     padding: 0 20px;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -324,10 +324,54 @@ a:hover {
     color: var(--text-secondary);
 }
 
+.restart-badge {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--color-danger, #ef4444);
+    border-radius: 12px;
+    animation: restartBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes restartBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.mcp-status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+.mcp-status-dot.checking {
+    background: #f59e0b;
+    animation: statusPulse 1s ease-in-out infinite;
+}
+.mcp-status-dot.ok {
+    background: #22c55e;
+}
+.mcp-status-dot.error {
+    background: #ef4444;
+    animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+}
+
 .header-right {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .theme-toggle {
@@ -1606,6 +1650,17 @@ tbody tr:last-child td {
         display: block;
     }
 
+    .header-right {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .header-right .btn {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+    }
+
     .stat-grid {
         grid-template-columns: 1fr 1fr;
     }
@@ -1635,6 +1690,21 @@ tbody tr:last-child td {
     .filters .search-input {
         width: 100%;
         min-width: 0;
+    }
+
+    .editor-tabs {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .editor-tabs .form-select {
+        min-width: 0;
+        width: 100%;
+        order: 10;
+    }
+
+    .tool-zones {
+        flex-direction: column;
     }
 }
 
@@ -1916,15 +1986,20 @@ tbody tr:last-child td {
 :root .gjs-two-color { color: var(--text-primary) !important; }
 :root .gjs-three-bg { background: var(--bg-input) !important; }
 :root .gjs-four-color, :root .gjs-four-color-h:hover { color: var(--color-primary) !important; }
-:root .gjs-pn-panel { background: var(--bg-card) !important; border-color: var(--border-color) !important; }
+:root .gjs-pn-panel { background: var(--bg-card) !important; border-color: var(--border-color) !important; overflow-x: auto !important; }
+:root .gjs-pn-commands, :root .gjs-pn-views { flex-wrap: wrap !important; }
 :root .gjs-block { background: var(--bg-input) !important; color: var(--text-primary) !important; border-color: var(--border-color) !important; }
 :root .gjs-category-title { background: var(--bg-card) !important; color: var(--text-primary) !important; }
 
 /* ---------- Tool Exposure — Zones + Bubbles ---------- */
 .tool-zones {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 16px;
+}
+.tool-zones > .tool-zone {
+    flex: 1;
+    min-width: 0;
 }
 .tool-zone {
     border: 2px dashed var(--border-color);
@@ -1953,9 +2028,9 @@ tbody tr:last-child td {
 .tool-bubble {
     display: inline-flex;
     align-items: center;
-    padding: 8px 16px;
+    padding: 6px 14px;
     border-radius: 20px;
-    font-size: 0.88rem;
+    font-size: 0.82rem;
     cursor: grab;
     user-select: none;
     transition: all 0.15s;
@@ -1967,9 +2042,12 @@ tbody tr:last-child td {
     background: var(--color-primary);
     color: white;
     font-weight: 600;
-    font-size: 0.92rem;
-    padding: 10px 20px;
-    border-radius: 24px;
+}
+.tool-zone-bubbles .tool-bubble-group {
+    margin-top: 8px;
+}
+.tool-zone-bubbles .tool-bubble-group:first-child {
+    margin-top: 0;
 }
 .tool-bubble-group.disabled {
     background: var(--bg-input);
@@ -1979,12 +2057,20 @@ tbody tr:last-child td {
 .tool-bubble-tool {
     background: rgba(34, 197, 94, 0.15);
     color: var(--color-success);
-    font-size: 0.82rem;
-    padding: 6px 14px;
 }
 .tool-bubble-tool.disabled {
     background: rgba(239, 68, 68, 0.1);
     color: var(--text-muted);
+}
+.tool-bubble-global-disabled {
+    background: var(--bg-input);
+    color: var(--text-muted);
+    border: 1px dashed var(--border-color);
+    opacity: 0.6;
+}
+.tool-bubble-global-disabled:hover {
+    transform: none;
+    box-shadow: none;
 }
 .tool-bubble:hover {
     transform: scale(1.05);
@@ -1993,10 +2079,54 @@ tbody tr:last-child td {
 
 /* ---------- Pulsing status dot (checking/pending) ---------- */
 .status-dot-pulse {
-    --pulse-color: var(--color-primary);
-    animation: dotPulse 1.5s ease-in-out infinite;
+    animation: dotPulse 1.2s ease-in-out infinite;
+}
+.status-dot-yellow.status-dot-pulse {
+    animation: dotPulseYellow 1.2s ease-in-out infinite;
 }
 @keyframes dotPulse {
-    0%, 100% { background: var(--text-muted); box-shadow: 0 0 0 0 transparent; }
-    50% { background: var(--pulse-color, var(--color-primary)); box-shadow: 0 0 0 4px rgba(31,101,244,0.15); }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes dotPulseYellow {
+    0%, 100% { background: var(--color-warning); box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); opacity: 1; }
+    50% { background: var(--color-warning); box-shadow: 0 0 12px rgba(245, 158, 11, 0.6); opacity: 0.5; }
+}
+
+/* ---------- Instant CSS Tooltips ---------- */
+[data-tooltip] {
+    position: relative;
+    cursor: default;
+}
+[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 10px;
+    border-radius: var(--radius-md, 6px);
+    background: var(--bg-card, #1e293b);
+    color: var(--text-primary, #e2e8f0);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    white-space: normal;
+    max-width: 280px;
+    width: max-content;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    border: 1px solid var(--border-color, #334155);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus::after {
+    opacity: 1;
+}
+[data-tooltip].tooltip-right::after {
+    bottom: auto;
+    left: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%);
 }

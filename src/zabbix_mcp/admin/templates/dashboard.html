@@ -21,13 +21,16 @@
     <a href="/servers" class="stat-card" style="text-decoration:none; color:inherit;">
         <div class="stat-icon">&#x1F5A5;</div>
         <div class="stat-content">
-            <div class="stat-value">
-                {% for server in servers %}
-                <span class="status-dot {% if server.status == 'online' %}status-dot-green{% elif server.status in ('pending', 'changed', 'unknown') %}status-dot-yellow{% else %}status-dot-red{% endif %}" title="{{ server.name }}: {{ server.status }}"></span>
-                {% endfor %}
-                {{ servers | length }}
-            </div>
+            <div class="stat-value">{{ servers | length }}</div>
             <div class="stat-label">Zabbix Servers</div>
+            <div id="server-status-list" style="margin-top:8px;">
+                {% for server in servers %}
+                <div style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-muted);">
+                    <span class="status-dot status-dot-yellow status-dot-pulse" data-server="{{ server.name }}" data-tooltip="{{ server.name }}: checking..." style="flex-shrink:0;"></span>
+                    <span data-server-label="{{ server.name }}">{{ server.name }}</span>
+                </div>
+                {% endfor %}
+            </div>
         </div>
     </a>
     <a href="/users" class="stat-card" style="text-decoration:none; color:inherit;">
@@ -91,4 +94,46 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Async check Zabbix server status — update dots from yellow/pulsing to green/red
+(function() {
+    fetch('/api/server-status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.querySelectorAll('.status-dot[data-server]').forEach(function(dot) {
+                var name = dot.dataset.server;
+                var info = data[name];
+                dot.classList.remove('status-dot-yellow', 'status-dot-pulse');
+                var label = document.querySelector('[data-server-label="' + name + '"]');
+                if (info && info.status === 'online') {
+                    dot.classList.add('status-dot-green');
+                    dot.dataset.tooltip = name + ': online (Zabbix ' + info.version + ')';
+                    if (label) label.textContent = name + ' — Zabbix ' + info.version;
+                } else if (info && info.status === 'token_error') {
+                    dot.classList.add('status-dot-yellow');
+                    dot.dataset.tooltip = name + ': API online (Zabbix ' + info.version + ') but token invalid';
+                    if (label) { label.textContent = name + ' — Zabbix ' + info.version + ' '; var warn = document.createElement('span'); warn.style.color = 'var(--color-warning)'; warn.textContent = 'token invalid'; label.appendChild(warn); }
+                } else {
+                    dot.classList.add('status-dot-red');
+                    var errMsg = info ? info.error || 'error' : 'not configured';
+                    dot.dataset.tooltip = name + ': ' + errMsg;
+                    if (label) label.textContent = name + ' — ' + errMsg;
+                }
+            });
+        })
+        .catch(function() {
+            document.querySelectorAll('.status-dot[data-server]').forEach(function(dot) {
+                var name = dot.dataset.server;
+                dot.classList.remove('status-dot-yellow', 'status-dot-pulse');
+                dot.classList.add('status-dot-red');
+                dot.dataset.tooltip = name + ': check failed';
+                var label = document.querySelector('[data-server-label="' + name + '"]');
+                if (label) label.textContent = name + ' — check failed';
+            });
+        });
+})();
+</script>
 {% endblock %}

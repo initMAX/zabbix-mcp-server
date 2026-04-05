@@ -73,10 +73,22 @@ async def user_create(request: Request) -> Response:
             "error": "Username must be at least 2 characters.",
         })
 
-    if len(password) < 8:
+    if len(password) < 10:
         return admin_app.render("users/create.html", request, {
             "active": "users",
-            "error": "Password must be at least 8 characters.",
+            "error": "Password must be at least 10 characters.",
+        })
+
+    if not any(c.isupper() for c in password):
+        return admin_app.render("users/create.html", request, {
+            "active": "users",
+            "error": "Password must contain at least one uppercase letter.",
+        })
+
+    if not any(c.isdigit() for c in password):
+        return admin_app.render("users/create.html", request, {
+            "active": "users",
+            "error": "Password must contain at least one digit.",
         })
 
     if role not in ("admin", "operator", "viewer"):
@@ -106,6 +118,7 @@ async def user_create(request: Request) -> Response:
         logger.info("User '%s' created (role: %s) by %s", username, role, session.user)
         client_ip = request.client.host if request.client else ""
         write_audit("user_create", user=session.user, target_type="user", target_id=username, details={"role": role}, ip=client_ip)
+        admin_app.restart_needed = True
     except Exception as e:
         logger.exception("Failed to create user: %s", e)
         return admin_app.render("users/create.html", request, {
@@ -113,7 +126,7 @@ async def user_create(request: Request) -> Response:
             "error": f"Failed to save: {e}",
         })
 
-    return RedirectResponse("/users", status_code=303)
+    return admin_app.flash_redirect("/users", f"User '{username}' created. Restart required.")
 
 
 async def user_detail(request: Request) -> Response:
@@ -150,8 +163,12 @@ async def user_detail(request: Request) -> Response:
         if new_password and new_password != confirm_password:
             error = "New password and confirmation do not match."
 
-        if new_password and len(new_password) < 8:
-            error = "Password must be at least 8 characters."
+        if new_password and len(new_password) < 10:
+            error = "Password must be at least 10 characters."
+        elif new_password and not any(c.isupper() for c in new_password):
+            error = "Password must contain at least one uppercase letter."
+        elif new_password and not any(c.isdigit() for c in new_password):
+            error = "Password must contain at least one digit."
 
         if error:
             return admin_app.render("users/create.html", request, {
@@ -177,10 +194,11 @@ async def user_detail(request: Request) -> Response:
             logger.info("User '%s' updated by %s", username, session.user)
             client_ip = request.client.host if request.client else ""
             write_audit("user_edit", user=session.user, target_type="user", target_id=username, ip=client_ip)
+            admin_app.restart_needed = True
+            return admin_app.flash_redirect(f"/users/{username}", "User updated. Restart required.")
         except Exception as e:
             logger.error("Failed to update user: %s", e)
-
-        return RedirectResponse(f"/users/{username}", status_code=303)
+            return admin_app.flash_redirect(f"/users/{username}", f"Failed to update: {e}", "danger")
 
     return admin_app.render("users/create.html", request, {
         "active": "users",
@@ -213,7 +231,10 @@ async def user_delete(request: Request) -> Response:
             logger.info("User '%s' deleted by %s", username, session.user)
             client_ip = request.client.host if request.client else ""
             write_audit("user_delete", user=session.user, target_type="user", target_id=username, ip=client_ip)
+            admin_app.restart_needed = True
+            return admin_app.flash_redirect("/users", f"User '{username}' deleted. Restart required.")
     except Exception as e:
         logger.error("Failed to delete user: %s", e)
+        return admin_app.flash_redirect("/users", f"Failed to delete user: {e}", "danger")
 
     return RedirectResponse("/users", status_code=303)

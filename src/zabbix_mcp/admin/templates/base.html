@@ -46,8 +46,12 @@
     <header class="header">
         <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar">&#9776;</button>
         <div class="header-center">
+            <span class="mcp-status-dot checking tooltip-right" id="mcp-status-dot" data-tooltip="Checking MCP..."></span>
             <span class="text-sm text-muted">MCP available at</span>
             <code class="monospace" style="font-size: 0.85rem; margin-left: 6px;">{{ server_name }}</code>
+            {% if restart_needed %}
+            <span class="restart-badge" style="cursor:pointer;" onclick="triggerRestart()" title="Click to restart MCP server">&#x26A0;&#xFE0F; Restart needed</span>
+            {% endif %}
         </div>
         <div class="header-right">
             <div class="theme-switcher">
@@ -80,7 +84,7 @@
     </main>
 
     <!-- Global confirm modal -->
-    <div class="modal-overlay" id="confirm-modal" style="display:none;">
+    <div class="modal-overlay" id="confirm-modal" style="display:none;" onclick="if(event.target===this)closeModal();">
         <div class="modal-card">
             <div class="modal-header">
                 <h3 id="confirm-title">Confirm</h3>
@@ -131,8 +135,14 @@
     function closeModal() {
         document.getElementById('confirm-modal').style.display = 'none';
         document.getElementById('confirm-message').style.display = 'block';
+        document.getElementById('confirm-buttons').style.display = 'flex';
+        document.getElementById('confirm-progress').style.display = 'none';
         _confirmCallback = null;
     }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
 
     function executeConfirm() {
         if (_confirmCallback) _confirmCallback();
@@ -145,16 +155,55 @@
         });
     }
 
+    function triggerRestart() { confirmRestart(); }
     function confirmRestart() {
         showConfirm('Restart MCP Server', 'The MCP server will be restarted. Active connections will be interrupted.', 'Restart Now', 'btn-warning', function() {
             showProgress('Restarting...', 'Sending restart signal...');
+            var fill = document.getElementById('confirm-progress-fill');
+            var status = document.getElementById('confirm-status');
+            fill.style.transition = 'width 1s ease';
+            fill.style.width = '20%';
+
             fetch('/servers/restart', {method: 'POST'}).then(function(r) {
-                document.getElementById('confirm-progress-fill').style.width = '100%';
-                document.getElementById('confirm-status').textContent = 'Restart signal sent. Page will reload...';
-                setTimeout(function() { window.location.reload(); }, 2000);
+                return r.json();
+            }).then(function(data) {
+                fill.style.width = '40%';
+                status.textContent = 'Restart signal sent. Waiting for MCP to come back...';
+                // Poll health check until MCP is back
+                var attempts = 0;
+                var maxAttempts = 30;
+                function pollHealth() {
+                    attempts++;
+                    var pct = 40 + Math.min(attempts * 2, 50);
+                    fill.style.width = pct + '%';
+                    status.textContent = 'Waiting for MCP... (' + attempts + '/' + maxAttempts + ')';
+                    fetch('/api/mcp-status').then(function(r) {
+                        return r.json();
+                    }).then(function(d) {
+                        if (d.status === 'ok') {
+                            fill.style.width = '100%';
+                            status.textContent = 'MCP is back online! Reloading...';
+                            status.style.color = 'var(--color-success)';
+                            setTimeout(function() { window.location.reload(); }, 1000);
+                        } else if (attempts < maxAttempts) {
+                            setTimeout(pollHealth, 2000);
+                        } else {
+                            status.textContent = 'MCP did not come back. Check server logs.';
+                            status.style.color = 'var(--color-danger)';
+                        }
+                    }).catch(function() {
+                        if (attempts < maxAttempts) {
+                            setTimeout(pollHealth, 2000);
+                        } else {
+                            status.textContent = 'MCP did not come back. Check server logs.';
+                            status.style.color = 'var(--color-danger)';
+                        }
+                    });
+                }
+                setTimeout(pollHealth, 3000);
             }).catch(function() {
-                document.getElementById('confirm-status').textContent = 'Restart failed. Try manually.';
-                document.getElementById('confirm-status').style.color = 'var(--color-danger)';
+                status.textContent = 'Failed to send restart signal.';
+                status.style.color = 'var(--color-danger)';
             });
         });
     }
@@ -217,9 +266,12 @@
         });
     }
 
-    // Initialize flatpickr on all date inputs
+    // Initialize flatpickr on all date inputs (native type="date" + class="flatpickr-date")
     document.querySelectorAll('input[type="date"]').forEach(function(el) {
         el.type = 'text'; // Remove native picker
+    });
+    document.querySelectorAll('input[type="date"], .flatpickr-date').forEach(function(el) {
+        if (el._flatpickr) return; // already initialized
         flatpickr(el, {
             dateFormat: 'Y-m-d',
             allowInput: true,
@@ -257,13 +309,41 @@
         if (toast) toast.remove();
     }, 5000);
 
-    // Modal helpers
+    // Modal helpers (for non-confirm modals like delete confirmations on detail pages)
     function openModal(id) {
         document.getElementById(id).hidden = false;
     }
-    function closeModal(id) {
-        document.getElementById(id).hidden = true;
-    }
+    // closeModal without args = close confirm modal (defined above)
+    // closeModal with id = close specific modal by id
+    var _closeModalOrig = closeModal;
+    closeModal = function(id) {
+        if (id) {
+            document.getElementById(id).hidden = true;
+        } else {
+            _closeModalOrig();
+        }
+    };
+
+    // MCP health check — runs on page load, updates status dot
+    (function() {
+        var dot = document.getElementById('mcp-status-dot');
+        if (!dot) return;
+        fetch('/api/mcp-status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'ok') {
+                    dot.className = 'mcp-status-dot ok tooltip-right';
+                    dot.dataset.tooltip = 'MCP is running | Uptime: ' + (data.uptime || '?');
+                } else {
+                    dot.className = 'mcp-status-dot error tooltip-right';
+                    dot.dataset.tooltip = 'MCP is not responding: ' + (data.error || 'unknown');
+                }
+            })
+            .catch(function() {
+                dot.className = 'mcp-status-dot error tooltip-right';
+                dot.dataset.tooltip = 'MCP health check failed';
+            });
+    })();
     </script>
 
     {% block scripts %}{% endblock %}

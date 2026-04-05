@@ -41,6 +41,7 @@
     <select class="form-select" style="width:auto; min-width:160px; padding:4px 28px 4px 8px; font-size:0.82rem;" onchange="insertVariable(this.value); this.selectedIndex=0;">
         <option value="">Insert variable...</option>
         <option value="{{ '{{' }} company {{ '}}' }}">company</option>
+        <option value="{{ '{{' }} subtitle {{ '}}' }}">subtitle</option>
         <option value="{{ '{{' }} period_label {{ '}}' }}">period_label</option>
         <option value="{{ '{{' }} hosts {{ '}}' }}">hosts</option>
         <option value="{{ '{{' }} availability_pct {{ '}}' }}">availability_pct</option>
@@ -216,8 +217,14 @@ function getEditorHtml() {
 
 // Save
 function submitTemplate() {
-    document.getElementById('hidden-name').value = document.getElementById('template-name').value;
-    document.getElementById('hidden-display-name').value = document.getElementById('template-name').value;
+    var nameInput = document.getElementById('template-name');
+    if (!nameInput.value.trim()) {
+        nameInput.focus();
+        nameInput.reportValidity();
+        return;
+    }
+    document.getElementById('hidden-name').value = nameInput.value;
+    document.getElementById('hidden-display-name').value = nameInput.value;
     document.getElementById('hidden-desc').value = document.getElementById('template-desc').value;
     document.getElementById('hidden-content').value = getEditorHtml();
     document.getElementById('template-form').submit();

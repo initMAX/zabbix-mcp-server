@@ -92,35 +92,46 @@ async def upload_logo(request: Request) -> Response:
     filename, content = await _read_upload(request)
     if filename is None or content is None or not filename:
         logger.warning("Logo upload: no file provided by %s", session.user)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "No file selected.", "danger")
 
     # Validate extension
     if _validate_extension(filename, LOGO_EXTENSIONS) is None:
         logger.warning("Logo upload: invalid extension '%s' by %s", filename, session.user)
         write_audit("upload_rejected", user=session.user, target_type="logo",
                      details={"filename": filename, "reason": "invalid_extension"}, ip=client_ip)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Invalid file type: {filename}. Allowed: PNG, JPG, SVG.", "danger")
 
     # Validate size
     if len(content) > MAX_LOGO_SIZE:
         logger.warning("Logo upload: file too large (%d bytes) by %s", len(content), session.user)
         write_audit("upload_rejected", user=session.user, target_type="logo",
                      details={"filename": filename, "reason": "file_too_large", "size": len(content)}, ip=client_ip)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "File too large (max 5 MB).", "danger")
 
     if len(content) == 0:
         logger.warning("Logo upload: empty file by %s", session.user)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "Uploaded file is empty.", "danger")
 
-    # SVG security: strip script tags and event handlers
+    # SVG security: strip dangerous content using layered sanitization
     ext = Path(filename).suffix.lower()
     if ext == ".svg":
-        import re as _re
         svg_text = content.decode("utf-8", errors="replace")
-        svg_text = _re.sub(r"<script[^>]*>.*?</script>", "", svg_text, flags=_re.DOTALL | _re.IGNORECASE)
-        svg_text = _re.sub(r"\bon\w+\s*=\s*[\"'][^\"']*[\"']", "", svg_text, flags=_re.IGNORECASE)
+        # Decode HTML entities before checking (prevents &#x6f;nload evasion)
+        import html as _html_mod
+        svg_text = _html_mod.unescape(svg_text)
+        import re as _re
+        # Remove ALL script tags (including unclosed/comment-hidden)
+        svg_text = _re.sub(r"<script[\s>][\s\S]*?(?:</script>|$)", "", svg_text, flags=_re.IGNORECASE)
+        # Remove ALL event handlers (on*)
+        svg_text = _re.sub(r"\bon\w+\s*=\s*(?:\"[^\"]*\"|'[^']*'|[^\s>]*)", "", svg_text, flags=_re.IGNORECASE)
+        # Remove javascript: URLs
+        svg_text = _re.sub(r"(?:href|xlink:href|src)\s*=\s*(?:\"javascript:[^\"]*\"|'javascript:[^']*')", "", svg_text, flags=_re.IGNORECASE)
+        # Remove <style> blocks containing javascript/expression
+        svg_text = _re.sub(r"<style[^>]*>[\s\S]*?</style>", lambda m: m.group(0) if "javascript:" not in m.group(0).lower() and "expression(" not in m.group(0).lower() else "", svg_text, flags=_re.IGNORECASE)
+        # Remove data: URIs except safe image types
+        svg_text = _re.sub(r"(?:href|xlink:href|src)\s*=\s*\"data:(?!image/(?:png|jpeg|gif|svg\+xml))[^\"]*\"", "", svg_text, flags=_re.IGNORECASE)
         content = svg_text.encode("utf-8")
-        logger.info("SVG sanitized: stripped script tags and event handlers")
+        logger.info("SVG sanitized: stripped dangerous content")
 
     safe_name = _sanitize_filename(filename)
     dest = ASSETS_DIR / safe_name
@@ -131,7 +142,7 @@ async def upload_logo(request: Request) -> Response:
         logger.info("Logo saved: %s (%d bytes) by %s", dest, len(content), session.user)
     except OSError as e:
         logger.error("Failed to save logo %s: %s", dest, e)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Failed to save file: {e}", "danger")
 
     # Update config.toml
     if TOMLKIT_AVAILABLE:
@@ -144,11 +155,12 @@ async def upload_logo(request: Request) -> Response:
             save_config_document(admin_app.config_path, doc)
         except Exception as e:
             logger.error("Failed to update config with logo path: %s", e)
+            return admin_app.flash_redirect("/settings", f"File saved but config update failed: {e}", "warning")
 
     write_audit("upload_logo", user=session.user, target_type="logo",
                  details={"filename": safe_name, "path": str(dest), "size": len(content)}, ip=client_ip)
 
-    return RedirectResponse("/settings", status_code=303)
+    return admin_app.flash_redirect("/settings", f"Logo uploaded: {safe_name}")
 
 
 async def upload_tls_cert(request: Request) -> Response:
@@ -163,25 +175,25 @@ async def upload_tls_cert(request: Request) -> Response:
     filename, content = await _read_upload(request)
     if filename is None or content is None or not filename:
         logger.warning("TLS cert upload: no file provided by %s", session.user)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "No file selected.", "danger")
 
     # Validate extension
     if _validate_extension(filename, TLS_CERT_EXTENSIONS) is None:
         logger.warning("TLS cert upload: invalid extension '%s' by %s", filename, session.user)
         write_audit("upload_rejected", user=session.user, target_type="tls_cert",
                      details={"filename": filename, "reason": "invalid_extension"}, ip=client_ip)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Invalid file type: {filename}. Allowed: PEM, CRT.", "danger")
 
     # Validate size
     if len(content) > MAX_TLS_SIZE:
         logger.warning("TLS cert upload: file too large (%d bytes) by %s", len(content), session.user)
         write_audit("upload_rejected", user=session.user, target_type="tls_cert",
                      details={"filename": filename, "reason": "file_too_large", "size": len(content)}, ip=client_ip)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "File too large (max 100 KB).", "danger")
 
     if len(content) == 0:
         logger.warning("TLS cert upload: empty file by %s", session.user)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "Uploaded file is empty.", "danger")
 
     dest = TLS_DIR / "cert.pem"
 
@@ -191,7 +203,7 @@ async def upload_tls_cert(request: Request) -> Response:
         logger.info("TLS cert saved: %s (%d bytes) by %s", dest, len(content), session.user)
     except OSError as e:
         logger.error("Failed to save TLS cert %s: %s", dest, e)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Failed to save certificate: {e}", "danger")
 
     # Update config.toml
     if TOMLKIT_AVAILABLE:
@@ -204,11 +216,13 @@ async def upload_tls_cert(request: Request) -> Response:
             save_config_document(admin_app.config_path, doc)
         except Exception as e:
             logger.error("Failed to update config with TLS cert path: %s", e)
+            return admin_app.flash_redirect("/settings", f"File saved but config update failed: {e}", "warning")
 
     write_audit("upload_tls_cert", user=session.user, target_type="tls_cert",
                  details={"path": str(dest), "size": len(content), "original_name": filename}, ip=client_ip)
 
-    return RedirectResponse("/settings", status_code=303)
+    admin_app.restart_needed = True
+    return admin_app.flash_redirect("/settings", "TLS certificate uploaded. Restart required.")
 
 
 async def upload_tls_key(request: Request) -> Response:
@@ -223,25 +237,25 @@ async def upload_tls_key(request: Request) -> Response:
     filename, content = await _read_upload(request)
     if filename is None or content is None or not filename:
         logger.warning("TLS key upload: no file provided by %s", session.user)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "No file selected.", "danger")
 
     # Validate extension
     if _validate_extension(filename, TLS_KEY_EXTENSIONS) is None:
         logger.warning("TLS key upload: invalid extension '%s' by %s", filename, session.user)
         write_audit("upload_rejected", user=session.user, target_type="tls_key",
                      details={"filename": filename, "reason": "invalid_extension"}, ip=client_ip)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Invalid file type: {filename}. Allowed: PEM, KEY.", "danger")
 
     # Validate size
     if len(content) > MAX_TLS_SIZE:
         logger.warning("TLS key upload: file too large (%d bytes) by %s", len(content), session.user)
         write_audit("upload_rejected", user=session.user, target_type="tls_key",
                      details={"filename": filename, "reason": "file_too_large", "size": len(content)}, ip=client_ip)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "File too large (max 100 KB).", "danger")
 
     if len(content) == 0:
         logger.warning("TLS key upload: empty file by %s", session.user)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", "Uploaded file is empty.", "danger")
 
     dest = TLS_DIR / "key.pem"
 
@@ -256,7 +270,7 @@ async def upload_tls_key(request: Request) -> Response:
         logger.info("TLS key saved: %s (%d bytes, mode 0600) by %s", dest, len(content), session.user)
     except OSError as e:
         logger.error("Failed to save TLS key %s: %s", dest, e)
-        return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Failed to save key: {e}", "danger")
 
     # Update config.toml
     if TOMLKIT_AVAILABLE:
@@ -269,8 +283,10 @@ async def upload_tls_key(request: Request) -> Response:
             save_config_document(admin_app.config_path, doc)
         except Exception as e:
             logger.error("Failed to update config with TLS key path: %s", e)
+            return admin_app.flash_redirect("/settings", f"File saved but config update failed: {e}", "warning")
 
     write_audit("upload_tls_key", user=session.user, target_type="tls_key",
                  details={"path": str(dest), "size": len(content), "original_name": filename}, ip=client_ip)
 
-    return RedirectResponse("/settings", status_code=303)
+    admin_app.restart_needed = True
+    return admin_app.flash_redirect("/settings", "TLS private key uploaded. Restart required.")

@@ -24,25 +24,58 @@
 - **Custom confirm modals** — all destructive actions use styled modals with blur overlay instead of native browser confirm; restart modal includes progress bar
 - **Startup branding** — `Zabbix MCP Server v1.16 — developed by initMAX s.r.o.` in startup log
 
+- **Per-token Zabbix server binding** — new `allowed_servers` field restricts which Zabbix servers a token can access (`["*"]` = all, or specific server names); enforced in all tool handlers via `check_token_authorization()`
+- **MCP health status indicator** — green/orange/red dot in header with async health check; tooltip shows "MCP is running | Uptime: 2h 15m"
+- **Dashboard async server status** — Zabbix server cards show live connectivity with visible text labels (not just dots); async fetch with **API + token validation** (detects "API online but token invalid")
+- **Restart flow** — clickable "Restart needed" badge opens confirm modal; Docker restart via SIGTERM to PID 1 with progress bar polling until MCP comes back online; works on both Docker and bare-metal (systemctl)
+- **Flash message system** — cookie-based flash messages across redirects for all CRUD operations (create, update, delete, revoke, activate); toast notification with auto-dismiss
+- **Tool allowlist UI** — new `tools` field in Settings > Tool Exposure for positive tool allowlist (complements `disabled_tools` denylist)
+- **Instant CSS tooltips** — replaced native `title` attributes with CSS `data-tooltip` system (100ms hover, no browser delay); supports `tooltip-right` positioning; works on focus/tap for touch devices
+- **Legacy token badge** — "Legacy" badge with tooltip on token list explaining migration path
+- **Token expiry UX** — "Never expires" toggle with auto-fill today+1d on both create and detail pages; flatpickr calendar on all date inputs
+
 ### Security
 
-- **SandboxedEnvironment for template preview** — prevents SSTI/RCE via Jinja2 template injection in user-uploaded templates
-- **Settings key allowlist** — per-section allowlists prevent arbitrary config key injection via settings forms
-- **Operator role restricted** — operators cannot modify admin config section or manage Zabbix server connections
-- **HTML escaping** — all dynamic content in HTMLResponse f-strings escaped via `html.escape()`
-- **Symlink check fixed** — logo reader checks `is_symlink()` before `resolve()` (prevents TOCTOU bypass)
-- **Session cookie secure flag** — `secure=True` set when served over HTTPS
-- **Token revoke blocks MCP** — revoked tokens immediately rejected by MCP authentication
+- **Token scopes enforced at runtime** — `check_token_authorization()` centralized helper checks server restrictions, tool prefix scopes (expanded from groups), and per-token `read_only` flag on every tool call
+- **Token IP allowlist enforced** — ASGI middleware captures client IP into context var; `MultiTokenVerifier` passes it to `verify()` for CIDR allowlist checks
+- **Auxiliary tools gated** — `zabbix_raw_api_call`, `graph_render`, `anomaly_detect`, `capacity_forecast`, `report_generate`, `action_prepare` all check `check_token_authorization()`
+- **Action confirmation caller binding** — `action_prepare` stores `caller_token_id`; `action_confirm` rejects tokens from different callers
+- **SSRF prevention hardened** — `/servers/test-new` restricted to admin role; DNS resolution check rejects private/loopback/link-local/reserved IPs; hostname blocklist
+- **Path traversal fix** — template edit/delete path checks use `Path.is_relative_to()` instead of `str.startswith()` (prevents sibling-prefix confusion)
+- **Config writer thread safety** — `threading.RLock` on `load_config_document` and `save_config_document`
+- **Session manager thread safety** — `threading.RLock` on all session operations
+- **Context variable cleanup** — `current_token_info` and `current_client_ip` reset at start of each request and in `try/finally` on error
+- **XSS prevention** — all innerHTML assignments replaced with `textContent` + `createElement`; server name in form action URL-encoded
+- **SVG sanitization hardened** — 5-layer regex (script, event handlers, javascript: URLs, dangerous styles, unsafe data: URIs) with `html.unescape()` pre-processing to prevent entity encoding bypass
+- **Flash cookie validation** — length limit (500 chars) + flash_type whitelist prevents cookie injection XSS
+- **POST rate limiting** — `_PostRateLimitMiddleware` limits 30 POST requests per minute per session
+- **Password complexity** — minimum 10 characters + uppercase letter + digit requirement
+- **Audit log rotation** — auto-rotate at 50 MB with `.1`/`.2` backup scheme
+- **`/api/mcp-status` auth required** — prevents unauthenticated uptime/version disclosure
+- **SandboxedEnvironment for template preview** — prevents SSTI/RCE via Jinja2 template injection
+- **Settings key allowlist** — per-section allowlists prevent arbitrary config key injection
+- **Session cookie** — SameSite=Strict + httponly for CSRF protection
 - **TLS key upload** — saved with `0600` permissions; TLS directory `0750`
 
 ### Fixed
 
+- **Dashboard Recent Activity empty** — template variable name mismatch (`recent_audit` → `audit_entries`)
+- **API token exposed in server edit** — changed to `type="password"` with masked hint (`fa0b...4a7`)
+- **Token `created_at` missing** — timestamp now saved on token creation
+- **Template name validation bypass** — client-side check in `submitTemplate()` before hidden form submit
+- **Mobile header overflow** — flex-wrap + shrink on `.header-right`; responsive editor tabs
+- **Tool Exposure side-by-side layout** — `flex-direction: row` on desktop, column on mobile
+- **Upload button height mismatch** — `align-items: center` on upload flex containers
+- **Tool bubble keyboard accessibility** — `tabindex="0"`, `role="button"`, Enter/Space handler
+- **Flatpickr initialization** — selector extended to `.flatpickr-date` class (not just `type="date"`)
+- **Restart detection false positives** — compares old vs new values instead of checking field presence
+- **Docker config.toml read-only** — removed `:ro` from volume mount so admin portal can write changes
+- **Confirm modal Cancel broken** — fixed duplicate `closeModal` function override; added Escape key + overlay click to dismiss
+- **GrapesJS toolbar mobile overflow** — `overflow-x: auto` + `flex-wrap` on panels
+- **Sidebar header border** — changed to `rgba(255,255,255,0.08)` for consistent dark appearance in light mode
 - **Installer pip upgrade** — `pip install --upgrade` ensures version upgrades actually install new code
-- **Installer git diverged history** — `git fetch + reset --hard` with self-re-exec after source update
-- **Legacy token persistence** — migrated `auth_token` written to `[tokens.legacy]` in config.toml so it survives admin portal token reloads
+- **Legacy token persistence** — migrated `auth_token` written to `[tokens.legacy]` in config.toml
 - **Config writer Docker support** — fallback to direct write when atomic rename fails on Docker bind mounts
-- **Explicit group creation** — `groupadd --system` before `useradd` (fixes openSUSE)
-- **Container-safe installer** — graceful skip when systemd/logrotate not present
 
 ## v1.15 — 2026-04-04
 

@@ -21,6 +21,16 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 
+def _valid_scope_names() -> set[str]:
+    """Return all valid scope names: groups + individual tool prefixes."""
+    from zabbix_mcp.config import TOOL_GROUPS
+    valid = {"*"}
+    for group_name, prefixes in TOOL_GROUPS.items():
+        valid.add(group_name)
+        valid.update(prefixes)
+    return valid
+
+
 class TokenCreate(BaseModel):
     """Create a new API token."""
 
@@ -33,7 +43,7 @@ class TokenCreate(BaseModel):
     @field_validator("scopes")
     @classmethod
     def validate_scopes(cls, v: list[str]) -> list[str]:
-        valid = {"*", "monitoring", "data_collection", "alerts", "users", "administration"}
+        valid = _valid_scope_names()
         for s in v:
             if s not in valid:
                 raise ValueError(f"Invalid scope: {s}")
@@ -54,7 +64,7 @@ class TokenUpdate(BaseModel):
     def validate_scopes(cls, v: Optional[list[str]]) -> Optional[list[str]]:
         if v is None:
             return v
-        valid = {"*", "monitoring", "data_collection", "alerts", "users", "administration"}
+        valid = _valid_scope_names()
         for s in v:
             if s not in valid:
                 raise ValueError(f"Invalid scope: {s}")

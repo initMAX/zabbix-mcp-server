@@ -47,13 +47,47 @@
         </div>
     </form>
     <script>
+    function _setTestResult(container, dotClass, text) {
+        // Safe DOM construction — no innerHTML from server responses
+        container.textContent = '';
+        if (dotClass) {
+            var dot = document.createElement('span');
+            dot.className = 'status-dot ' + dotClass;
+            container.appendChild(dot);
+        }
+        var msg = document.createElement('span');
+        msg.textContent = text;
+        container.appendChild(msg);
+    }
+
+    function _parseTestResponse(container, responseText) {
+        // Parse known safe patterns from server HTML response using textContent
+        if (responseText.indexOf('status-dot-green') !== -1) {
+            var versionMatch = responseText.match(/Zabbix ([^<]*)/);
+            var ver = versionMatch ? versionMatch[1] : '';
+            _setTestResult(container, 'status-dot-green', 'Connected' + (ver ? ' — Zabbix ' + ver : ''));
+            return true;  // success
+        } else if (responseText.indexOf('status-dot-yellow') !== -1) {
+            _setTestResult(container, 'status-dot-yellow', 'API online — Token invalid or expired');
+            return false;
+        } else if (responseText.indexOf('status-dot-red') !== -1) {
+            var errMatch = responseText.match(/color:var\(--color-danger\)[^>]*>([^<]*)/);
+            _setTestResult(container, 'status-dot-red', 'Error' + (errMatch ? ': ' + errMatch[1] : ''));
+            return false;
+        } else {
+            // Fallback: display as plain text (safe)
+            container.textContent = responseText.replace(/<[^>]*>/g, '');
+            return false;
+        }
+    }
+
     function testNewServer() {
         var url = document.querySelector('#add-server-form [name=url]').value;
         var token = document.querySelector('#add-server-form [name=api_token]').value;
         var ssl = document.querySelector('#add-server-form [name=verify_ssl]').checked;
         var result = document.getElementById('add-test-result');
         var saveBtn = document.getElementById('add-save-btn');
-        result.innerHTML = '<span class="text-muted">Testing...</span>';
+        _setTestResult(result, '', 'Testing...');
         saveBtn.disabled = true;
         fetch('/servers/test-new', {
             method: 'POST',
@@ -62,18 +96,18 @@
         })
         .then(function(r) { return r.text(); })
         .then(function(html) {
-            result.innerHTML = html;
-            if (html.indexOf('status-dot-green') !== -1) {
+            var success = _parseTestResponse(result, html);
+            if (success) {
                 saveBtn.disabled = false;
             }
         })
-        .catch(function() { result.innerHTML = '<span class="text-danger">Test failed</span>'; });
+        .catch(function() { _setTestResult(result, '', 'Test failed'); });
     }
     // Reset test when inputs change
     document.querySelectorAll('#add-server-form input').forEach(function(el) {
         el.addEventListener('input', function() {
             document.getElementById('add-save-btn').disabled = true;
-            document.getElementById('add-test-result').innerHTML = '';
+            document.getElementById('add-test-result').textContent = '';
         });
     });
     </script>

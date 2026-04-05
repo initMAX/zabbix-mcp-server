@@ -135,29 +135,38 @@ async def settings_update(request: Request) -> Response:
         needs_restart = False
 
         for key in allowed_keys:
+            old_value = config_section.get(key)
+
             if key in BOOL_KEYS:
-                config_section[key] = key in form
+                new_value = key in form
+                config_section[key] = new_value
             elif key in LIST_KEYS:
                 raw = str(form.get(key, "")).strip()
                 if raw:
-                    config_section[key] = [s.strip() for s in raw.split(",") if s.strip()]
+                    new_value = [s.strip() for s in raw.split(",") if s.strip()]
+                    config_section[key] = new_value
                 else:
-                    # Remove key if empty (use default)
+                    new_value = None
                     if key in config_section:
                         del config_section[key]
             elif key in form:
                 value = str(form.get(key, "")).strip()
                 if value == "":
-                    # Empty string — remove key to use default
+                    new_value = None
                     if key in config_section:
                         del config_section[key]
                     continue
-                # Type conversion
                 if value.isdigit():
                     value = int(value)
+                new_value = value
                 config_section[key] = value
+            else:
+                continue
 
-            if key in RESTART_REQUIRED and key in form:
+            # Flag restart if any field actually changed
+            old_cmp = str(old_value) if old_value is not None else ""
+            new_cmp = str(new_value) if new_value is not None else ""
+            if old_cmp != new_cmp:
                 needs_restart = True
 
         save_config_document(admin_app.config_path, doc)
@@ -166,11 +175,14 @@ async def settings_update(request: Request) -> Response:
         client_ip = request.client.host if request.client else ""
         write_audit("settings_update", user=session.user, target_type="settings", target_id=section, ip=client_ip)
 
-        if not needs_restart:
-            from zabbix_mcp.admin.config_writer import signal_reload
-            signal_reload()
+        if needs_restart:
+            admin_app.restart_needed = True
+
+        msg = "Settings saved."
+        if needs_restart:
+            msg += " Restart required to apply changes."
+        return admin_app.flash_redirect("/settings", msg)
 
     except Exception as e:
         logger.error("Failed to update settings: %s", e)
-
-    return RedirectResponse("/settings", status_code=303)
+        return admin_app.flash_redirect("/settings", f"Failed to save settings: {e}", "danger")

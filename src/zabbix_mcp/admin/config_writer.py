@@ -20,10 +20,13 @@
 import os
 import signal
 import tempfile
+import threading
 import logging
 from pathlib import Path
 
 logger = logging.getLogger("zabbix_mcp.admin")
+
+_config_lock = threading.RLock()
 
 try:
     import tomlkit
@@ -52,9 +55,10 @@ def _validate_config_path(config_path: Path) -> Path:
 def load_config_document(config_path: str | Path) -> "tomlkit.TOMLDocument":
     """Load config.toml as a tomlkit document (preserves comments)."""
     _require_tomlkit()
-    path = _validate_config_path(Path(config_path))
-    with open(path, "r", encoding="utf-8") as f:
-        return tomlkit.load(f)
+    with _config_lock:
+        path = _validate_config_path(Path(config_path))
+        with open(path, "r", encoding="utf-8") as f:
+            return tomlkit.load(f)
 
 
 def save_config_document(config_path: str | Path, doc: "tomlkit.TOMLDocument") -> None:
@@ -66,41 +70,42 @@ def save_config_document(config_path: str | Path, doc: "tomlkit.TOMLDocument") -
     4. Preserve original file permissions
     """
     _require_tomlkit()
-    path = _validate_config_path(Path(config_path))
-    parent = path.parent
+    with _config_lock:
+        path = _validate_config_path(Path(config_path))
+        parent = path.parent
 
-    # Preserve original permissions
-    original_stat = os.stat(path)
-    original_mode = original_stat.st_mode
+        # Preserve original permissions
+        original_stat = os.stat(path)
+        original_mode = original_stat.st_mode
 
-    content = tomlkit.dumps(doc)
+        content = tomlkit.dumps(doc)
 
-    # Try atomic write (temp + rename), fallback to direct write
-    # (rename fails on Docker bind mounts / cross-device)
-    fd = None
-    tmp_path = None
-    try:
-        fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".config_", suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            fd = None
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        os.chmod(tmp_path, original_mode)
-        os.rename(tmp_path, str(path))
+        # Try atomic write (temp + rename), fallback to direct write
+        # (rename fails on Docker bind mounts / cross-device)
+        fd = None
         tmp_path = None
-        logger.info("Config saved atomically: %s", path)
-    except OSError:
-        # Atomic rename failed (cross-device mount) — fall back to direct write
-        if fd is not None:
-            os.close(fd)
-        if tmp_path is not None and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
-        logger.info("Config saved (direct write): %s", path)
+        try:
+            fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".config_", suffix=".tmp")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                fd = None
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            os.chmod(tmp_path, original_mode)
+            os.rename(tmp_path, str(path))
+            tmp_path = None
+            logger.info("Config saved atomically: %s", path)
+        except OSError:
+            # Atomic rename failed (cross-device mount) — fall back to direct write
+            if fd is not None:
+                os.close(fd)
+            if tmp_path is not None and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+            logger.info("Config saved (direct write): %s", path)
 
 
 def update_config_section(config_path: str | Path, section: str, data: dict) -> None:

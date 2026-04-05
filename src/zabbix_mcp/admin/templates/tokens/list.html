@@ -19,6 +19,7 @@
                 <th class="sortable">Name</th>
                 <th>Prefix</th>
                 <th>Scopes</th>
+                <th>Servers</th>
                 <th>Read-only</th>
                 <th>IP Restrictions</th>
                 <th class="sortable">Status</th>
@@ -32,6 +33,9 @@
             <tr id="token-{{ token.id }}">
                 <td>
                     <a href="/tokens/{{ token.id }}" class="text-primary" style="font-weight:500;">{{ token.name }}</a>
+                    {% if token.is_legacy %}
+                    <span class="badge badge-warning tooltip-right" style="margin-left:4px; cursor:pointer;" tabindex="0" role="button" data-tooltip="Migrated from legacy auth_token in config.toml. Recommended: create a new token with proper scopes, server restrictions and IP limits, then remove the legacy auth_token from config.">Legacy</span>
+                    {% endif %}
                 </td>
                 <td>
                     <span class="copy-group">
@@ -41,6 +45,12 @@
                 </td>
                 <td>
                     {% for s in token.scopes %}
+                    <span class="badge badge-{% if s == '*' %}success{% else %}primary{% endif %}">{% if s == '*' %}* (all){% else %}{{ s }}{% endif %}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% set servers = token.allowed_servers if token.allowed_servers else ['*'] %}
+                    {% for s in servers %}
                     <span class="badge badge-{% if s == '*' %}success{% else %}primary{% endif %}">{% if s == '*' %}* (all){% else %}{{ s }}{% endif %}</span>
                     {% endfor %}
                 </td>

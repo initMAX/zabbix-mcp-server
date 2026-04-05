@@ -20,17 +20,35 @@ from zabbix_mcp.admin.config_writer import (
     TOMLKIT_AVAILABLE,
 )
 from zabbix_mcp.admin.audit_writer import write_audit
+from zabbix_mcp.config import TOOL_GROUPS
 from zabbix_mcp.token_store import TokenStore
 
 logger = logging.getLogger("zabbix_mcp.admin")
 
 # All known tool groups
-_ALL_GROUPS = ["monitoring", "data_collection", "alerts", "users", "administration"]
+_ALL_GROUPS = list(TOOL_GROUPS.keys())
+
+# Build tool data for templates (groups with their child tool prefixes)
+_TOOL_DATA = []
+_GROUP_DESCRIPTIONS = {
+    "monitoring": "Hosts, problems, triggers, items, events, history, trends, SLA, dashboards, maps",
+    "data_collection": "Templates, template groups, dashboards, value maps, configuration",
+    "alerts": "Actions, media types, alert history, script execution",
+    "users": "Users, user groups, roles, tokens, authentication",
+    "administration": "Settings, proxies, housekeeping, audit log, connectors, modules",
+}
+for _gname, _gtools in TOOL_GROUPS.items():
+    _TOOL_DATA.append({
+        "name": _gname,
+        "type": "group",
+        "desc": _GROUP_DESCRIPTIONS.get(_gname, _gname),
+        "tools": list(_gtools),
+    })
 
 
 def _get_global_context(admin_app) -> dict:
     """Read global disabled_tools and allowed_hosts from config for token templates."""
-    disabled_groups: list[str] = []
+    disabled_tools: list[str] = []
     global_allowed_hosts: list[str] = []
     if TOMLKIT_AVAILABLE:
         try:
@@ -38,15 +56,38 @@ def _get_global_context(admin_app) -> dict:
             server_cfg = doc.get("server", {})
             raw_disabled = server_cfg.get("disabled_tools", [])
             if isinstance(raw_disabled, list):
-                disabled_groups = [g for g in raw_disabled if g in _ALL_GROUPS]
+                disabled_tools = list(raw_disabled)
             raw_hosts = server_cfg.get("allowed_hosts", [])
             if isinstance(raw_hosts, list):
                 global_allowed_hosts = list(raw_hosts)
         except Exception:
             pass
+    # Expand groups into individual tool prefixes for the full disabled set
+    from zabbix_mcp.config import _expand_tool_groups
+    expanded_disabled = _expand_tool_groups(disabled_tools) if disabled_tools else []
+    # Get available Zabbix server names
+    zabbix_servers: list[str] = []
+    if TOMLKIT_AVAILABLE:
+        try:
+            if 'doc' not in dir():
+                doc = load_config_document(admin_app.config_path)
+            zabbix_section = doc.get("zabbix", {})
+            zabbix_servers = list(zabbix_section.keys())
+        except Exception:
+            pass
+    # Also include runtime servers
+    if hasattr(admin_app, 'client_manager'):
+        for s in admin_app.client_manager.server_names:
+            if s not in zabbix_servers:
+                zabbix_servers.append(s)
+
     return {
-        "disabled_groups": disabled_groups,
+        "disabled_groups": [g for g in disabled_tools if g in _ALL_GROUPS],
+        "disabled_tools_list": disabled_tools,
+        "expanded_disabled": expanded_disabled,
         "global_allowed_hosts": global_allowed_hosts,
+        "tool_data": _TOOL_DATA,
+        "zabbix_servers": zabbix_servers,
     }
 
 
@@ -104,6 +145,10 @@ async def token_create(request: Request) -> Response:
     allowed_ips = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()] if allowed_ips_raw else None
     expires_at = str(form.get("expires_at", "")).strip() or None
 
+    # Parse allowed_servers
+    servers_raw = str(form.get("allowed_servers", "*")).strip()
+    allowed_servers = [s.strip() for s in servers_raw.split(",") if s.strip()] if servers_raw else ["*"]
+
     # Generate token
     raw_token, token_hash = TokenStore.generate_token()
 
@@ -114,12 +159,15 @@ async def token_create(request: Request) -> Response:
         token_id = "t_" + token_id
 
     # Write to config.toml
+    from datetime import datetime, timezone
     token_data = {
         "name": name,
         "token_hash": token_hash,
         "scopes": list(scopes),
         "read_only": read_only,
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
+    token_data["allowed_servers"] = allowed_servers
     if allowed_ips:
         token_data["allowed_ips"] = allowed_ips
     if expires_at:
@@ -129,6 +177,7 @@ async def token_create(request: Request) -> Response:
         add_config_table(admin_app.config_path, "tokens", token_id, token_data)
         # Reload token store
         _reload_tokens(admin_app)
+        admin_app.restart_needed = True
         logger.info("Token '%s' created by %s", name, session.user)
         client_ip = request.client.host if request.client else ""
         write_audit("token_create", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
@@ -187,11 +236,26 @@ async def token_detail(request: Request) -> Response:
         if expires_at:
             updates["expires_at"] = expires_at
 
+        servers_raw = str(form.get("allowed_servers", "*")).strip()
+        updates["allowed_servers"] = [s.strip() for s in servers_raw.split(",") if s.strip()] if servers_raw else ["*"]
+
         try:
             # Read current, merge updates
             doc = load_config_document(admin_app.config_path)
             tokens_section = doc.get("tokens", {})
             if token_id in tokens_section:
+                # Detect if any non-name field actually changed
+                current = dict(tokens_section[token_id])
+                changed_restart = False
+                for k, v in updates.items():
+                    if k == "name":
+                        continue
+                    old_val = str(current.get(k, ""))
+                    new_val = str(v)
+                    if old_val != new_val:
+                        changed_restart = True
+                        break
+
                 for k, v in updates.items():
                     tokens_section[token_id][k] = v
                 from zabbix_mcp.admin.config_writer import save_config_document
@@ -200,10 +264,16 @@ async def token_detail(request: Request) -> Response:
                 logger.info("Token '%s' updated by %s", token_id, session.user)
                 client_ip = request.client.host if request.client else ""
                 write_audit("token_edit", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
+
+                if changed_restart:
+                    admin_app.restart_needed = True
+                    return admin_app.flash_redirect(f"/tokens/{token_id}", "Token updated. Restart required to apply changes.")
+                return admin_app.flash_redirect(f"/tokens/{token_id}", "Token updated.")
+            else:
+                return admin_app.flash_redirect(f"/tokens/{token_id}", "Token not found in config.", "danger")
         except Exception as e:
             logger.error("Failed to update token: %s", e)
-
-        return RedirectResponse(f"/tokens/{token_id}", status_code=303)
+            return admin_app.flash_redirect(f"/tokens/{token_id}", f"Failed to save: {e}", "danger")
 
     ctx = {
         "active": "tokens",
@@ -234,8 +304,11 @@ async def token_revoke(request: Request) -> Response:
             logger.info("Token '%s' %s by %s", token_id, action, session.user)
             client_ip = request.client.host if request.client else ""
             write_audit(f"token_{action}", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
+            admin_app.restart_needed = True
+            return admin_app.flash_redirect("/tokens", f"Token {action}. Restart required.")
     except Exception as e:
         logger.error("Failed to revoke token: %s", e)
+        return admin_app.flash_redirect("/tokens", f"Failed: {e}", "danger")
 
     return RedirectResponse("/tokens", status_code=303)
 
@@ -253,10 +326,11 @@ async def token_delete(request: Request) -> Response:
         logger.info("Token '%s' deleted by %s", token_id, session.user)
         client_ip = request.client.host if request.client else ""
         write_audit("token_delete", user=session.user, target_type="token", target_id=token_id, ip=client_ip)
+        admin_app.restart_needed = True
+        return admin_app.flash_redirect("/tokens", f"Token '{token_id}' deleted. Restart required.")
     except Exception as e:
         logger.error("Failed to delete token: %s", e)
-
-    return RedirectResponse("/tokens", status_code=303)
+        return admin_app.flash_redirect("/tokens", f"Failed to delete token: {e}", "danger")
 
 
 def _reload_tokens(admin_app) -> None:
