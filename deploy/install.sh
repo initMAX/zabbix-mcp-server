@@ -608,6 +608,37 @@ LOGROTATE
 }
 
 # --------------------------------------------------------------------------- #
+# Embedded: sudoers — allow service user to restart via admin portal
+# --------------------------------------------------------------------------- #
+install_sudoers() {
+    local sudoers_file="/etc/sudoers.d/${SERVICE_NAME}"
+    local systemctl_path
+    systemctl_path="$(command -v systemctl 2>/dev/null || echo /usr/bin/systemctl)"
+
+    if [[ ! -d /etc/sudoers.d ]]; then
+        warn "No /etc/sudoers.d — skipping sudoers configuration."
+        return 0
+    fi
+
+    info "Installing sudoers rule (admin portal restart)..."
+    cat > "$sudoers_file" <<EOF
+# Allow the Zabbix MCP service user to restart its own service
+# via the admin portal without a password.
+${SERVICE_USER} ALL=(root) NOPASSWD: ${systemctl_path} restart ${SERVICE_NAME}
+EOF
+    chmod 440 "$sudoers_file"
+
+    # Validate syntax — remove if broken to avoid locking out sudo
+    if command -v visudo &>/dev/null; then
+        if ! visudo -cf "$sudoers_file" &>/dev/null; then
+            warn "Sudoers syntax check failed — removing $sudoers_file to avoid lockout."
+            rm -f "$sudoers_file"
+            return 1
+        fi
+    fi
+}
+
+# --------------------------------------------------------------------------- #
 # Install Python package from local git clone
 # --------------------------------------------------------------------------- #
 install_package() {
@@ -761,9 +792,10 @@ do_install() {
         warn "Config already exists at $CONFIG_DIR/config.toml - not overwriting."
     fi
 
-    # systemd + logrotate
+    # systemd + logrotate + sudoers
     install_systemd_unit
     install_logrotate
+    install_sudoers
 
     # Verify permissions (catches issues from re-runs or partial earlier installs)
     check_permissions
@@ -898,9 +930,10 @@ do_update() {
         info "Check config.example.toml for any new parameters added in this version."
     fi
 
-    # Update systemd + logrotate (in case they changed)
+    # Update systemd + logrotate + sudoers (in case they changed)
     install_systemd_unit
     install_logrotate
+    install_sudoers
 
     # Check and fix file permissions (catches issues from failed earlier installs)
     check_permissions

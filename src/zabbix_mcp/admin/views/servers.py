@@ -252,9 +252,10 @@ async def server_restart(request: Request) -> Response:
     restarted = False
 
     # Try systemctl first (bare-metal / systemd)
+    # Requires sudoers entry: zabbix-mcp ALL=(root) NOPASSWD: /usr/bin/systemctl restart zabbix-mcp-server
     try:
         subprocess.run(
-            ["systemctl", "restart", "zabbix-mcp-server"],
+            ["sudo", "systemctl", "restart", "zabbix-mcp-server"],
             check=True, capture_output=True, timeout=10,
         )
         restarted = True
