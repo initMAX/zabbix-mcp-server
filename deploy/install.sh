@@ -982,6 +982,7 @@ do_uninstall() {
     echo "  - Config dir:       $CONFIG_DIR (config.toml)"
     echo "  - Log dir:          $LOG_DIR (server.log and rotated logs)"
     echo "  - Logrotate config: /etc/logrotate.d/${SERVICE_NAME}"
+    echo "  - Sudoers rule:     /etc/sudoers.d/${SERVICE_NAME}"
     echo "  - System user:      $SERVICE_USER"
     echo
 
@@ -1022,6 +1023,12 @@ do_uninstall() {
     if [[ -f "/etc/logrotate.d/${SERVICE_NAME}" ]]; then
         rm -f "/etc/logrotate.d/${SERVICE_NAME}"
         ok "Removed logrotate config"
+    fi
+
+    # Remove sudoers rule
+    if [[ -f "/etc/sudoers.d/${SERVICE_NAME}" ]]; then
+        rm -f "/etc/sudoers.d/${SERVICE_NAME}"
+        ok "Removed sudoers rule"
     fi
 
     # Remove install directory (venv, binaries)
