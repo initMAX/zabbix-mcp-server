@@ -1017,7 +1017,22 @@ def _truncate_result(result: Any, *, max_chars: int = _RESPONSE_MAX_CHARS) -> st
         truncated_list.append(meta)
         return _dumps(truncated_list)
 
-    # Non-list result (dict, scalar, etc.): try compact JSON
+    # String results (e.g. configuration_export YAML): truncate the content
+    # itself so the LLM gets as much of the template as fits, rather than a
+    # useless summary object.
+    if isinstance(result, str):
+        if len(result) <= max_chars:
+            return result  # raw string, no JSON wrapping needed
+        budget = max_chars - 200  # room for truncation note
+        if budget < 500:
+            budget = max_chars
+        note = (
+            f"\n\n... [TRUNCATED: showing {budget} of {len(result)} characters. "
+            f"Increase response_max_chars in config.toml to see more.]"
+        )
+        return result[:budget] + note
+
+    # Non-list, non-string result (dict, scalar, etc.): try compact JSON
     compact = _dumps(result, indent=None)
     if len(compact) <= max_chars:
         return compact
@@ -1039,6 +1054,7 @@ def _make_tool_handler(
     *,
     allowed_import_dirs: list[str] | None = None,
     compact_output: bool = True,
+    response_max_chars: int = _RESPONSE_MAX_CHARS,
 ):
     """Create a tool handler with a proper typed signature for FastMCP schema generation."""
 
@@ -1076,7 +1092,7 @@ def _make_tool_handler(
             result = await asyncio.to_thread(
                 client_manager.call, server_name, method_def.api_method, params,
             )
-            return _UNTRUSTED_PREAMBLE + _truncate_result(result)
+            return _UNTRUSTED_PREAMBLE + _truncate_result(result, max_chars=response_max_chars)
 
         except (ReadOnlyError, RateLimitError) as e:
             return json.dumps({"error": True, "message": str(e), "type": type(e).__name__})
@@ -1133,6 +1149,7 @@ def _register_tools(
     *,
     allowed_import_dirs: list[str] | None = None,
     compact_output: bool = True,
+    response_max_chars: int = _RESPONSE_MAX_CHARS,
     config: AppConfig | None = None,
 ) -> int:
     """Register Zabbix API methods as MCP tools. Returns tool count.
@@ -1162,6 +1179,7 @@ def _register_tools(
             method_def, client_manager, server_names,
             allowed_import_dirs=allowed_import_dirs,
             compact_output=compact_output,
+            response_max_chars=response_max_chars,
         )
         # Build MCP tool annotations based on method characteristics
         tool_annotations: dict[str, Any] = {}
@@ -1243,7 +1261,7 @@ def _register_tools(
             result = await asyncio.to_thread(
                 client_manager.call, server_name, method, params or {},
             )
-            return _UNTRUSTED_PREAMBLE + _truncate_result(result)
+            return _UNTRUSTED_PREAMBLE + _truncate_result(result, max_chars=response_max_chars)
         except (ReadOnlyError, RateLimitError, ValueError) as e:
             return json.dumps({"error": True, "message": str(e), "type": type(e).__name__})
         except Exception as e:
@@ -1844,6 +1862,7 @@ def run_server(
         mcp, client_manager, config.server.tools, config.server.disabled_tools,
         allowed_import_dirs=config.server.allowed_import_dirs,
         compact_output=config.server.compact_output,
+        response_max_chars=config.server.response_max_chars,
         config=config,
     )
     if config.server.tools or config.server.disabled_tools:

@@ -79,8 +79,16 @@ rate_limit = 300
 # Set to false to always return all fields (pre-1.13 behavior).
 compact_output = true
 
+# Maximum characters per tool response before truncation. Default 50000
+# (roughly 12k tokens), minimum 5000. Increase for workflows that export
+# large Zabbix templates via configuration_export (a typical built-in
+# template is 30-100KB of YAML). Higher values use more LLM context per
+# response. Examples: 200000 for medium templates, 500000 for large
+# built-in templates.
+# response_max_chars = 50000
+
 # ---------------------------------------------------------------------------
-# PDF Reporting (optional — requires: pip install zabbix-mcp-server[reporting])
+# PDF Reporting (optional - requires: pip install zabbix-mcp-server[reporting])
 # ---------------------------------------------------------------------------
 # The report_generate tool creates professional PDF reports from Zabbix data.
 # Install optional dependencies to enable: pip install weasyprint jinja2

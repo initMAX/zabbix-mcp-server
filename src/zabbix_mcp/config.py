@@ -65,6 +65,7 @@ class ServerConfig:
     allowed_import_dirs: list[str] | None = None
     allowed_hosts: list[str] | None = None
     compact_output: bool = True
+    response_max_chars: int = 50000
     report_logo: str | None = None
     report_company: str = ""
     report_subtitle: str = "IT Monitoring Service"
@@ -234,6 +235,10 @@ def load_config(path: str | Path) -> AppConfig:
     if not isinstance(compact_output_raw, bool):
         raise ConfigError("'compact_output' must be a boolean (true or false)")
 
+    response_max_chars_raw = server_raw.get("response_max_chars", 50000)
+    if not isinstance(response_max_chars_raw, int) or response_max_chars_raw < 5000:
+        raise ConfigError("'response_max_chars' must be an integer >= 5000")
+
     server_config = ServerConfig(
         transport=transport,
         host=server_raw.get("host", "127.0.0.1"),
@@ -250,6 +255,7 @@ def load_config(path: str | Path) -> AppConfig:
         allowed_import_dirs=allowed_import_dirs,
         allowed_hosts=allowed_hosts,
         compact_output=compact_output_raw,
+        response_max_chars=response_max_chars_raw,
         report_logo=server_raw.get("report_logo"),
         report_company=server_raw.get("report_company", ""),
         report_subtitle=server_raw.get("report_subtitle", "IT Monitoring Service"),

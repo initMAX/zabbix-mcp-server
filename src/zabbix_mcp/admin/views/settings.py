@@ -33,7 +33,7 @@ BOOL_KEYS = {"compact_output", "enabled"}
 SECTION_CONFIG = {
     "server": {
         "toml_section": "server",
-        "allowed_keys": {"host", "port", "transport", "log_level", "log_file", "compact_output"},
+        "allowed_keys": {"host", "port", "transport", "log_level", "log_file", "compact_output", "response_max_chars"},
         "min_role": "admin",
     },
     "tls_access": {

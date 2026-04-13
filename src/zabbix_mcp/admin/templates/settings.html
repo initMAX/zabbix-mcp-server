@@ -87,6 +87,19 @@
                 </label>
             </div>
         </div>
+        <div class="settings-row">
+            <div class="settings-label">Response Max Chars</div>
+            <div>
+                <div class="number-input-group">
+                    <button type="button" class="num-btn num-minus">&minus;</button>
+                    <input type="number" name="response_max_chars" min="5000" step="1000"
+                           value="{{ settings.response_max_chars | default(50000) }}"
+                           {% if current_user_role == 'viewer' %}disabled{% endif %}>
+                    <button type="button" class="num-btn num-plus">+</button>
+                </div>
+                <div class="form-hint">Max characters per tool response before truncation (default: 50000, min: 5000). Increase for template export workflows (e.g. 200000 for medium templates, 500000 for large built-in templates).</div>
+            </div>
+        </div>
         {% if current_user_role != 'viewer' %}
         <div style="margin-top:16px;">
             <button type="submit" class="btn btn-primary btn-sm">Save MCP Server Settings</button>

@@ -1,9 +1,11 @@
 # Changelog
 
-## v1.19 - 2026-04-10
+## v1.19 - 2026-04-14
 
 ### Added
 
+- **Configurable response truncation limit** ([#13](https://github.com/initMAX/zabbix-mcp-server/issues/13)) - new `response_max_chars` option in `[server]` (default: `50000`). Controls the maximum characters per tool response before truncation. Increase for workflows that export large Zabbix templates via `configuration_export` (a typical built-in template is 30-100KB of YAML). Configurable via `config.toml`, admin portal (Settings -> MCP Server), or `--check-config` validation. String results (YAML/XML/JSON from export tools) now return partial content with a truncation note instead of a useless `{"_error": "Result too large"}` summary object. Example: `response_max_chars = 200000` returns up to ~200k characters of template YAML, enough for most templates.
+- **Token Budget documentation** - new "Token Budget" section in README explaining that the default 232-tool catalog costs ~100k tokens, with per-group tool counts and copy-paste `[server].tools` filter examples to reduce from ~100k to ~7k tokens.
 - **Server rename in the admin portal** - the Zabbix server edit page now exposes the server name as an editable field. Renaming validates the new name against the existing regex (must start with a letter, only letters/digits/dashes/underscores), refuses to overwrite an existing entry, copies the entire `[zabbix.<old>]` table to a new key under tomlkit (preserving every key including ones the form does not expose), deletes the old key, and rewrites any `[tokens.*].allowed_servers` lists that referenced the old name so token ACLs survive the rename. The audit log records a new `server_rename` action with `old_name`/`new_name` in `details`. Until v1.19 the only way to rename a server was to delete it and create a new one, which broke any token that scoped access to the old name and dropped non-form keys (e.g. `ssl_cert`, `tls_*`).
 
 ### Changed

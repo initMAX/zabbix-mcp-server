@@ -71,8 +71,8 @@ The server runs as a standalone HTTP service. AI clients connect to it over the 
 - **Multi-token authentication** - Named tokens with scopes, IP restrictions, server binding, expiry; managed via admin portal, CLI (`generate-token`), or config.toml
 - **Multi-server support** - Connect to multiple Zabbix instances (production, staging, ...) with separate tokens
 - **HTTP + SSE transports** - Streamable HTTP (recommended) and SSE for clients like n8n that lack session management
-- **Tool filtering** - Limit exposed tools by category (`monitoring`, `alerts`, `users`, `extensions`, etc.) to stay under LLM tool limits
-- **Compact output mode** - Get methods return only key fields by default, reducing token usage; LLM can request `extend` for full details
+- **Tool filtering** - Limit exposed tools by category (`monitoring`, `alerts`, `users`, `extensions`, etc.) or individual API prefix to reduce the tool catalog size and stay under LLM context limits (see [Token Budget](#token-budget) below)
+- **Compact output mode** - Get methods return only key fields by default, reducing response token usage; LLM can request `extend` for full details
 - **LLM-friendly normalizations** - Symbolic enum names, auto-fill defaults, preprocessing cleanup, timestamp conversion
 - **Single config file** - One TOML file, no scattered environment variables
 - **Read-only mode** - Per-server and per-token write protection to prevent accidental changes
@@ -717,6 +717,35 @@ template_file = "/etc/zabbix-mcp/templates/my_custom.html"
 
 See [`docs/REPORTING.md`](docs/REPORTING.md) for the full authoring guide: available Jinja2 context variables per report type, base CSS classes provided by `base.html`, and a worked example.
 
+## Token Budget
+
+By default the server exposes all ~232 Zabbix API tools. Each tool's JSON schema (name, description, 20-40 optional parameters) adds roughly 400-500 tokens to the MCP tool catalog that is sent to the LLM at the start of every session. **With the default "all tools" configuration, the catalog alone costs ~100k tokens before your first prompt even reaches the model.** This is the single largest driver of token usage - far more than compact vs. extended response mode.
+
+**Fix:** add a `tools` allowlist in `[server]` to expose only what you need:
+
+```toml
+[server]
+# Tight allowlist for problem triage / host inspection (~15 tools, ~7k tokens)
+tools = ["host", "hostgroup", "problem", "trigger", "event", "item"]
+
+# Broader set including templates and dashboards (~30 tools, ~15k tokens)
+# tools = ["host", "hostgroup", "problem", "trigger", "event", "item",
+#          "template", "dashboard", "maintenance"]
+```
+
+Or use group names as shortcuts (pulls in more tools per group):
+
+| Group | Tools (approx) | Contains |
+|---|---|---|
+| `monitoring` | ~31 | host, hostgroup, item, trigger, problem, event, history, trend, graph, sla, discovery, httptest, ... |
+| `alerts` | ~16 | action, alert, mediatype, script |
+| `data_collection` | ~107 | template, templategroup, templatedashboard, valuemap, dashboard |
+| `users` | ~30 | user, usergroup, userdirectory, usermacro, token, role, mfa |
+| `administration` | ~39 | settings, housekeeping, authentication, maintenance, map, proxy, ... |
+| `extensions` | ~9 | graph_render, anomaly_detect, capacity_forecast, report_generate, ... |
+
+The same mechanism works per-token via `[tokens.*].scopes` - see [MCP Authentication](#mcp-authentication-optional).
+
 ## Common Parameters (get methods)
 
 <table>
@@ -750,6 +779,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 <tr><td><code>allowed_hosts</code></td><td>IP allowlist — IPs and CIDR ranges (e.g. <code>["10.0.0.0/24"]</code>)</td></tr>
 <tr><td><code>allowed_import_dirs</code></td><td>Directories for <code>source_file</code> imports (default: disabled)</td></tr>
 <tr><td><code>compact_output</code></td><td>Return only key fields from get methods (default: <code>true</code>); set to <code>false</code> to always return all fields</td></tr>
+<tr><td><code>response_max_chars</code></td><td>Maximum characters per tool response before truncation (default: <code>50000</code>, min: <code>5000</code>). Increase for template export workflows: <code>200000</code> for medium templates, <code>500000</code> for large built-in templates. See <a href="#token-budget">Token Budget</a></td></tr>
 <tr><td rowspan="5"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL (must start with <code>http://</code> or <code>https://</code>)</td></tr>
 <tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
