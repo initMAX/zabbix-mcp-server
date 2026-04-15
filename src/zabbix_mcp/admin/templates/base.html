@@ -1,3 +1,9 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -27,6 +33,8 @@
                 <span class="nav-icon">&#x1F511;</span> MCP Tokens</a></li>
             <li><a href="/servers" class="nav-item {% if active == 'servers' %}active{% endif %}">
                 <span class="nav-icon">&#x1F5A5;</span> Zabbix Servers</a></li>
+            <li><a href="/wizard" class="nav-item {% if active == 'wizard' %}active{% endif %}">
+                <span class="nav-icon">&#x1FA84;</span> Client MCP Wizard</a></li>
             <li><a href="/users" class="nav-item {% if active == 'users' %}active{% endif %}">
                 <span class="nav-icon">&#x1F465;</span> Admin Users</a></li>
             <li><a href="/templates" class="nav-item {% if active == 'templates' %}active{% endif %}">

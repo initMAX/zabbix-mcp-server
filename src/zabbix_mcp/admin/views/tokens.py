@@ -118,17 +118,24 @@ async def token_create(request: Request) -> Response:
             "flash_type": "danger",
         })
 
+    # Capture return_to so the form (and any error re-renders) can pass
+    # it through. Used by the Client Wizard chain: /tokens/create?return_to=/wizard...
+    return_to = request.query_params.get("return_to") or ""
+
     if request.method == "GET":
-        ctx = {"active": "tokens"}
+        ctx = {"active": "tokens", "return_to": return_to}
         ctx.update(_get_global_context(admin_app))
         return admin_app.render("tokens/create.html", request, ctx)
 
     # POST — create token
     form = await request.form()
+    # Form may carry return_to as a hidden field too (POST clears query string)
+    return_to = str(form.get("return_to", return_to) or return_to)
     name = str(form.get("name", "")).strip()
     if not name:
         return admin_app.render("tokens/create.html", request, {
             "active": "tokens",
+            "return_to": return_to,
             "error": "Name is required.",
         })
 
@@ -162,7 +169,7 @@ async def token_create(request: Request) -> Response:
     # Check for ID collision with existing tokens
     existing_token = admin_app.token_store.get_token(token_id)
     if existing_token is not None:
-        ctx = {"active": "tokens", "error": f"A token with ID '{token_id}' already exists. Choose a different name."}
+        ctx = {"active": "tokens", "return_to": return_to, "error": f"A token with ID '{token_id}' already exists. Choose a different name."}
         ctx.update(_get_global_context(admin_app))
         return admin_app.render("tokens/create.html", request, ctx)
 
@@ -193,8 +200,16 @@ async def token_create(request: Request) -> Response:
         logger.error("Failed to create token: %s", e)
         return admin_app.render("tokens/create.html", request, {
             "active": "tokens",
+            "return_to": return_to,
             "error": f"Failed to save: {e}",
         })
+
+    # If the operator started from the wizard, build a continue link
+    # back to it with the new token id appended.
+    continue_to = ""
+    if return_to:
+        sep = "&" if "?" in return_to else "?"
+        continue_to = f"{return_to}{sep}token={token_id}"
 
     # Show the raw token ONCE
     return admin_app.render("tokens/create.html", request, {
@@ -202,6 +217,8 @@ async def token_create(request: Request) -> Response:
         "created_token": raw_token,
         "token_name": name,
         "token_id": token_id,
+        "return_to": return_to,
+        "continue_to": continue_to,
     })
 
 

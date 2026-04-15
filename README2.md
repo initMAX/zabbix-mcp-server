@@ -1,50 +1,19 @@
 <div align="center">
-    <a href="http://www.initmax.com"><img src="./.readme/logo/initMAX_banner.png" alt="initMAX Logo"></a>
-    <h3>
-        <span>
-            Honesty, diligence and MAXimum knowledge of our products is our standard.
-        </span>
-    </h3>
-    <h3>
-        <a href="https://www.initmax.com/">
-            <img alt="Static Badge" src="https://img.shields.io/badge/initMAX.com-%20?color=%231f65f4&logo=data:image/png;base64,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">
-        </a>&nbsp;
-        <a href="https://www.linkedin.com/company/initmax/">
-            <img alt="LinkedIn" src="https://img.shields.io/badge/%20-%20?style=social&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHJvbGU9ImltZyIgdmlld0JveD0iMCAwIDI0IDI0Ij4KICA8dGl0bGU+TGlua2VkSW48L3RpdGxlPgogIDxwYXRoIGZpbGw9IiMwQTY2QzIiIGQ9Ik0yMC40NDcgMjAuNDUyaC0zLjU1NHYtNS41NjljMC0xLjMyOC0uMDI3LTMuMDM3LTEuODUyLTMuMDM3LTEuODUzIDAtMi4xMzYgMS40NDUtMi4xMzYgMi45Mzl2NS42NjdIOS4zNTFWOWgzLjQxNXYxLjU2MWguMDQ5Yy40NzYtLjkgMS42MzctMS44NTIgMy4zNjgtMS44NTIgMy41OTkgMCA0LjI2NyAyLjM2OSA0LjI2NyA1LjQ1NXY2LjI4OHpNNS4zMzcgNy40MzNjLTEuMTQ0IDAtMi4wNjktLjkyNi0yLjA2OS0yLjA2OCAwLTEuMTQzLjkyNS0yLjA2OSAyLjA2OS0yLjA2OSAxLjE0MiAwIDIuMDY4LjkyNiAyLjA2OCAyLjA2OSAwIDEuMTQyLS45MjYgMi4wNjgtMi4wNjggMi4wNjh6bTEuNzc3IDEzLjAxOUgzLjU2VjloMy41NTR2MTEuNDUyek0yMi4yMjUgMEgxLjc3MUMuNzkyIDAgMCAuNzc0IDAgMS43Mjl2MjAuNTQyQzAgMjMuMjI3Ljc5MiAyNCAxLjc3MSAyNGgyMC40NTFDMjMuMiAyNCAyNCAyMy4yMjcgMjQgMjIuMjcxVjEuNzI5QzI0IC43NzQgMjMuMiAwIDIyLjIyMiAwaC4wMDN6Ii8+Cjwvc3ZnPgo=">
-        </a>&nbsp;
-        <a href="https://www.youtube.com/@initmax1">
-            <img alt="Static Badge" src="https://img.shields.io/badge/%20-web?style=social&logo=youtube">
-        </a>&nbsp;
-        <a href="https://www.facebook.com/initmax">
-            <img alt="Static Badge" src="https://img.shields.io/badge/%20-%20?style=social&logo=facebook">
-        </a>&nbsp;
-        <a href="https://www.instagram.com/initmax/">
-            <img alt="Static Badge" src="https://img.shields.io/badge/%20-%20?style=social&logo=instagram">
-        </a>&nbsp;
-        <a href="https://twitter.com/initmax">
-            <img alt="Static Badge" src="https://img.shields.io/badge/%20-%20?style=social&logo=x">
-        </a>&nbsp;
-        <a href="https://github.com/initmax">
-            <img alt="Static Badge" src="https://img.shields.io/badge/%20-%20?style=social&logo=github">
-        </a>
-    </h3>
-    <h3>
-        <a><img src="./.readme/logo/zabbix-premium-partner.png" alt="Zabbix premium partner" width="100"></a>&nbsp;&nbsp;&nbsp;
-        <a><img src="./.readme/logo/zabbix-certified-trainer.png" alt="Zabbix certified trainer" width="100"></a>
-    </h3>
+    <a href="https://github.com/initMAX/zabbix-mcp-server"><img src="./.readme/zabbix-mcp-server-preview.png" alt="Zabbix MCP Server" width="700"></a>
 </div>
 <br>
-<br>
-
----
----
 
 <div align="center">
     <h1>
         Zabbix MCP Server
     </h1>
+    <p>
+        developed and maintained by
+        <a href="https://www.initmax.com"><img alt="initMAX" src="./.readme/logo/initmax-logo-framed.svg" height="24" valign="middle"></a>
+        and community
+    </p>
     <h4>
-        Complete Zabbix API coverage for any MCP-compatible AI assistant (231 tools)
+        Full Zabbix API access from Claude, Codex, VS Code, JetBrains, and other MCP clients - with a web admin portal, multi-server support, scoped bearer auth, audit log, and PDF reporting built in.
     </h4>
     <br>
     <a href="https://github.com/initMAX/zabbix-mcp-server/releases"><img alt="Version" src="https://img.shields.io/github/v/release/initMAX/zabbix-mcp-server?color=%231f65f4&label=version"></a>&nbsp;
@@ -55,6 +24,18 @@
     <a href="https://safeskill.dev/scan/initmax-zabbix-mcp-server"><img alt="SafeSkill" src="https://img.shields.io/badge/SafeSkill-100%2F100_Verified%20Safe-brightgreen"></a>
 </div>
 <br>
+<br>
+
+## Table of Contents
+
+<p align="center">
+  📖 <b>Overview:</b> <a href="#what-is-this">What is this?</a> · <a href="#features">Features</a><br>
+  🚀 <b>Install:</b> <a href="#quick-start">Quick Start</a> · <a href="#installation">Installation</a> · <a href="#installer-cli">Installer CLI</a><br>
+  ⚙️ <b>Configure:</b> <a href="#configuration-reference">Reference</a> · <a href="#tls--https">TLS / HTTPS</a> · <a href="#token-budget">Token Budget</a><br>
+  🔌 <b>Use:</b> <a href="#client-mcp-wizard-beta">Client Wizard</a> · <a href="#connecting-ai-clients">AI Clients</a> · <a href="#example-prompts">Prompts</a> · <a href="#available-tools">Tools</a> · <a href="#common-parameters-get-methods">Parameters</a> · <a href="#pdf-reports-beta">PDF Reports</a><br>
+  📚 <b>More:</b> <a href="#zabbix-compatibility">Compatibility</a> · <a href="#development">Development</a> · <a href="#related-projects">Related Projects</a> · <a href="#license">License</a> · <a href="#about-initmax">About initMAX</a>
+</p>
+
 <br>
 
 ## What is this?
@@ -894,11 +875,23 @@ npx @modelcontextprotocol/inspector zabbix-mcp-server --config config.toml
 
 AGPL-3.0 - see [LICENSE](LICENSE).
 
-<br>
-<br>
+## About initMAX
 
----
----
+<div align="center">
+    <a href="http://www.initmax.com"><img src="./.readme/logo/initMAX_banner.png" alt="initMAX Logo" width="400"></a>
+    <h3>
+        <span>
+            Honesty, diligence and MAXimum knowledge of our products is our standard.
+        </span>
+    </h3>
+    <h3>
+        <a><img src="./.readme/logo/zabbix-premium-partner.png" alt="Zabbix premium partner" width="100"></a>&nbsp;&nbsp;&nbsp;
+        <a><img src="./.readme/logo/zabbix-certified-trainer.png" alt="Zabbix certified trainer" width="100"></a>
+    </h3>
+</div>
+
+initMAX is an international Zabbix Premium Partner and Certified Trainer with offices in **the United States**, **the Czech Republic**, and **Slovakia**. We build, deploy, and support Zabbix infrastructure for organizations across North America and Europe, and this server is part of a wider effort to integrate Zabbix into modern AI-assisted operations workflows.
+
 <div align="center">
     <h4>
         <a href="https://www.initmax.com/">

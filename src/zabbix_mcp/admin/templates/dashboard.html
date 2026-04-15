@@ -1,3 +1,9 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 
@@ -23,11 +29,11 @@
         <div class="stat-content">
             <div class="stat-value">{{ servers | length }}</div>
             <div class="stat-label">Zabbix Servers</div>
-            <div id="server-status-list" style="margin-top:8px;">
+            <div id="server-status-list" style="margin-top:8px; min-width:0;">
                 {% for server in servers %}
-                <div style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-muted);">
+                <div style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-muted); min-width:0;">
                     <span class="status-dot status-dot-yellow status-dot-pulse" data-server="{{ server.name }}" data-tooltip="{{ server.name }}: checking..." style="flex-shrink:0;"></span>
-                    <span data-server-label="{{ server.name }}">{{ server.name }}</span>
+                    <span data-server-label="{{ server.name }}" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;">{{ server.name }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -119,8 +125,13 @@
                 } else {
                     dot.classList.add('status-dot-red');
                     var errMsg = info ? info.error || 'error' : 'not configured';
+                    // Full error lands in the tooltip; the inline label uses a short
+                    // summary because the card is narrow and python traceback strings
+                    // (urlopen errors, etc.) will wrap and blow the card height out.
+                    var shortMsg = errMsg.split(':')[0].substring(0, 40);
+                    if (errMsg.length > shortMsg.length) shortMsg += '...';
                     dot.dataset.tooltip = name + ': ' + errMsg;
-                    if (label) label.textContent = name + ' — ' + errMsg;
+                    if (label) { label.title = errMsg; label.textContent = name + ' — ' + shortMsg; }
                 }
             });
         })

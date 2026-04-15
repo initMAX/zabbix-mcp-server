@@ -1,3 +1,9 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
 {% extends "base.html" %}
 {% block title %}Create Token{% endblock %}
 
@@ -20,11 +26,21 @@
     <div class="token-value">{{ created_token }}</div>
     <div class="token-warning">&#x26A0; This token will not be shown again. Copy it now and store it securely.</div>
 </div>
+{% if continue_to %}
+{# URL fragment (#prefill_token=...) carries the raw token to the wizard
+   so it can pre-fill the bearer field. Fragments are NOT sent to the
+   server, so the raw token never leaves the browser. The wizard JS
+   reads it on load and clears the hash so a refresh does not keep it. #}
+<a href="{{ continue_to }}#prefill_token={{ created_token | urlencode }}" class="btn btn-primary">Continue to wizard &rarr;</a>
+<a href="/tokens" class="btn btn-ghost">Back to Tokens</a>
+{% else %}
 <a href="/tokens" class="btn btn-primary">Done</a>
+{% endif %}
 
 {% else %}
-<div class="card" style="max-width:640px;">
+<div class="card">
     <form method="post" action="/tokens/create">
+        {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
         <div class="form-group">
             <label class="form-label" for="name">Token Name</label>
             <input type="text" id="name" name="name" class="form-input" placeholder="e.g. Claude Desktop - Production" required>

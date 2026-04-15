@@ -1,3 +1,9 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
 {% extends "base.html" %}
 {% block title %}MCP Tokens{% endblock %}
 
@@ -38,10 +44,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <span class="copy-group">
-                        <code class="monospace">{{ token.token_prefix }}...</code>
-                        <button class="btn-copy" onclick="copyToClipboard('{{ token.token_prefix }}', this)" title="Copy prefix">&#x1F4CB;</button>
-                    </span>
+                    <code class="monospace">{{ token.token_prefix }}</code>
                 </td>
                 <td>
                     {% for s in token.scopes %}
@@ -70,9 +73,9 @@
                 </td>
                 <td>
                     {% if token.revoked %}
-                    <span class="badge badge-danger">Revoked</span>
+                    <span class="badge badge-danger" style="min-width:70px; text-align:center; display:inline-block;">Revoked</span>
                     {% else %}
-                    <span class="badge badge-success">Active</span>
+                    <span class="badge badge-success" style="min-width:70px; text-align:center; display:inline-block;">Active</span>
                     {% endif %}
                 </td>
                 <td class="text-sm text-muted">{{ token.last_used_at or 'Never' }}</td>
@@ -80,11 +83,11 @@
                     <div class="actions">
                         {% if token.revoked %}
                         <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
-                            <button type="submit" class="btn btn-ghost btn-sm">Activate</button>
+                            <button type="submit" class="btn btn-ghost btn-sm" style="min-width:78px;">Activate</button>
                         </form>
                         {% else %}
                         <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
-                            <button type="submit" class="btn btn-ghost btn-sm">Revoke</button>
+                            <button type="submit" class="btn btn-ghost btn-sm" style="min-width:78px;">Revoke</button>
                         </form>
                         {% endif %}
                         <button class="btn btn-danger btn-sm"

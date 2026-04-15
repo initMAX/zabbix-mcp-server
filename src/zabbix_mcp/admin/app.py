@@ -124,6 +124,7 @@ class AdminApp:
         from zabbix_mcp.admin.views.settings import settings_view, settings_update
         from zabbix_mcp.admin.views.uploads import upload_logo, upload_tls_cert, upload_tls_key
         from zabbix_mcp.admin.views.audit import audit_view, audit_export
+        from zabbix_mcp.admin.views.wizard import wizard_view
 
         routes = [
             Route("/health", self._admin_health, methods=["GET"]),
@@ -132,6 +133,7 @@ class AdminApp:
             Route("/login", self._login, methods=["GET", "POST"]),
             Route("/logout", self._logout, methods=["POST"]),
             Route("/", dashboard),
+            Route("/wizard", wizard_view, methods=["GET"]),
             Route("/tokens", token_list),
             Route("/tokens/create", token_create, methods=["GET", "POST"]),
             Route("/tokens/{token_id}", token_detail, methods=["GET", "POST"]),

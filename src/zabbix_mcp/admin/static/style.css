@@ -635,7 +635,7 @@ tbody tr:last-child td {
 .btn-ghost {
     background: transparent;
     color: var(--text-secondary);
-    border-color: var(--border-color);
+    border-color: var(--border-hover);
 }
 
 .btn-ghost:hover {

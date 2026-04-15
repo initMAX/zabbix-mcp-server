@@ -1,0 +1,653 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
+{% extends "base.html" %}
+{% block title %}Client MCP Wizard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Client MCP Wizard</h1>
+        <p class="page-subtitle">Generate a copy-paste-ready config snippet for any AI client (Claude Desktop, Codex, Cursor, Cline, ...) - no manual JSON editing needed.</p>
+    </div>
+</div>
+
+<style>
+  .wiz-step { margin-bottom: 32px; }
+  .wiz-step-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .wiz-step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--bg-secondary); color: var(--text-muted);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 0.85rem;
+    border: 1px solid var(--border-color);
+  }
+  .wiz-step.active .wiz-step-num {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  }
+  .wiz-step.done .wiz-step-num {
+    background: var(--color-success); color: #fff; border-color: var(--color-success);
+  }
+  .wiz-step-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); }
+  .wiz-step-pick {
+    margin-left: auto; font-size: 0.85rem; color: var(--text-muted);
+  }
+  .wiz-step-pick code { font-size: 0.85rem; }
+
+  /* Cards mirror the .server-card design exactly so light/dark themes
+     stay consistent with the Zabbix Servers page. */
+  .wiz-cards {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+  .wiz-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+    cursor: pointer;
+    text-decoration: none; color: var(--text-primary);
+    transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  }
+  .wiz-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-md); }
+  .wiz-card.selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary), var(--shadow-card);
+  }
+  .wiz-card.disabled { opacity: 0.5; cursor: not-allowed; }
+  .wiz-card.disabled:hover { border-color: var(--border-color); box-shadow: var(--shadow-card); }
+  .wiz-card-title {
+    font-weight: 600; font-size: 1.05rem; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .wiz-card-meta {
+    font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-muted);
+    word-break: break-all;
+  }
+  .wiz-card-meta code { font-size: 0.82rem; background: var(--bg-code); padding: 1px 6px; border-radius: 4px; color: var(--text-secondary); }
+  .wiz-card-info {
+    font-family: var(--font-sans); font-size: 0.85rem; color: var(--text-secondary);
+  }
+
+  .wiz-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .wiz-chip {
+    padding: 2px 8px; font-size: 0.72rem; border-radius: 10px;
+    background: var(--bg-secondary); color: var(--text-muted);
+    border: 1px solid var(--border-color);
+  }
+  .wiz-chip.scope { background: var(--color-primary-light); color: var(--color-primary); border-color: var(--color-primary); }
+  .wiz-chip.warn { background: var(--color-warning-light); color: var(--color-warning); border-color: var(--color-warning); }
+
+  /* Grid tracks use minmax(0, 1fr) so a long non-wrapping code box
+     (white-space: pre) cannot force the column wider than its share.
+     Without the 0 minimum, the default min-content implicit track size
+     would let the snippet push the left column into an unreadable sliver
+     the moment the bearer token gets pasted in. The code-box itself
+     already has overflow-x: auto so it will just scroll horizontally. */
+  .wiz-output {
+    display: grid; gap: 18px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  @media (max-width: 900px) { .wiz-output { grid-template-columns: minmax(0, 1fr); } }
+
+  /* Shared code block styling - used for both the config snippet and the
+     curl quick-test block so they look identical. Always dark regardless
+     of the page's light/dark theme. */
+  .wiz-code-box {
+    background: #0d1117; color: #c9d1d9;
+    border: 1px solid #1f2937; border-radius: var(--radius-lg);
+    padding: 14px; padding-right: 48px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem; line-height: 1.5;
+    overflow-x: auto; white-space: pre;
+  }
+  .wiz-code-block { margin-top: 14px; }
+  .wiz-code-block:first-child { margin-top: 0; }
+  .wiz-code-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 6px; gap: 8px;
+  }
+  .wiz-code-header-title { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+  .wiz-code-header-title code { font-size: 0.82rem; background: var(--bg-code); padding: 1px 6px; border-radius: 4px; }
+  .wiz-code-caption {
+    font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;
+  }
+  .wiz-code-caption code { font-size: 0.8rem; background: var(--bg-code); padding: 1px 6px; border-radius: 4px; }
+
+  /* Overlay copy button in the top-right corner of the code box. Hidden
+     by default, fades in on hover/focus. Uses an SVG copy icon (two
+     overlapping rectangles) - the standard pattern for code snippets
+     in dev-tool UIs (GitHub, Stripe, Vercel docs, ...). */
+  .wiz-code-wrap { position: relative; }
+  .wiz-code-copy {
+    position: absolute; top: 8px; right: 8px;
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.08);
+    color: #c9d1d9;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0; transition: opacity 0.15s, background 0.15s;
+    padding: 0;
+  }
+  .wiz-code-copy:hover { background: rgba(255, 255, 255, 0.15); }
+  .wiz-code-copy:focus-visible { opacity: 1; outline: 2px solid var(--color-primary); outline-offset: 1px; }
+  .wiz-code-wrap:hover .wiz-code-copy,
+  .wiz-code-wrap:focus-within .wiz-code-copy { opacity: 1; }
+  .wiz-code-copy svg { width: 14px; height: 14px; display: block; }
+
+  .wiz-instructions {
+    list-style: none; counter-reset: step;
+    padding: 0; margin: 0;
+  }
+  .wiz-instructions li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 36px; padding-bottom: 14px;
+    color: var(--text-primary);
+  }
+  .wiz-instructions li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: -2px;
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--color-primary); color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 0.78rem;
+  }
+  .wiz-instructions li code {
+    font-size: 0.85rem; background: var(--bg-code); padding: 1px 6px; border-radius: 4px;
+    color: var(--text-secondary);
+  }
+
+  /* Emphasized box for the token paste field - sits at the top of the
+     output column so the operator understands what is being substituted
+     into the examples below. */
+  .wiz-token-box {
+    background: var(--color-primary-light);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    padding: 12px 14px; margin-bottom: 14px;
+  }
+  .wiz-token-box label { font-weight: 600; color: var(--text-primary); }
+  .wiz-token-box input { font-family: var(--font-mono); }
+  .wiz-token-box .wiz-token-help {
+    font-size: 0.8rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.4;
+  }
+
+  .wiz-os-tabs {
+    display: flex; gap: 4px; margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .wiz-os-tab {
+    padding: 6px 14px; font-size: 0.85rem;
+    color: var(--text-muted); text-decoration: none;
+    border-bottom: 2px solid transparent;
+  }
+  .wiz-os-tab.selected { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+
+  .wiz-host-override {
+    background: var(--color-warning-light); border: 1px solid var(--color-warning);
+    border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 10px;
+    font-size: 0.85rem; color: var(--text-primary);
+  }
+  .wiz-host-override code { font-size: 0.85rem; background: var(--bg-code); padding: 1px 6px; border-radius: 4px; }
+  .wiz-host-override .wiz-host-help {
+    margin: 6px 0 10px 0; color: var(--text-secondary);
+  }
+  .wiz-host-override .wiz-host-row {
+    display: flex; gap: 6px; align-items: stretch;
+  }
+  .wiz-host-override .wiz-host-row input { flex: 1; font-family: var(--font-mono); }
+  .wiz-host-override details {
+    margin-top: 10px; font-size: 0.82rem; color: var(--text-muted);
+  }
+  .wiz-host-override details summary {
+    cursor: pointer; user-select: none;
+  }
+  .wiz-host-override .wiz-ip-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .wiz-host-override .wiz-ip-pills a {
+    display: inline-block; padding: 3px 10px;
+    background: var(--bg-card); color: var(--text-primary);
+    border: 1px solid var(--border-color); border-radius: 12px;
+    font-family: var(--font-mono); font-size: 0.78rem; text-decoration: none;
+  }
+  .wiz-host-override .wiz-ip-pills a.selected { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+  .wiz-tools-summary {
+    margin-top: 14px; padding: 12px 14px;
+    background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  }
+  .wiz-tools-summary-text {
+    font-size: 0.85rem; margin-bottom: 6px; color: var(--text-secondary);
+  }
+  .wiz-note {
+    margin-top: 14px; padding: 10px 12px;
+    background: var(--color-primary-light); border: 1px solid var(--color-primary); border-radius: var(--radius-md);
+    font-size: 0.85rem; color: var(--text-primary);
+  }
+  .wiz-config-path {
+    margin-bottom: 12px; padding: 8px 12px;
+    background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-primary);
+  }
+</style>
+
+<!-- ============================================================ -->
+<!-- Step 1: Pick a Zabbix server -->
+<!-- ============================================================ -->
+<div class="wiz-step {% if not selected_server %}active{% else %}done{% endif %}">
+  <div class="wiz-step-header">
+    <span class="wiz-step-num">1</span>
+    <span class="wiz-step-title">Pick a Zabbix server</span>
+  </div>
+
+  {% if servers %}
+  <div class="wiz-cards">
+    {% for s in servers %}
+      <a href="?server={{ s.name | urlencode }}" class="wiz-card {% if selected_server and selected_server.name == s.name %}selected{% endif %}">
+        <div class="wiz-card-title">
+          {{ s.name }}
+          {% if s.read_only %}
+            <span class="badge badge-warning">Read-only</span>
+          {% else %}
+            <span class="badge badge-danger">Writes allowed</span>
+          {% endif %}
+        </div>
+        <div class="wiz-card-meta">{{ s.url }}</div>
+      </a>
+    {% endfor %}
+  </div>
+  {% else %}
+    <p class="text-muted">No Zabbix servers configured yet. <a href="/servers">Add a server first</a>.</p>
+  {% endif %}
+</div>
+
+<!-- ============================================================ -->
+<!-- Step 2: Pick an MCP token (only after server is chosen) -->
+<!-- ============================================================ -->
+{% if selected_server %}
+<div class="wiz-step {% if not selected_token and not skip_auth %}active{% else %}done{% endif %}">
+  <div class="wiz-step-header">
+    <span class="wiz-step-num">2</span>
+    <span class="wiz-step-title">Pick an MCP token</span>
+  </div>
+
+  {# Banner shown when the MCP server has no auth configured. The
+     operator can either create a token (to enable auth) or skip auth
+     entirely and generate a tokenless snippet. Everything below still
+     works - Step 3 is gated on "token picked OR skip_auth". #}
+  {% if not auth_enabled %}
+  <div class="wiz-note" style="margin-top: 0; margin-bottom: 14px; background: var(--color-warning-light); border-color: var(--color-warning);">
+    <strong>&#x26A0;&#xFE0F; This MCP server has no authentication configured.</strong>
+    It accepts requests without a bearer token - fine for dev/localhost, dangerous for anything reachable over the network. You can either create a token below to enable auth, or generate a tokenless snippet using the card marked <em>Continue without token</em>.
+  </div>
+  {% endif %}
+
+  <div class="wiz-cards">
+    {# "Continue without token" card - only when the MCP server is in
+       no-auth mode, so snippets and curl drop the Authorization header. #}
+    {% if not auth_enabled %}
+      <a href="?server={{ zabbix_server_name | urlencode }}&token=none{% if client_id %}&client={{ client_id | urlencode }}{% endif %}"
+         class="wiz-card {% if skip_auth %}selected{% endif %}" style="border-style: dashed;">
+        <div class="wiz-card-title">
+          Continue without token
+          <span class="badge badge-warning">No auth</span>
+        </div>
+        <div class="wiz-card-info">
+          Generate a config snippet with no <code>Authorization</code> header. Matches the current MCP server config. Any client can connect.
+        </div>
+      </a>
+    {% endif %}
+
+    {% for t in tokens %}
+      <a href="?server={{ zabbix_server_name | urlencode }}&token={{ t.id | urlencode }}{% if client_id %}&client={{ client_id | urlencode }}{% endif %}"
+         class="wiz-card {% if selected_token and selected_token.id == t.id %}selected{% endif %} {% if t.revoked %}disabled{% endif %}">
+        <div class="wiz-card-title">
+          {{ t.name }}
+          {% if t.is_legacy %}<span class="badge badge-muted">Legacy</span>{% endif %}
+          {% if t.revoked %}<span class="badge badge-danger">Revoked</span>{% endif %}
+          {% if t.read_only %}<span class="badge badge-warning">Read-only</span>{% endif %}
+        </div>
+        <div class="wiz-card-meta">{{ t.token_prefix }}</div>
+        <div class="wiz-card-info">
+          <div class="wiz-chips">
+            {% for s in t.scope_chips %}<span class="wiz-chip scope">{{ s }}</span>{% endfor %}
+            <span class="wiz-chip">{{ t.ip_summary }}</span>
+            {% if t.expires_at %}<span class="wiz-chip">expires {{ t.expires_at[:10] }}</span>{% endif %}
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+
+    {# "Create new token" card - links to /tokens/create with return_to so the wizard resumes #}
+    {% if can_create_token %}
+      <a href="/tokens/create?return_to={{ return_to | urlencode }}" class="wiz-card" style="border-style: dashed;">
+        <div class="wiz-card-title">+ Create new token</div>
+        <div class="wiz-card-info">
+          Opens the token creation page with full options (IP allowlist, expiry, scopes). Returns here when saved.
+        </div>
+      </a>
+    {% else %}
+      <div class="wiz-card disabled" title="Viewer role cannot create tokens">
+        <div class="wiz-card-title">+ Create new token</div>
+        <div class="wiz-card-info">Viewer role cannot create tokens. Ask an admin or operator.</div>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if selected_token and selected_token_tools %}
+  <div class="wiz-tools-summary">
+    <div class="wiz-tools-summary-text">
+      This token can call <strong>{{ selected_token_tools | length }}</strong> tool prefixes (each prefix = several methods like <code>_get</code>, <code>_create</code>, <code>_update</code>, ...):
+    </div>
+    <div class="wiz-chips">
+      {% for prefix in selected_token_tools[:60] %}<span class="wiz-chip scope">{{ prefix }}</span>{% endfor %}
+      {% if selected_token_tools | length > 60 %}<span class="wiz-chip">+{{ selected_token_tools | length - 60 }} more</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- Step 3: Pick the AI client -->
+<!-- ============================================================ -->
+{% if selected_token or skip_auth %}
+<div class="wiz-step {% if not selected_client %}active{% else %}done{% endif %}">
+  <div class="wiz-step-header">
+    <span class="wiz-step-num">3</span>
+    <span class="wiz-step-title">Pick your AI client</span>
+  </div>
+
+  <div class="wiz-cards">
+    {% for cid, c in clients %}
+      <a href="?server={{ zabbix_server_name | urlencode }}&token={{ token_id | urlencode }}&client={{ cid | urlencode }}"
+         class="wiz-card {% if client_id == cid %}selected{% endif %}">
+        <div class="wiz-card-title">
+          {{ c.name }}
+          <span class="badge badge-muted">{{ c.format }}</span>
+        </div>
+        {% if c.vendor %}<div class="wiz-card-info">{{ c.vendor }}</div>{% endif %}
+        <div class="wiz-card-info">
+          <div class="wiz-chips">
+            {% for tr in c.transports %}<span class="wiz-chip">{{ tr }}</span>{% endfor %}
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ============================================================ -->
+<!-- Step 4: Output (snippet + instructions) -->
+<!-- ============================================================ -->
+{% if selected_client %}
+<div class="wiz-step active">
+  <div class="wiz-step-header">
+    <span class="wiz-step-num">4</span>
+    <span class="wiz-step-title">Copy the config</span>
+  </div>
+
+  {# Transport picker if the client supports more than one. We mark the
+     transport that the running MCP server is actually serving as
+     "Detected" - that's the one clients will need. The others render as
+     "example only" because switching to them would require a server
+     restart with a different [server].transport in config.toml. #}
+  {% if selected_client.transports | length > 1 %}
+  <div style="margin-bottom: 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <span class="text-sm text-muted">Transport:</span>
+    {% for tr in selected_client.transports %}
+      {% set is_active = (transport == tr) %}
+      {% set is_server_default = (server_transport == tr) %}
+      <a href="?server={{ zabbix_server_name | urlencode }}&token={{ token_id | urlencode }}&client={{ client_id | urlencode }}&transport={{ tr }}{% if os_choice %}&os={{ os_choice | urlencode }}{% endif %}{% if url_ctx.host and url_ctx.host != url_ctx.raw_host %}&override_host={{ url_ctx.host | urlencode }}{% endif %}"
+         class="badge {% if is_active %}badge-success{% else %}badge-muted{% endif %}"
+         style="text-decoration: none; padding: 4px 10px;">
+        {{ tr }}
+        {% if is_server_default %}<strong style="margin-left: 4px;">&middot; detected</strong>{% endif %}
+      </a>
+    {% endfor %}
+  </div>
+  {% if transport != server_transport %}
+  <div class="wiz-note" style="margin-top: 0; margin-bottom: 14px;">
+    <strong>&#x26A0;&#xFE0F; Example only:</strong> the running MCP server is configured for <code>{{ server_transport }}</code> transport.
+    Clients connecting to <code>{{ url_ctx.url }}</code> right now will need <code>{{ server_transport }}</code>.
+    To use <code>{{ transport }}</code>, change <code>transport = "{{ transport }}"</code> in <code>[server]</code> of your <code>config.toml</code> and restart the MCP server.
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {# Host override picker if [server].host = 0.0.0.0. The detected IPs
+     come from `hostname -I` inside the server host, so in Docker they'll
+     be container-internal addresses that clients cannot reach. Primary
+     UX is therefore a manual input - operator types the public host
+     (DNS name, public IP, reverse-proxy URL); the auto-detected list
+     is hidden behind a <details> as a last-resort hint. #}
+  {% if url_ctx.needs_override %}
+  <div class="wiz-host-override">
+    <strong>&#x26A0;&#xFE0F; Server is listening on <code>{{ url_ctx.raw_host }}</code> (all interfaces) - you must tell clients which address to use.</strong>
+    <p class="wiz-host-help">
+      Enter the host or URL your AI client will use to reach this MCP server. This is typically your <strong>public DNS name</strong>, <strong>public IP</strong>, or a <strong>reverse-proxy hostname</strong>. Auto-detected values (Docker container IPs, private ranges) are usually NOT reachable from the client machine - verify before using.
+    </p>
+    <div class="wiz-host-row">
+      <input type="text" id="wiz-custom-host" class="form-input"
+             placeholder="e.g. mcp.example.com or 203.0.113.42"
+             value="{{ url_ctx.host }}"
+             autocomplete="off" spellcheck="false">
+      <button type="button" class="btn btn-sm btn-primary" id="wiz-apply-host">Apply</button>
+    </div>
+    {% if url_ctx.detected_ips %}
+    <details>
+      <summary>Show auto-detected addresses ({{ url_ctx.detected_ips | length }}) - may not be reachable from clients</summary>
+      <div class="wiz-ip-pills">
+        {% for ip in url_ctx.detected_ips %}
+          <a href="?server={{ zabbix_server_name | urlencode }}&token={{ token_id | urlencode }}&client={{ client_id | urlencode }}&transport={{ transport }}&override_host={{ ip | urlencode }}{% if os_choice %}&os={{ os_choice | urlencode }}{% endif %}"
+             class="{% if url_ctx.host == ip %}selected{% endif %}">{{ ip }}</a>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# Token input is full-width (mirroring the host override block above)
+     so the snippet/curl column below gets the full right-hand track and
+     long bearer tokens have room to breathe without crushing the left
+     column. Hidden when the user picked "Continue without token" - the
+     snippet/curl are already auth-free so there's nothing to substitute. #}
+  {% if not skip_auth %}
+  <div class="wiz-token-box">
+    <label for="wiz-token-field">Paste your bearer token here</label>
+    <input type="text" id="wiz-token-field" class="form-input" placeholder="zmcp_..." style="margin-top: 6px; width: 100%;" autocomplete="off" spellcheck="false">
+    <div class="wiz-token-help">
+      The examples below will be filled in with this value. We <strong>cannot</strong> show you an existing token - only a hash is stored - so paste the raw <code>zmcp_...</code> you copied when you created the token. Nothing is sent to the server; it lives only in this browser tab.
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="wiz-output">
+    <!-- Left column: instructions -->
+    <div>
+      {# OS tabs if multiple config_paths #}
+      {% if selected_client.config_paths | length > 1 %}
+      <div class="wiz-os-tabs">
+        {% for os_key in selected_client.config_paths.keys() %}
+          <a href="?server={{ zabbix_server_name | urlencode }}&token={{ token_id | urlencode }}&client={{ client_id | urlencode }}&transport={{ transport }}&os={{ os_key | urlencode }}{% if url_ctx.host and url_ctx.host != url_ctx.raw_host %}&override_host={{ url_ctx.host | urlencode }}{% endif %}"
+             class="wiz-os-tab {% if (os_choice == os_key) or (not os_choice and loop.first) %}selected{% endif %}">{{ os_key }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# Only show the config-path hint for file-based clients. For CLI
+         or UI-driven clients (Claude Code, ChatGPT, n8n, generic) the
+         "path" is a free-form instruction that already appears in the
+         numbered steps below; rendering it in a narrow monospace box
+         just looks broken. #}
+      {% if config_path_display and selected_client.format in ('json', 'toml', 'yaml') %}
+      <div class="wiz-config-path">{{ config_path_display }}</div>
+      {% endif %}
+
+      <ol class="wiz-instructions">
+        {% for step in instructions %}<li>{{ step | safe }}</li>{% endfor %}
+      </ol>
+
+      {% if notes %}
+      <div class="wiz-note">
+        <strong>Note:</strong> {{ notes }}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Right column: snippet + curl test (token substitutes into both from the full-width box above) -->
+    <div>
+      {# Config snippet. Copy button is the hover-overlay icon in the top
+         right of the dark box; Download stays in the header because it is
+         a less-common action. #}
+      <div class="wiz-code-block">
+        <div class="wiz-code-header">
+          <span class="wiz-code-header-title">Config snippet (<code>{{ snippet_format }}</code>)</span>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="downloadSnippet()">Download</button>
+        </div>
+        <div class="wiz-code-wrap">
+          <div class="wiz-code-box" id="wiz-snippet-box">{{ snippet }}</div>
+          <button type="button" class="wiz-code-copy"
+                  onclick="copyToClipboard(document.getElementById('wiz-snippet-box').textContent.trim(), this)"
+                  title="Copy to clipboard" aria-label="Copy config snippet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {# Curl test - uses the same YOUR_TOKEN_HERE placeholder so the token
+         input below substitutes into this block too. #}
+      <div class="wiz-code-block">
+        <div class="wiz-code-header">
+          <span class="wiz-code-header-title">Quick test (<code>curl</code>)</span>
+        </div>
+        <div class="wiz-code-wrap">
+          <div class="wiz-code-box" id="wiz-curl-box">{% if skip_auth %}curl -i {{ url_ctx.url }}{% else %}curl -i -H "Authorization: Bearer YOUR_TOKEN_HERE" {{ url_ctx.url }}{% endif %}</div>
+          <button type="button" class="wiz-code-copy"
+                  onclick="copyToClipboard(document.getElementById('wiz-curl-box').textContent.trim(), this)"
+                  title="Copy to clipboard" aria-label="Copy curl command">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="wiz-code-caption">
+          {% if skip_auth %}Expected: <code>HTTP/1.1 405</code> (GET not allowed on MCP endpoint). Anything other than 405 means the server path is wrong.{% else %}Expected: <code>HTTP/1.1 405</code> (auth OK, GET not allowed) with the token; <code>HTTP/1.1 401</code> without it.{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // Both the config snippet and the curl quick-test are code boxes that
+    // need YOUR_TOKEN_HERE swapped out when the operator pastes a token.
+    // We iterate them all so a future third box (e.g. env var example)
+    // gets the same treatment for free.
+    var codeBoxes = document.querySelectorAll('.wiz-code-box');
+    var tokenField = document.getElementById('wiz-token-field');
+    if (!codeBoxes.length) return;
+
+    // Stash the original (server-rendered) text so we can re-substitute
+    // on every keystroke without losing the YOUR_TOKEN_HERE placeholder.
+    codeBoxes.forEach(function(box) {
+      box.dataset.original = box.textContent;
+    });
+
+    function applyToken(token) {
+      codeBoxes.forEach(function(box) {
+        var original = box.dataset.original || '';
+        box.textContent = token
+          ? original.split('YOUR_TOKEN_HERE').join(token)
+          : original;
+      });
+    }
+
+    if (tokenField) {
+      tokenField.addEventListener('input', function() {
+        applyToken(tokenField.value.trim());
+      });
+
+      // Pre-fill from URL fragment when the user just created a new token
+      // via the Client Wizard chain. The fragment is set by tokens/create.html
+      // success block (#prefill_token=zmcp_...). Fragments are never sent
+      // to the server, so the raw token only lives in this browser tab.
+      // We clear the hash after reading so a refresh does not keep it.
+      if (window.location.hash) {
+        var hash = window.location.hash.substring(1);
+        var parts = hash.split('&');
+        for (var i = 0; i < parts.length; i++) {
+          var kv = parts[i].split('=');
+          if (kv[0] === 'prefill_token' && kv[1]) {
+            tokenField.value = decodeURIComponent(kv[1]);
+            applyToken(tokenField.value.trim());
+            // Strip the fragment from the URL bar without reload.
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            break;
+          }
+        }
+      }
+    }
+
+    // Custom host input: reload the page with ?override_host=<typed>
+    // so the snippet/curl/URLs all re-render with the operator-chosen
+    // host. The query-string round-trip keeps the URL bookmarkable and
+    // reuses the server-side compose_url logic.
+    var hostInput = document.getElementById('wiz-custom-host');
+    var applyBtn = document.getElementById('wiz-apply-host');
+    function applyHost() {
+      if (!hostInput) return;
+      var val = hostInput.value.trim();
+      if (!val) return;
+      var params = new URLSearchParams(window.location.search);
+      params.set('override_host', val);
+      window.location.search = params.toString();
+    }
+    if (applyBtn) applyBtn.addEventListener('click', applyHost);
+    if (hostInput) {
+      hostInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); applyHost(); }
+      });
+    }
+  })();
+
+  function downloadSnippet() {
+    var snippetBox = document.getElementById('wiz-snippet-box');
+    if (!snippetBox) return;
+    var format = '{{ snippet_format }}';
+    var ext = format === 'json' ? 'json'
+            : format === 'toml' ? 'toml'
+            : format === 'yaml' ? 'yaml'
+            : 'txt';
+    var clientId = '{{ client_id }}';
+    var filename = 'mcp-' + clientId + '.' + ext;
+    var blob = new Blob([snippetBox.textContent], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+</script>
+{% endif %}
+
+{% endblock %}
