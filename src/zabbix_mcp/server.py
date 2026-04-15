@@ -1759,13 +1759,15 @@ def run_server(
     if transport in ("http", "sse"):
         logger.warning("--- Security status ---")
 
-        # Authentication (MCP auth_token — the bearer token for HTTP/SSE transport)
-        if config.server.auth_token:
-            logger.warning("  MCP auth_token:     ENABLED")
+        # Authentication: legacy auth_token OR new [tokens.*] multi-token system
+        if token_store.token_count > 0:
+            logger.warning("  MCP auth:           ENABLED (%d token(s) from [tokens.*])", token_store.token_count)
+        elif config.server.auth_token:
+            logger.warning("  MCP auth:           ENABLED (legacy auth_token)")
         elif host == "127.0.0.1":
-            logger.warning("  MCP auth_token:     not set (localhost only — OK)")
+            logger.warning("  MCP auth:           not set (localhost only - OK)")
         else:
-            logger.warning("  MCP auth_token:     DISABLED — server is unauthenticated!")
+            logger.warning("  MCP auth:           DISABLED - server is unauthenticated!")
 
         # TLS
         if config.server.tls_cert_file:
