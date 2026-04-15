@@ -1,5 +1,5 @@
 <div align="center">
-    <a href="https://github.com/initMAX/zabbix-mcp-server"><img src="https://www.initmax.cz/wp-content/uploads/2026/04/zabbix-mcp-server-preview-v2.jpeg" alt="Zabbix MCP Server" width="700"></a>
+    <a href="https://github.com/initMAX/zabbix-mcp-server"><img src="https://www.initmax.cz/wp-content/uploads/2026/04/zabbix-mcp-server-preview-v2.jpeg" alt="Zabbix MCP Server" width="700" style="border-radius: 16px;"></a>
 </div>
 <br>
 
