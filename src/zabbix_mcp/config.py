@@ -85,11 +85,29 @@ class ServerConfig:
 
 
 @dataclass(frozen=True)
+class AdminAIConfig:
+    """Admin portal AI assistant (report template generator).
+
+    When `provider` and `api_key` are both set, the /templates page
+    shows a "Generate with AI" button that calls an LLM to produce a
+    Jinja2 template from a plain-English description. Missing or empty
+    config disables the feature cleanly (the UI button is hidden).
+    """
+
+    provider: str = ""  # "anthropic" | "openai" | ""
+    api_key: str = ""  # supports ${ENV_VAR} expansion
+    model: str = ""  # empty = provider default (e.g. claude-sonnet-4-6)
+    max_tokens: int = 8000
+    timeout: int = 60
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Top-level application configuration."""
 
     server: ServerConfig = field(default_factory=ServerConfig)
     zabbix_servers: dict[str, ZabbixServerConfig] = field(default_factory=dict)
+    admin_ai: AdminAIConfig = field(default_factory=AdminAIConfig)
 
     @property
     def default_server(self) -> str | None:
@@ -323,4 +341,16 @@ def load_config(path: str | Path) -> AppConfig:
             request_timeout=int(srv.get("request_timeout", 300)),
         )
 
-    return AppConfig(server=server_config, zabbix_servers=zabbix_servers)
+    # Optional [admin.ai] block for the report-template AI assistant.
+    # Missing section = feature disabled, no error.
+    admin_raw = raw.get("admin", {}) or {}
+    ai_raw = admin_raw.get("ai", {}) or {}
+    admin_ai = AdminAIConfig(
+        provider=str(ai_raw.get("provider", "") or "").strip().lower(),
+        api_key=str(ai_raw.get("api_key", "") or "").strip(),
+        model=str(ai_raw.get("model", "") or "").strip(),
+        max_tokens=int(ai_raw.get("max_tokens", 8000) or 8000),
+        timeout=int(ai_raw.get("timeout", 60) or 60),
+    )
+
+    return AppConfig(server=server_config, zabbix_servers=zabbix_servers, admin_ai=admin_ai)

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.23 - unreleased
+
+### Added
+
+- **AI-assisted report template generation (beta)** - a new "Generate with AI" button on `/templates/create` and `/templates/<id>` opens a dialog where the operator describes the report they want in plain English ("Weekly SRE review with a big availability gauge, total-hosts/total-events summary row, and a table of hosts sorted by event count"). The dialog calls an LLM (Anthropic Claude or OpenAI GPT via `[admin.ai]` config), receives a valid Jinja2 template, validates it in the `SandboxedEnvironment` with the same sample context the preview uses, and loads it into the HTML editor. No valid template = clear validation error back to the operator so they can refine the prompt. Feature is off by default - add `[admin.ai]` to `config.toml` with `provider` + `api_key` to enable. Admin + operator roles only (viewer cannot generate).
+- **`POST /templates/generate` endpoint** - JSON API backing the UI, CSRF-protected, audit-logged (provider, model, request/response character counts, elapsed ms - not the request content to avoid leaking NDA'd descriptions). Returns 412 when AI is disabled, 400 on validation failure (malformed Jinja, unknown variables, sandbox denied operation), 502 on upstream LLM failure, 200 with `{html, provider, model, elapsed_ms}` on success.
+- **`[admin.ai]` config section** - `provider` (`anthropic` or `openai`), `api_key` (supports `${ENV_VAR}` expansion so the key never hits the audit log or UI), `model` (empty = provider default), `max_tokens`, `timeout`. Documented in `config.example.toml`. Missing section or empty key = feature silently disabled, no error at startup.
+- **`src/zabbix_mcp/admin/ai_template.py` module** - provider-agnostic LLM abstraction (`LLMProvider` protocol + `AnthropicProvider` + `OpenAIProvider` concrete classes using stdlib `urllib` so no new pinned dependency is needed), prompt builder with full variable catalog derived from `reporting.data_fetcher` return shapes, CSS class list from `base.html`, one worked example (availability.html), and validation via `jinja2.sandbox.SandboxedEnvironment` before returning to the UI. Sandboxed rendering means a malicious/hallucinated template cannot escape through Python introspection even if the operator tries to save it.
+
 ## v1.22 - 2026-04-16
 
 ### Fixed

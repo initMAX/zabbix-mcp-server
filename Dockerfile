@@ -32,7 +32,7 @@ LABEL org.opencontainers.image.url="https://github.com/initMAX/zabbix-mcp-server
 LABEL org.opencontainers.image.documentation="https://github.com/initMAX/zabbix-mcp-server/blob/main/README.md"
 LABEL org.opencontainers.image.vendor="initMAX s.r.o."
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only"
-LABEL org.opencontainers.image.version="1.22"
+LABEL org.opencontainers.image.version="1.23"
 
 # System libs for weasyprint PDF rendering
 RUN apt-get update && apt-get install -y --no-install-recommends \

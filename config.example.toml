@@ -316,8 +316,25 @@ port = 9090
 # The installer generates the initial admin password automatically.
 
 # [admin.users.admin]
-# password_hash = "scrypt:16384:8:1$salt$hash"
+# password_hash = "scrypt:131072:8:1$salt$hash"
 # role = "admin"     # admin | operator | viewer
+
+# ---------------------------------------------------------------------------
+# Admin AI - report template generator (optional, since v1.23)
+# ---------------------------------------------------------------------------
+# When configured, the admin portal's /templates page shows a
+# "Generate with AI" button that takes a plain-English description of
+# the report you want and produces a valid Jinja2 HTML template ready
+# to save. Leave this section out entirely to disable the feature.
+# Requires outbound HTTPS from the admin portal host to the provider's
+# API endpoint.
+
+# [admin.ai]
+# provider = "anthropic"                   # "anthropic" | "openai"
+# api_key = "${ANTHROPIC_API_KEY}"         # ${ENV_VAR} expansion supported
+# model = "claude-sonnet-4-6"              # provider-specific; leave empty for provider default
+# max_tokens = 8000                        # generation cap; ~2-3k usually suffices
+# timeout = 60                             # seconds; raise for slow networks
 
 # ---------------------------------------------------------------------------
 # MCP Tokens (multi-token authentication)

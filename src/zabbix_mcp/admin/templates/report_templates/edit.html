@@ -54,6 +54,9 @@
         <option value="{{ '{{' }} generated_at {{ '}}' }}">generated_at</option>
         <option value="{{ '{{' }} logo_base64 {{ '}}' }}">logo_base64</option>
     </select>
+    {% if ai_enabled %}
+    <button class="btn btn-ghost btn-sm" onclick="openAiModal()" style="color: var(--color-primary);">&#x2728; Generate with AI</button>
+    {% endif %}
     <button class="btn btn-ghost btn-sm" onclick="renderPreview()">&#x1F441; Preview</button>
     <button class="btn btn-primary btn-sm" onclick="submitTemplate()">&#x1F4BE; Save</button>
 </div>
@@ -76,6 +79,40 @@
     <input type="hidden" name="description" id="hidden-desc">
     <input type="hidden" name="html_content" id="hidden-content">
 </form>
+
+{% if ai_enabled %}
+<!-- AI Generator Modal -->
+<div class="modal-overlay" id="ai-modal" style="display:none;">
+    <div class="modal-card" style="max-width:720px; max-height:90vh; display:flex; flex-direction:column;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; padding:16px 24px;">
+            <h3 style="margin:0;">&#x2728; Generate template with AI</h3>
+            <button class="btn btn-ghost btn-sm" onclick="closeAiModal()">&times;</button>
+        </div>
+        <div style="padding:20px 24px; overflow-y:auto;">
+            <p class="text-muted" style="margin-top:0; font-size:0.9rem;">
+                Describe the report you want in plain English. The AI assistant will generate
+                a Jinja2 template that plugs into the PDF report engine. You can iterate by
+                regenerating with a refined description.
+            </p>
+            <div class="form-group">
+                <label class="form-label" for="ai-request">Describe the report</label>
+                <textarea id="ai-request" class="form-textarea" rows="6" style="font-family: var(--font-sans);"
+                    placeholder="Example: Weekly SRE review report. Include: (1) a big availability gauge at the top, (2) a summary row with total hosts and total events, (3) a table of hosts sorted by event count descending, and (4) a list of the 3 top metrics (CPU / memory / disk) with color-coded bars. Company color: initMAX blue."></textarea>
+                <div class="form-hint">
+                    Provider: <code>{{ ai_provider }}</code>{% if ai_model %} &middot; Model: <code>{{ ai_model }}</code>{% endif %} &middot;
+                    Available context variables are documented in the prompt sent to the LLM; you do not need to list them.
+                </div>
+            </div>
+            <div id="ai-status" class="text-sm text-muted" style="min-height:20px; margin:8px 0;"></div>
+            <div id="ai-error" class="alert alert-danger" style="display:none; padding:10px 14px; border-radius:var(--radius-md); background:rgba(239,68,68,0.1); border:1px solid var(--color-danger); color:var(--color-danger); font-size:0.85rem; margin-bottom:12px;"></div>
+        </div>
+        <div style="padding:16px 24px; border-top:1px solid var(--border-color); display:flex; gap:8px; justify-content:flex-end;">
+            <button class="btn btn-ghost" onclick="closeAiModal()">Cancel</button>
+            <button class="btn btn-primary" id="ai-generate-btn" onclick="generateTemplateAI()">&#x2728; Generate</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- Preview Modal -->
 <div class="modal-overlay" id="preview-modal" style="display:none;">
@@ -275,5 +312,67 @@ document.addEventListener('keydown', function(e) {
         submitTemplate();
     }
 });
+
+// AI generator - only wired up when the server rendered the buttons + modal
+// (ai_enabled context flag). The functions are defined unconditionally so
+// accidental calls from console never ReferenceError.
+function openAiModal() {
+    var m = document.getElementById('ai-modal');
+    if (!m) return;
+    m.style.display = 'flex';
+    document.getElementById('ai-error').style.display = 'none';
+    document.getElementById('ai-status').textContent = '';
+    var ta = document.getElementById('ai-request');
+    if (ta) ta.focus();
+}
+function closeAiModal() {
+    var m = document.getElementById('ai-modal');
+    if (m) m.style.display = 'none';
+}
+function generateTemplateAI() {
+    var req = document.getElementById('ai-request').value.trim();
+    var err = document.getElementById('ai-error');
+    var status = document.getElementById('ai-status');
+    var btn = document.getElementById('ai-generate-btn');
+    err.style.display = 'none';
+    if (!req) {
+        err.textContent = 'Describe what you want first.';
+        err.style.display = 'block';
+        return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Generating... this usually takes 5-20 seconds.';
+    var csrf = document.querySelector('meta[name="csrf-token"]');
+    fetch('/templates/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrf ? csrf.content : '',
+        },
+        body: JSON.stringify({request: req}),
+    }).then(function(r) {
+        return r.json().then(function(body) { return {status: r.status, body: body}; });
+    }).then(function(resp) {
+        btn.disabled = false;
+        if (resp.status !== 200) {
+            status.textContent = '';
+            err.textContent = (resp.body && resp.body.message) || ('Request failed: ' + resp.status);
+            err.style.display = 'block';
+            return;
+        }
+        // Load generated HTML into the code editor and switch to the HTML tab.
+        var html = resp.body.html || '';
+        var ed = document.getElementById('template-editor');
+        if (ed) ed.value = html;
+        if (typeof switchTab === 'function') switchTab('html');
+        status.textContent = 'Generated (' + resp.body.provider + ' / ' + resp.body.model +
+            ', ' + resp.body.elapsed_ms + ' ms, ' + html.length + ' chars). Close this dialog to edit.';
+    }).catch(function(e) {
+        btn.disabled = false;
+        status.textContent = '';
+        err.textContent = 'Network error: ' + e;
+        err.style.display = 'block';
+    });
+}
 </script>
 {% endblock %}

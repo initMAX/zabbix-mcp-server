@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, RedirectResponse, Response
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from zabbix_mcp.admin.config_writer import (
     add_config_table,
@@ -33,6 +33,27 @@ _BUILTIN_DESCRIPTIONS = {
     "capacity_network": "Network bandwidth and traffic per interface",
     "backup": "Daily backup success/fail matrix (hosts \u00d7 days)",
 }
+
+
+def _ai_template_ctx(config) -> dict:
+    """Return the {ai_enabled, ai_provider, ai_model} template context.
+
+    Read once per request so the edit.html template can decide whether
+    to show the "Generate with AI" button without re-importing the
+    module. Missing [admin.ai] section => all flags falsy.
+    """
+    try:
+        from zabbix_mcp.admin.ai_template import is_ai_enabled
+    except Exception:
+        return {"ai_enabled": False, "ai_provider": "", "ai_model": ""}
+    if not is_ai_enabled(config):
+        return {"ai_enabled": False, "ai_provider": "", "ai_model": ""}
+    ai = getattr(config, "admin_ai", None)
+    return {
+        "ai_enabled": True,
+        "ai_provider": getattr(ai, "provider", "") or "",
+        "ai_model": getattr(ai, "model", "") or "",
+    }
 
 
 def _get_builtin_templates() -> list[dict]:
@@ -116,6 +137,7 @@ async def template_create(request: Request) -> Response:
             "initial_name": initial_name,
             "initial_description": initial_description,
             "duplicate_from": duplicate_from,
+            **_ai_template_ctx(admin_app.config),
         })
 
     # POST — save new template
@@ -131,6 +153,7 @@ async def template_create(request: Request) -> Response:
             "create_mode": True,
             "error": "Template name is required.",
             "initial_content": html_content,
+            **_ai_template_ctx(admin_app.config),
         })
 
     # Sanitize name for filesystem
@@ -146,6 +169,7 @@ async def template_create(request: Request) -> Response:
             "create_mode": True,
             "error": f"A template with name '{safe_name}' already exists.",
             "initial_content": html_content,
+            **_ai_template_ctx(admin_app.config),
         })
 
     # Write HTML to file in writable location
@@ -160,6 +184,7 @@ async def template_create(request: Request) -> Response:
             "create_mode": True,
             "error": f"Failed to write template file: {e}",
             "initial_content": html_content,
+            **_ai_template_ctx(admin_app.config),
         })
 
     # Write to config
@@ -241,6 +266,7 @@ async def template_edit(request: Request) -> Response:
         "template": tmpl,
         "template_id": template_id,
         "initial_content": content,
+        **_ai_template_ctx(admin_app.config),
     })
 
 
@@ -399,6 +425,99 @@ async def template_preview(request: Request) -> Response:
     except Exception as e:
         import html as _html
         return HTMLResponse(f"<p style='color:red'>Template error: {_html.escape(str(e))}</p>")
+
+
+async def template_generate(request: Request) -> Response:
+    """POST /templates/generate - AI-assisted Jinja2 template generation.
+
+    Body: JSON or form with a single `request` field carrying the
+    operator's plain-English description of the report they want.
+    Returns JSON with the generated HTML (+ provider/model/elapsed
+    metadata) on success, or a structured error with HTTP 4xx/5xx.
+
+    Admin or operator role required. Feature is silently disabled
+    (412) if `[admin.ai]` is not configured.
+    """
+    admin_app = request.app.state.admin_app
+    session = admin_app.require_auth(request)
+    if not session:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if session.role not in ("admin", "operator"):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+
+    # Accept either application/json or application/x-www-form-urlencoded.
+    content_type = request.headers.get("content-type", "")
+    user_request = ""
+    if content_type.startswith("application/json"):
+        try:
+            body = await request.json()
+            user_request = str(body.get("request", "") or "")
+        except Exception:
+            return JSONResponse({"error": "invalid_json"}, status_code=400)
+    else:
+        form = await request.form()
+        user_request = str(form.get("request", "") or "")
+
+    from zabbix_mcp.admin.ai_template import (
+        AIDisabledError,
+        AIProviderError,
+        AITemplateValidationError,
+        generate_template,
+    )
+    from zabbix_mcp.admin.audit_writer import write_audit
+
+    client_ip = request.client.host if request.client else ""
+    try:
+        result = generate_template(admin_app.config, user_request)
+    except AIDisabledError as exc:
+        return JSONResponse(
+            {"error": "ai_disabled", "message": str(exc)},
+            status_code=412,
+        )
+    except AITemplateValidationError as exc:
+        return JSONResponse(
+            {"error": "validation_failed", "message": str(exc)},
+            status_code=400,
+        )
+    except AIProviderError as exc:
+        logger.warning("AI template generation failed: %s", exc)
+        return JSONResponse(
+            {"error": "provider_error", "message": str(exc)},
+            status_code=502,
+        )
+    except Exception as exc:
+        logger.exception("AI template generation crashed")
+        return JSONResponse(
+            {"error": "internal_error", "message": str(exc)},
+            status_code=500,
+        )
+
+    # Audit the fact of generation + request length + token cost, but
+    # NOT the request text (may contain NDA'd data) or the response
+    # (potentially dozens of KB of HTML).
+    try:
+        write_audit(
+            "template_generate_ai",
+            user=session.user,
+            details={
+                "provider": result.provider,
+                "model": result.model,
+                "request_chars": len(user_request),
+                "html_chars": len(result.html),
+                "elapsed_ms": result.elapsed_ms,
+            },
+            ip=client_ip,
+        )
+    except Exception:
+        # Audit failure must not crash the generation.
+        pass
+
+    return JSONResponse({
+        "html": result.html,
+        "provider": result.provider,
+        "model": result.model,
+        "elapsed_ms": result.elapsed_ms,
+    })
 
 
 async def template_delete(request: Request) -> Response:
