@@ -126,8 +126,10 @@ class ClientManager:
 
         # A hung Zabbix frontend must not stall the MCP thread pool
         # indefinitely. zabbix-utils accepts `timeout` seconds on the
-        # ZabbixAPI constructor and plumbs it through to urllib.
-        timeout = getattr(srv, "request_timeout", 30) or 30
+        # ZabbixAPI constructor and plumbs it through to urllib. The
+        # 300 s default matches Zabbix PHP frontend's max_execution_time
+        # so expensive exports / long history.get ranges can complete.
+        timeout = getattr(srv, "request_timeout", 300) or 300
         api = ZabbixAPI(
             url=srv.url,
             validate_certs=srv.verify_ssl,

@@ -41,6 +41,11 @@
                 <input type="checkbox" name="verify_ssl" id="srv-ssl" {% if server.verify_ssl %}checked{% endif %}> Verify SSL
             </label>
         </div>
+        <div class="form-group">
+            <label class="form-label" for="srv-timeout">Request timeout (seconds)</label>
+            <input type="number" name="request_timeout" id="srv-timeout" class="form-input" min="5" max="3600" step="5" value="{{ server.request_timeout | default(300) }}" style="max-width:140px;">
+            <small class="text-muted">HTTP timeout for Zabbix API calls. Default <code>300</code> matches the Zabbix PHP frontend's <code>max_execution_time</code>. Lower it for a slow WAN link you want to fail fast on; raise it for workflows that export large templates or fetch long history ranges.</small>
+        </div>
 
         <div id="edit-test-result" style="margin-bottom:12px;"></div>
 

@@ -45,9 +45,13 @@ class ZabbixServerConfig:
     verify_ssl: bool = True
     skip_version_check: bool = False
     # Request timeout (seconds). A hung Zabbix frontend must not stall
-    # the MCP thread pool indefinitely; 30 s matches how long LLM
-    # clients typically wait before giving up on a tool call.
-    request_timeout: int = 30
+    # the MCP thread pool indefinitely. Default 300 s matches the
+    # Zabbix PHP frontend's max_execution_time (and typical nginx
+    # fastcgi_read_timeout), so whatever timeout your Zabbix UI
+    # respects, we respect too. Expensive tools like
+    # configuration.export of a large host or history.get over a
+    # multi-day range can legitimately run that long.
+    request_timeout: int = 300
 
 
 @dataclass(frozen=True)
@@ -316,7 +320,7 @@ def load_config(path: str | Path) -> AppConfig:
             read_only=srv.get("read_only", True),
             verify_ssl=srv.get("verify_ssl", True),
             skip_version_check=srv.get("skip_version_check", False),
-            request_timeout=int(srv.get("request_timeout", 30)),
+            request_timeout=int(srv.get("request_timeout", 300)),
         )
 
     return AppConfig(server=server_config, zabbix_servers=zabbix_servers)

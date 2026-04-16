@@ -18,7 +18,7 @@
 ### Added
 
 - **`[server].trusted_proxies` config option** - list of reverse proxy IPs whose `X-Forwarded-For` header we honor for client-IP attribution. Used by both the admin portal rate limiter and the MCP bearer-token IP allowlist. Empty (default) means we only trust the raw TCP peer. Populate with e.g. `trusted_proxies = ["127.0.0.1"]` when running behind nginx on localhost so per-token `allowed_ips` checks see the real client instead of the proxy.
-- **`[zabbix.<name>].request_timeout` config option** - per-server HTTP timeout in seconds (default 30). A hung Zabbix frontend no longer stalls the MCP thread pool indefinitely. Configurable per Zabbix server so slow WAN links can raise it; fast local links can drop it.
+- **`[zabbix.<name>].request_timeout` config option** - per-server HTTP timeout in seconds (default 300, matching the Zabbix PHP frontend's `max_execution_time`). A hung Zabbix frontend no longer stalls the MCP thread pool indefinitely; legitimately slow calls like `configuration.export` of a large host or a multi-day `history.get` still complete. Configurable in the admin portal server edit page (Servers -> edit -> "Request timeout") or directly in `config.toml`. Valid range is 5-3600 s.
 
 ### Fixed
 
