@@ -23,6 +23,7 @@
 <div id="add-server-form" class="card mb-4" style="display:none; max-width:640px;">
     <h3 style="margin-top:0;">Add Zabbix Server</h3>
     <form method="post" action="/servers/create">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-group">
             <label class="form-label">Server Name</label>
             <input type="text" name="name" class="form-input" placeholder="e.g. production, staging" required pattern="[a-zA-Z][a-zA-Z0-9_-]*">
@@ -95,9 +96,12 @@
         var saveBtn = document.getElementById('add-save-btn');
         _setTestResult(result, '', 'Testing...');
         saveBtn.disabled = true;
+        var _csrf = document.querySelector('meta[name="csrf-token"]');
+        var _headers = {'Content-Type': 'application/x-www-form-urlencoded'};
+        if (_csrf) _headers['X-CSRF-Token'] = _csrf.content;
         fetch('/servers/test-new', {
             method: 'POST',
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            headers: _headers,
             body: 'url=' + encodeURIComponent(url) + '&api_token=' + encodeURIComponent(token) + '&verify_ssl=' + (ssl ? '1' : '0'),
         })
         .then(function(r) { return r.text(); })
@@ -179,6 +183,7 @@
             </button>
                 {% if current_user_role != 'viewer' %}
                 <form method="post" action="/servers/{{ server.name }}/delete" style="display:inline;" id="del-srv-{{ server.name }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('server {{ server.name }}', 'del-srv-{{ server.name }}')">Delete</button>
                 </form>
                 {% endif %}

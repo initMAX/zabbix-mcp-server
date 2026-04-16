@@ -61,6 +61,7 @@
                 <div class="actions">
                     <a href="/templates/{{ template.id }}" class="btn btn-ghost btn-sm">&#x270F; Edit</a>
                     <form method="post" action="/templates/{{ template.id }}/delete" style="display:inline;" id="del-tpl-{{ template.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('template {{ template.name }}', 'del-tpl-{{ template.id }}')">Delete</button>
                     </form>
                 </div>

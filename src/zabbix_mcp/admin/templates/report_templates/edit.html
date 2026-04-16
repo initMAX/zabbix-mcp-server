@@ -70,6 +70,7 @@
 
 <!-- Hidden form for submission -->
 <form method="post" action="/templates/{{ t.id or 'create' }}" id="template-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="name" id="hidden-name">
     <input type="hidden" name="display_name" id="hidden-display-name">
     <input type="hidden" name="description" id="hidden-desc">

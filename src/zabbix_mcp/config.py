@@ -44,6 +44,14 @@ class ZabbixServerConfig:
     read_only: bool = True
     verify_ssl: bool = True
     skip_version_check: bool = False
+    # Request timeout (seconds). A hung Zabbix frontend must not stall
+    # the MCP thread pool indefinitely. Default 300 s matches the
+    # Zabbix PHP frontend's max_execution_time (and typical nginx
+    # fastcgi_read_timeout), so whatever timeout your Zabbix UI
+    # respects, we respect too. Expensive tools like
+    # configuration.export of a large host or history.get over a
+    # multi-day range can legitimately run that long.
+    request_timeout: int = 300
 
 
 @dataclass(frozen=True)
@@ -64,6 +72,11 @@ class ServerConfig:
     cors_origins: list[str] | None = None
     allowed_import_dirs: list[str] | None = None
     allowed_hosts: list[str] | None = None
+    # IPs of reverse proxies whose X-Forwarded-For / Forwarded headers
+    # we trust for client-IP attribution. Empty (default) means we only
+    # ever use the raw TCP peer. Populate with e.g. ["127.0.0.1"] when
+    # running behind nginx on localhost.
+    trusted_proxies: list[str] | None = None
     compact_output: bool = True
     response_max_chars: int = 50000
     report_logo: str | None = None
@@ -229,6 +242,13 @@ def load_config(path: str | Path) -> AppConfig:
             raise ConfigError("'allowed_hosts' must be a list of IP addresses or CIDR ranges")
         allowed_hosts = [str(h) for h in allowed_hosts_raw]
 
+    trusted_proxies_raw = server_raw.get("trusted_proxies")
+    trusted_proxies: list[str] | None = None
+    if trusted_proxies_raw is not None:
+        if not isinstance(trusted_proxies_raw, list):
+            raise ConfigError("'trusted_proxies' must be a list of IP addresses")
+        trusted_proxies = [str(h) for h in trusted_proxies_raw]
+
     log_file = server_raw.get("log_file")
 
     compact_output_raw = server_raw.get("compact_output", True)
@@ -254,6 +274,7 @@ def load_config(path: str | Path) -> AppConfig:
         cors_origins=cors_origins,
         allowed_import_dirs=allowed_import_dirs,
         allowed_hosts=allowed_hosts,
+        trusted_proxies=trusted_proxies,
         compact_output=compact_output_raw,
         response_max_chars=response_max_chars_raw,
         report_logo=server_raw.get("report_logo"),
@@ -299,6 +320,7 @@ def load_config(path: str | Path) -> AppConfig:
             read_only=srv.get("read_only", True),
             verify_ssl=srv.get("verify_ssl", True),
             skip_version_check=srv.get("skip_version_check", False),
+            request_timeout=int(srv.get("request_timeout", 300)),
         )
 
     return AppConfig(server=server_config, zabbix_servers=zabbix_servers)

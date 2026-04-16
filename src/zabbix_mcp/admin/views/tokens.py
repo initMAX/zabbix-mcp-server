@@ -25,6 +25,41 @@ from zabbix_mcp.token_store import TokenStore
 
 logger = logging.getLogger("zabbix_mcp.admin")
 
+
+def _safe_return_to(raw: str) -> str:
+    """Validate a `return_to` redirect target.
+
+    Only accepts a single-slash absolute path pointing at the Client
+    Wizard (``/wizard`` or ``/wizard?...``). Everything else - empty
+    strings, absolute URLs, ``//host`` protocol-relative URLs,
+    ``javascript:`` and other dangerous schemes, and paths that
+    do not start with ``/wizard`` - maps to ``""`` so the caller
+    falls back to the default post-create view.
+
+    Without this guard, an attacker could craft
+    ``/tokens/create?return_to=https://evil/steal`` (or
+    ``javascript:fetch(...)``) and leak the freshly-minted raw token
+    via the URL fragment the success page appends to the "Continue"
+    link (see tokens/create.html).
+    """
+    if not raw:
+        return ""
+    # Reject schemes and host-based URLs outright.
+    if ":" in raw.split("/", 1)[0]:
+        return ""
+    # Reject protocol-relative URLs (//evil.example/x) - still absolute.
+    if raw.startswith("//") or not raw.startswith("/"):
+        return ""
+    # No CR/LF in case this flows into a header later.
+    if "\n" in raw or "\r" in raw:
+        return ""
+    # Only /wizard is a legitimate return target today.
+    path_only = raw.split("?", 1)[0].split("#", 1)[0]
+    if path_only != "/wizard":
+        return ""
+    return raw
+
+
 # All known tool groups
 _ALL_GROUPS = list(TOOL_GROUPS.keys())
 
@@ -120,7 +155,10 @@ async def token_create(request: Request) -> Response:
 
     # Capture return_to so the form (and any error re-renders) can pass
     # it through. Used by the Client Wizard chain: /tokens/create?return_to=/wizard...
-    return_to = request.query_params.get("return_to") or ""
+    # Only same-origin paths starting with `/wizard` are allowed; anything
+    # else (absolute URLs, `javascript:`, other routes) is silently dropped
+    # to prevent open-redirect + token-leak via URL fragment.
+    return_to = _safe_return_to(request.query_params.get("return_to") or "")
 
     if request.method == "GET":
         ctx = {"active": "tokens", "return_to": return_to}
@@ -129,8 +167,11 @@ async def token_create(request: Request) -> Response:
 
     # POST — create token
     form = await request.form()
-    # Form may carry return_to as a hidden field too (POST clears query string)
-    return_to = str(form.get("return_to", return_to) or return_to)
+    # Form may carry return_to as a hidden field too (POST clears query string).
+    # Re-validate the form copy: never trust it, since the hidden input was
+    # rendered into HTML that the browser may have had replaced by an XSS
+    # in another tab sharing the same origin.
+    return_to = _safe_return_to(str(form.get("return_to", return_to) or return_to))
     name = str(form.get("name", "")).strip()
     if not name:
         return admin_app.render("tokens/create.html", request, {

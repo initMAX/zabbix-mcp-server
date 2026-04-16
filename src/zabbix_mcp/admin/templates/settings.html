@@ -26,6 +26,7 @@
     <h2 class="settings-section-title">&#x1F5A5; MCP Server</h2>
     <div class="form-hint" style="margin-bottom:12px;">&#x26A0;&#xFE0F; All changes in this section require a <strong>server restart</strong> to take effect.</div>
     <form method="post" action="/settings/server">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="settings-row">
             <div class="settings-label">
                 MCP Listen Host
@@ -129,6 +130,7 @@
         {% endif %}
     </div>
     <form method="post" action="/settings/tls_access">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="settings-row">
             <div class="settings-label">
                 TLS Certificate
@@ -211,6 +213,7 @@
     <h2 class="settings-section-title">&#x1F527; Tool Exposure</h2>
     <div class="form-hint" style="margin-bottom:12px;">&#x26A0;&#xFE0F; All changes in this section require a <strong>server restart</strong> to take effect.</div>
     <form method="post" action="/settings/tools">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="disabled_tools" id="disabled-tools-input" value="{{ settings.disabled_tools | join(',') if settings.disabled_tools else '' }}">
 
         <div class="settings-row">
@@ -258,6 +261,7 @@
     <h2 class="settings-section-title">&#x1F4CA; PDF Reports &amp; Branding</h2>
     <div class="form-hint" style="margin-bottom:12px;">&#x26A0;&#xFE0F; All changes in this section require a <strong>server restart</strong> to take effect.</div>
     <form method="post" action="/settings/reporting">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="settings-row">
             <div class="settings-label">Company Name</div>
             <div>
@@ -305,6 +309,7 @@
     <h2 class="settings-section-title">&#x2699;&#xFE0F; Admin Portal</h2>
     <div class="form-hint" style="margin-bottom:12px;">&#x26A0;&#xFE0F; All changes in this section require a <strong>server restart</strong> to take effect.</div>
     <form method="post" action="/settings/admin">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="settings-row">
             <div class="settings-label">Enabled</div>
             <div>
@@ -340,9 +345,12 @@
 </div>
 
 <!-- Hidden upload forms (outside all section forms to avoid nesting) -->
-<form id="upload-logo-form" method="post" action="/settings/upload/logo" enctype="multipart/form-data" style="display:none;"></form>
-<form id="upload-tls-cert-form" method="post" action="/settings/upload/tls_cert" enctype="multipart/form-data" style="display:none;"></form>
-<form id="upload-tls-key-form" method="post" action="/settings/upload/tls_key" enctype="multipart/form-data" style="display:none;"></form>
+<form id="upload-logo-form" method="post" action="/settings/upload/logo" enctype="multipart/form-data" style="display:none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>
+<form id="upload-tls-cert-form" method="post" action="/settings/upload/tls_cert" enctype="multipart/form-data" style="display:none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>
+<form id="upload-tls-key-form" method="post" action="/settings/upload/tls_key" enctype="multipart/form-data" style="display:none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}"></form>
 {% endblock %}
 
 {% block scripts %}

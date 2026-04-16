@@ -26,6 +26,7 @@ import json
 import logging
 import re
 import secrets
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1481,7 +1482,14 @@ def _register_tools(
     # ------------------------------------------------------------------
     # Action approval flow (two-step prepare + confirm)
     # ------------------------------------------------------------------
+    # `_pending_actions` is shared across concurrent async handlers. A
+    # race between `action_prepare` and a TTL sweep OR a concurrent
+    # `action_confirm` could (a) leak a pending action, (b) double-pop
+    # the same token. A threading.Lock is enough because every access
+    # path is synchronous (not an `await`) and the critical sections
+    # are tiny dict operations.
     _pending_actions: dict[str, dict[str, Any]] = {}  # token -> action details
+    _pending_actions_lock = threading.Lock()
 
     async def action_prepare(
         *,
@@ -1509,25 +1517,28 @@ def _register_tools(
         token = secrets.token_urlsafe(32)
         expires = time.time() + 300  # 5 minutes
 
-        # Cleanup expired tokens
-        now = time.time()
-        expired = [t for t, v in _pending_actions.items() if v["expires"] < now]
-        for t in expired:
-            del _pending_actions[t]
-
         # Bind to caller token for security (prevent cross-token confirmation)
         from zabbix_mcp.token_store import current_token_info as _cti
         _caller_token = _cti.get()
         _caller_id = _caller_token.id if _caller_token else None
 
-        _pending_actions[token] = {
-            "action": action,
-            "params": params,
-            "server": srv,
-            "expires": expires,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "caller_token_id": _caller_id,
-        }
+        with _pending_actions_lock:
+            # Cleanup expired tokens under the same lock that guards the
+            # store, so a concurrent action_confirm cannot pop a token
+            # we are about to delete.
+            now = time.time()
+            expired = [t for t, v in _pending_actions.items() if v["expires"] < now]
+            for t in expired:
+                del _pending_actions[t]
+
+            _pending_actions[token] = {
+                "action": action,
+                "params": params,
+                "server": srv,
+                "expires": expires,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "caller_token_id": _caller_id,
+            }
 
         return json.dumps({
             "status": "pending_confirmation",
@@ -1552,10 +1563,13 @@ def _register_tools(
     ) -> str:
         """Execute a previously prepared action. The confirmation token must match
         an active (non-expired) prepared action and be from the same caller."""
-        if confirmation_token not in _pending_actions:
+        # Atomic pop-then-validate: holding the lock from the lookup
+        # through the pop closes the window where a concurrent second
+        # confirm call could race with us.
+        with _pending_actions_lock:
+            action_data = _pending_actions.pop(confirmation_token, None)
+        if action_data is None:
             return json.dumps({"error": "Invalid or expired confirmation token."})
-
-        action_data = _pending_actions[confirmation_token]
 
         # Verify caller identity matches the preparer
         from zabbix_mcp.token_store import current_token_info as _cti
@@ -1563,8 +1577,6 @@ def _register_tools(
         _caller_id = _caller_token.id if _caller_token else None
         if action_data.get("caller_token_id") != _caller_id:
             return json.dumps({"error": "Confirmation token was prepared by a different caller. Access denied."})
-
-        _pending_actions.pop(confirmation_token)
 
         if action_data["expires"] < time.time():
             return json.dumps({"error": "Confirmation token has expired. Prepare the action again."})
@@ -1939,15 +1951,30 @@ def run_server(
             else:
                 asgi_app = mcp.sse_app()
 
-            # Capture client IP in context var for token IP allowlist checks
+            # Capture client IP in context var for token IP allowlist checks.
+            # When behind a reverse proxy listed in [server].trusted_proxies,
+            # honor the first entry of X-Forwarded-For (the original client);
+            # otherwise the raw TCP peer is used so an untrusted client
+            # cannot impersonate an arbitrary IP via XFF.
             from zabbix_mcp.token_store import current_client_ip as _cip_var, current_token_info as _cti_var
             _inner_app = asgi_app
+            _trusted_proxies = set(config.server.trusted_proxies or [])
+
             async def _client_ip_middleware(scope, receive, send):
                 _cti_var.set(None)
-                if scope["type"] in ("http", "websocket") and "client" in scope and scope["client"]:
-                    _cip_var.set(scope["client"][0])
-                else:
-                    _cip_var.set(None)
+                peer = None
+                if scope["type"] in ("http", "websocket"):
+                    client = scope.get("client")
+                    if client:
+                        peer = client[0]
+                        if peer in _trusted_proxies:
+                            headers = dict(scope.get("headers", []))
+                            xff = headers.get(b"x-forwarded-for", b"").decode()
+                            if xff:
+                                first = xff.split(",")[0].strip()
+                                if first:
+                                    peer = first
+                _cip_var.set(peer)
                 try:
                     await _inner_app(scope, receive, send)
                 finally:

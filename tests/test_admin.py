@@ -41,7 +41,10 @@ class TestPasswordHashing(unittest.TestCase):
         hashed = hash_password("Test12345678")
         parts = hashed.split("$")
         self.assertEqual(len(parts), 3)
-        self.assertEqual(parts[0], "scrypt:16384:8:1")
+        # v1.21 bumped N to OWASP 2024 recommendation (131072).
+        # Old hashes with N=16384 still verify (value is embedded in
+        # the hash so verify_password picks it up).
+        self.assertEqual(parts[0], "scrypt:131072:8:1")
         self.assertEqual(len(parts[1]), 32)  # 16 bytes hex salt
         self.assertEqual(len(parts[2]), 64)  # 32 bytes hex hash
 

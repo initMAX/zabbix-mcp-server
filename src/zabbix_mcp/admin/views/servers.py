@@ -25,6 +25,31 @@ from zabbix_mcp.admin.config_writer import (
 
 logger = logging.getLogger("zabbix_mcp.admin")
 
+# Default HTTP timeout matches Zabbix PHP frontend's max_execution_time so
+# expensive exports / long history.get ranges can complete. Match the
+# default in ZabbixServerConfig.request_timeout.
+_DEFAULT_TIMEOUT = 300
+_MIN_TIMEOUT = 5
+_MAX_TIMEOUT = 3600  # 1 hour; anything longer blocks the MCP thread pool too long.
+
+
+def _parse_timeout(raw) -> int:
+    """Coerce a form value into a safe timeout seconds integer.
+
+    Falls back to the default on empty / non-numeric / out-of-range
+    input rather than raising, so a bad form submission cannot crash
+    the edit handler before it can re-render the page.
+    """
+    try:
+        v = int(str(raw).strip()) if raw not in (None, "") else _DEFAULT_TIMEOUT
+    except (TypeError, ValueError):
+        return _DEFAULT_TIMEOUT
+    if v < _MIN_TIMEOUT:
+        return _MIN_TIMEOUT
+    if v > _MAX_TIMEOUT:
+        return _MAX_TIMEOUT
+    return v
+
 
 async def servers_view(request: Request) -> Response:
     admin_app = request.app.state.admin_app
@@ -117,6 +142,7 @@ async def server_create(request: Request) -> Response:
     api_token = str(form.get("api_token", "")).strip()
     read_only = "read_only" in form
     verify_ssl = "verify_ssl" in form
+    request_timeout = _parse_timeout(form.get("request_timeout"))
 
     if not name or not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", name):
         return admin_app.flash_redirect("/servers", "Invalid server name. Must start with a letter and contain only letters, digits, dashes, and underscores.", "danger")
@@ -130,6 +156,7 @@ async def server_create(request: Request) -> Response:
             "api_token": api_token,
             "read_only": read_only,
             "verify_ssl": verify_ssl,
+            "request_timeout": request_timeout,
         }
         add_config_table(admin_app.config_path, "zabbix", name, server_data)
         logger.info("Zabbix server '%s' added by %s", name, session.user)
@@ -176,6 +203,7 @@ async def server_edit(request: Request) -> Response:
     api_token = str(form.get("api_token", "")).strip()
     read_only = "read_only" in form
     verify_ssl = "verify_ssl" in form
+    request_timeout = _parse_timeout(form.get("request_timeout"))
 
     # Validate new name (allow keeping the same name as a no-op rename)
     if not new_name or not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", new_name):
@@ -206,6 +234,7 @@ async def server_edit(request: Request) -> Response:
             zabbix[server_name]["api_token"] = api_token
         zabbix[server_name]["read_only"] = read_only
         zabbix[server_name]["verify_ssl"] = verify_ssl
+        zabbix[server_name]["request_timeout"] = request_timeout
 
         if renamed:
             # tomlkit has no rename — copy the table data into a new entry

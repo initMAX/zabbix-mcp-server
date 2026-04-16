@@ -496,8 +496,12 @@
       <div class="wiz-config-path">{{ config_path_display }}</div>
       {% endif %}
 
+      {# Steps are plain text. Autoescape is ON (Jinja2 default) to
+         prevent reflected XSS via `{server_key}` substitution from the
+         query-string `?server=...` param. Markdown-style backticks are
+         rendered as literal characters, which is fine for CLI snippets. #}
       <ol class="wiz-instructions">
-        {% for step in instructions %}<li>{{ step | safe }}</li>{% endfor %}
+        {% for step in instructions %}<li>{{ step }}</li>{% endfor %}
       </ol>
 
       {% if notes %}

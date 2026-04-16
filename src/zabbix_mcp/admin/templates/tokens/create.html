@@ -40,6 +40,7 @@
 {% else %}
 <div class="card">
     <form method="post" action="/tokens/create">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
         <div class="form-group">
             <label class="form-label" for="name">Token Name</label>

@@ -83,10 +83,12 @@
                     <div class="actions">
                         {% if token.revoked %}
                         <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="btn btn-ghost btn-sm" style="min-width:78px;">Activate</button>
                         </form>
                         {% else %}
                         <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit" class="btn btn-ghost btn-sm" style="min-width:78px;">Revoke</button>
                         </form>
                         {% endif %}
@@ -107,6 +109,7 @@
                             <div class="modal-footer">
                                 <button class="btn btn-ghost" onclick="closeModal('delete-modal-{{ token.id }}')">Cancel</button>
                                 <form method="post" action="/tokens/{{ token.id }}/delete" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <button type="submit" class="btn btn-danger"
                                             onclick="closeModal('delete-modal-{{ token.id }}')">Delete</button>
                                 </form>

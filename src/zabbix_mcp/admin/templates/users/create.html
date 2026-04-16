@@ -23,6 +23,7 @@
     </div>
     {% endif %}
     <form method="post" action="{% if edit_mode %}/users/{{ edit_username }}{% else %}/users/create{% endif %}" autocomplete="off">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-group">
             <label class="form-label" for="username">Username</label>
             {% if edit_mode %}

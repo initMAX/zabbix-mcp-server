@@ -30,6 +30,7 @@
             <h2 class="card-title">Token Settings</h2>
         </div>
         <form method="post" action="/tokens/{{ token.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="form-group">
                 <label class="form-label" for="name">Token Name</label>
                 <input type="text" id="name" name="name" class="form-input" value="{{ token.name }}" required>
@@ -143,10 +144,12 @@
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 {% if token.revoked %}
                 <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-success">Activate Token</button>
                 </form>
                 {% else %}
                 <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;" id="revoke-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="button" class="btn btn-ghost" onclick="showConfirm('Revoke Token', 'This token will immediately stop working for MCP authentication.', 'Revoke', 'btn-warning', function(){ document.getElementById('revoke-form').submit(); })">Revoke Token</button>
                 </form>
                 {% endif %}
@@ -171,6 +174,7 @@
         <div class="modal-footer">
             <button class="btn btn-ghost" onclick="closeModal('delete-modal')">Cancel</button>
             <form method="post" action="/tokens/{{ token.id }}/delete" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn btn-danger">Delete Permanently</button>
             </form>
         </div>

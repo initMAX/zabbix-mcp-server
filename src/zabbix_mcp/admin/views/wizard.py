@@ -32,9 +32,39 @@ Reuses (no duplication):
 from __future__ import annotations
 
 import logging
+import re
 import socket
 import subprocess
 from urllib.parse import quote_plus
+
+# Host strings we are willing to bake into a copy-paste URL. Covers
+# bare hostnames (`mcp.example.com`), dotted IPv4 (`10.0.0.5`), and
+# IPv6 literals either bracketed or plain. Whitespace, `/`, `?`, `#`,
+# `@` (basic-auth prefix) and control characters are rejected so an
+# attacker cannot craft `?override_host=evil.example%2Fx` and trick
+# the operator into curl-ing their token to a third party.
+_HOST_RE = re.compile(
+    r"^(?:"
+    r"[A-Za-z0-9.\-]{1,253}"           # hostname or IPv4
+    r"|\[[0-9a-fA-F:]{2,45}\]"          # bracketed IPv6
+    r"|[0-9a-fA-F:]{2,45}"              # bare IPv6
+    r")$"
+)
+
+
+def _safe_host_override(raw: str) -> str:
+    """Return the host override only if it looks like a safe authority.
+
+    The wizard bakes this value into the snippet URL and the curl
+    example the operator copies. An unvalidated value could redirect
+    both to an attacker-controlled host.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
+    if not _HOST_RE.match(raw):
+        return ""
+    return raw
 
 from jinja2 import Template
 from starlette.requests import Request
@@ -265,7 +295,7 @@ async def wizard_view(request: Request) -> Response:
     token_id = qp.get("token") or ""
     client_id = qp.get("client") or ""
     transport = qp.get("transport") or ""
-    override_host = qp.get("override_host") or ""
+    override_host = _safe_host_override(qp.get("override_host") or "")
     os_choice = qp.get("os") or ""
 
     # Step 1: servers

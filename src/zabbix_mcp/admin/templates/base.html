@@ -9,12 +9,23 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {# Expose per-session CSRF token to inline JS (fetch/htmx requests). #}
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}Zabbix MCP Server{% endblock %} — Admin</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/flatpickr.min.css">
     <link rel="stylesheet" href="/static/grapes.min.css">
     <script src="/static/htmx.min.js"></script>
     <script src="/static/flatpickr.min.js"></script>
+    <script>
+      // Attach the CSRF header to every htmx-initiated request so
+      // `hx-post`/`hx-delete` pass the _CsrfMiddleware check without
+      // every call site having to spell it out.
+      document.addEventListener("htmx:configRequest", function (e) {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) e.detail.headers["X-CSRF-Token"] = meta.content;
+      });
+    </script>
 </head>
 <body hx-indicator="#loader">
     <!-- Sidebar -->
@@ -70,6 +81,7 @@
             <div class="user-menu">
                 <span class="user-name">{{ current_user }}</span>
                 <form method="post" action="/logout" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
                 </form>
             </div>
@@ -181,7 +193,11 @@
             fill.style.transition = 'width 1s ease';
             fill.style.width = '20%';
 
-            fetch('/servers/restart', {method: 'POST'}).then(function(r) {
+            var _csrf = document.querySelector('meta[name="csrf-token"]');
+            fetch('/servers/restart', {
+                method: 'POST',
+                headers: _csrf ? {'X-CSRF-Token': _csrf.content} : {},
+            }).then(function(r) {
                 return r.json();
             }).then(function(data) {
                 fill.style.width = '40%';

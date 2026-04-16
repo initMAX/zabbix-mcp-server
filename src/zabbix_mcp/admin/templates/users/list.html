@@ -48,6 +48,7 @@
                         <a href="/users/{{ username }}" class="btn btn-ghost btn-sm">Edit</a>
                         {% if username != current_user %}
                         <form method="post" action="/users/{{ username }}/delete" style="display:inline;" id="del-user-{{ username }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="button" class="btn btn-danger btn-sm"
                                     onclick="confirmDelete('user {{ username }}', 'del-user-{{ username }}')">Delete</button>
                         </form>

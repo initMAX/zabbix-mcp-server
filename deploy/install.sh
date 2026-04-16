@@ -502,38 +502,61 @@ check_health() {
     local configured_host="${2:-127.0.0.1}"
     # For curl, always use 127.0.0.1 (0.0.0.0 binds all interfaces, including localhost)
     local curl_host="127.0.0.1"
-    local url="http://${curl_host}:${port}/health"
+
+    # Detect whether TLS is enabled in config.toml (via tls_cert_file)
+    # so the health poll hits the right scheme. Before v1.21 we always
+    # polled http://, which returned "Empty reply from server" when
+    # the admin had enabled TLS and made every upgrade look like a
+    # broken install. Parse via grep/awk rather than firing up Python
+    # so we do not depend on the venv existing yet during the first
+    # install step.
+    local scheme="http"
+    local curl_opts=()
+    if [[ -r "$CONFIG_FILE" ]] && grep -qE '^[[:space:]]*tls_cert_file[[:space:]]*=[[:space:]]*"[^"]+"' "$CONFIG_FILE" 2>/dev/null; then
+        scheme="https"
+        # Self-signed certs are common in test installs; skip cert
+        # validation here since we are hitting the loopback interface.
+        curl_opts+=("-k")
+    fi
+    local url="${scheme}://${curl_host}:${port}/health"
 
     local display_host="$configured_host"
     if [[ "$display_host" == "0.0.0.0" ]]; then
         display_host=$(_get_host_ips | head -1)
     fi
-    info "Server configured on ${display_host}:${port}"
+    info "Server configured on ${display_host}:${port} (${scheme})"
 
     if ! command -v curl &>/dev/null; then
-        warn "curl is not installed — skipping health check."
-        warn "Install curl and test manually: curl $url"
+        warn "curl is not installed - skipping health check."
+        warn "Install curl and test manually: curl ${curl_opts[*]} $url"
         return
     fi
 
-    local max_attempts=5
+    # Bumped from 5 to 30 attempts in v1.21 after G0nz0uk and others
+    # reported the installer giving up before the new os._exit(1)
+    # restart path finished respawning under systemd + warming the
+    # venv + importing ~230 tool modules. Total wait window is now
+    # up to 1 + (30 * 2) = 61 s, which covers slow hosts / WAN-mounted
+    # /opt / first boot cold-cache scenarios while still clearly
+    # failing when the service genuinely cannot start.
+    local max_attempts=30
     local attempt=1
 
     info "Waiting for service to start..."
     sleep 1
 
     while [[ $attempt -le $max_attempts ]]; do
-        if curl -sf --max-time 3 "$url" &>/dev/null; then
-            ok "Health check passed: $url → OK"
+        if curl -sf --max-time 3 "${curl_opts[@]}" "$url" &>/dev/null; then
+            ok "Health check passed: $url -> OK"
             return
         fi
-        warn "Health check attempt $attempt/$max_attempts failed — retrying..."
+        warn "Health check attempt $attempt/$max_attempts failed - retrying..."
         ((attempt++))
         sleep 2
     done
 
     error "Health check failed after $max_attempts attempts!"
-    error "Test manually: curl $url"
+    error "Test manually: curl ${curl_opts[*]} $url"
     error "Check logs:    tail -f $LOG_DIR/server.log"
 }
 

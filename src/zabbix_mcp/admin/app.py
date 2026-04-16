@@ -40,8 +40,38 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+def _peer_ip(scope: dict) -> str:
+    """Best-effort client IP from ASGI scope.
+
+    Respects an optional trusted-proxy list configured via the app state
+    (set in AdminApp._build_app). When the direct peer is in the trusted
+    list, read the first IP from X-Forwarded-For; otherwise use the raw
+    TCP peer. Never trust XFF from arbitrary peers - that would let any
+    client claim any IP.
+    """
+    client = scope.get("client") or ("", 0)
+    raw = client[0] or "unknown"
+    admin_app = scope.get("app") and getattr(scope["app"], "state", None)
+    trusted = set()
+    if admin_app is not None:
+        adm = getattr(admin_app, "admin_app", None)
+        if adm is not None:
+            trusted = set(getattr(adm, "trusted_proxies", []) or [])
+    if trusted and raw in trusted:
+        headers = dict(scope.get("headers", []))
+        xff = headers.get(b"x-forwarded-for", b"").decode()
+        if xff:
+            # First entry in XFF is the original client (others are hops).
+            return xff.split(",")[0].strip() or raw
+    return raw
+
+
 class _PostRateLimitMiddleware:
-    """ASGI middleware: rate-limit POST requests to 30/min per session."""
+    """ASGI middleware: rate-limit POST requests per client IP.
+
+    Keyed by client IP (not session cookie prefix) - rotating the cookie
+    must not create a fresh bucket.
+    """
 
     def __init__(self, app: Starlette, max_requests: int = 30, window: int = 60) -> None:
         self.app = app
@@ -55,11 +85,7 @@ class _PostRateLimitMiddleware:
             method = scope.get("method", "GET")
             if method == "POST":
                 import time
-                headers = dict(scope.get("headers", []))
-                cookie = headers.get(b"cookie", b"").decode()
-                key = "anon"
-                if "admin_session=" in cookie:
-                    key = cookie.split("admin_session=")[1].split(";")[0][:20]
+                key = _peer_ip(scope)
                 now = time.time()
                 if key not in self._requests:
                     self._requests[key] = []
@@ -74,6 +100,122 @@ class _PostRateLimitMiddleware:
                     await resp(scope, receive, send)
                     return
                 self._requests[key].append(now)
+        await self.app(scope, receive, send)
+
+
+class _CsrfMiddleware:
+    """ASGI middleware: validate CSRF token on unsafe methods.
+
+    SameSite=Strict session cookies are our first line of defense, but on
+    older browsers and in subdomain-overlap scenarios they are not
+    sufficient. This double-submit token check requires every unsafe
+    request (POST/PUT/PATCH/DELETE) to carry a `csrf_token` form field
+    (or `X-CSRF-Token` header) that matches the authenticated session's
+    token. Unauthenticated POSTs (login) and health endpoints are
+    allowed through.
+    """
+
+    EXEMPT_PATHS = {"/login", "/health", "/api/mcp-status", "/api/server-status"}
+    UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    def __init__(self, app: Starlette) -> None:
+        self.app = app
+        self.state = app.state
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope.get("method", "GET")
+        path = scope.get("path", "")
+        if method not in self.UNSAFE_METHODS or path in self.EXEMPT_PATHS:
+            await self.app(scope, receive, send)
+            return
+
+        # Extract session cookie + its CSRF token (if authenticated)
+        admin_app = self.state.admin_app if hasattr(self.state, "admin_app") else None
+        headers = dict(scope.get("headers", []))
+        cookie = headers.get(b"cookie", b"").decode()
+        session_token = ""
+        for part in cookie.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "admin_session":
+                session_token = v
+                break
+
+        session = None
+        if admin_app is not None and session_token:
+            session = admin_app.sessions.validate_session(session_token)
+
+        if session is None:
+            # Unauthenticated POST to a protected endpoint - let the
+            # downstream auth check return 401/303, no CSRF to validate.
+            await self.app(scope, receive, send)
+            return
+
+        # Extract submitted token from header or form body.
+        submitted = headers.get(b"x-csrf-token", b"").decode()
+        if not submitted:
+            # Read body for form submissions. We have to buffer the body
+            # and re-emit it to downstream so form handlers still see it.
+            body = b""
+            more_body = True
+            while more_body:
+                msg = await receive()
+                if msg["type"] == "http.request":
+                    body += msg.get("body", b"")
+                    more_body = msg.get("more_body", False)
+                else:
+                    break
+            content_type = headers.get(b"content-type", b"").decode().split(";")[0].strip()
+            if content_type == "application/x-www-form-urlencoded":
+                from urllib.parse import parse_qs
+                try:
+                    fields = parse_qs(body.decode("utf-8", errors="replace"))
+                    submitted = fields.get("csrf_token", [""])[0]
+                except Exception:
+                    submitted = ""
+            elif content_type == "multipart/form-data":
+                # Cheap scan for the csrf_token field without fully
+                # parsing the multipart body (that is done downstream).
+                marker = b'name="csrf_token"'
+                idx = body.find(marker)
+                if idx != -1:
+                    tail = body[idx + len(marker):]
+                    # Skip CRLF CRLF separating headers from value
+                    sep = tail.find(b"\r\n\r\n")
+                    if sep != -1:
+                        val_start = sep + 4
+                        val_end = tail.find(b"\r\n", val_start)
+                        if val_end != -1:
+                            submitted = tail[val_start:val_end].decode(errors="replace")
+
+            # Re-emit the buffered body to downstream handlers.
+            async def replay() -> dict:
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            original_receive = receive
+            sent = {"done": False}
+
+            async def new_receive():
+                if not sent["done"]:
+                    sent["done"] = True
+                    return await replay()
+                return await original_receive()
+
+            receive = new_receive
+
+        import hmac as _hmac
+        if not submitted or not _hmac.compare_digest(submitted, session.csrf_token):
+            logger.warning("CSRF validation failed for user '%s' path=%s", session.user, path)
+            resp = JSONResponse(
+                {"error": "csrf_token_invalid", "error_description": "CSRF token missing or invalid"},
+                status_code=403,
+            )
+            await resp(scope, receive, send)
+            return
+
         await self.app(scope, receive, send)
 
 
@@ -101,6 +243,12 @@ class AdminApp:
         signing_key = secrets.token_hex(32)
         self.sessions = SessionManager(signing_key)
         self.rate_limiter = LoginRateLimiter()
+        self._flash_signing_key = secrets.token_bytes(32)
+
+        # Trusted reverse proxies from config; X-Forwarded-For is only
+        # honored when the direct peer is in this list.
+        trusted_cfg = getattr(config.server, "trusted_proxies", None) or []
+        self.trusted_proxies = list(trusted_cfg)
 
         # Track whether config changed and restart is needed
         self.restart_needed = False
@@ -178,8 +326,12 @@ class AdminApp:
         app = Starlette(routes=routes, exception_handlers={404: not_found})
         app.state.admin_app = self
 
-        # Wrap with POST rate limiting (30 req/min per session)
-        return _PostRateLimitMiddleware(app)
+        # Wrap with CSRF validation first (innermost), then POST rate
+        # limiting (outermost). Order matters: rate limit rejects before
+        # we decode the body, CSRF reads the body for form-urlencoded
+        # submissions.
+        csrf_app = _CsrfMiddleware(app)
+        return _PostRateLimitMiddleware(csrf_app)
 
     def render(self, template_name: str, request: Request, context: dict | None = None, status_code: int = 200) -> HTMLResponse:
         """Render a Jinja2 template with common context."""
@@ -199,6 +351,9 @@ class AdminApp:
         if session:
             ctx["current_user"] = session.user
             ctx["current_user_role"] = session.role
+            ctx["csrf_token"] = session.csrf_token
+        else:
+            ctx["csrf_token"] = ""
 
         # Consume flash message from cookie (set by redirects)
         flash_cookie = request.cookies.get("_flash")
@@ -341,7 +496,14 @@ class AdminApp:
                 "error": "Invalid username or password.",
             }, status_code=401)
 
-        # Success
+        # Success - rotate the session ID. If an attacker pre-planted an
+        # `admin_session` cookie on the victim's browser (subdomain or
+        # MITM-before-TLS scenario), destroy that old server-side entry
+        # before we set the new one so they cannot "resume" as us.
+        old_token = request.cookies.get("admin_session")
+        if old_token:
+            self.sessions.destroy_session(old_token)
+
         self.rate_limiter.reset(client_ip)
         role = user_data.get("role", "viewer")
         session_token = self.sessions.create_session(username, role, client_ip)
@@ -349,8 +511,9 @@ class AdminApp:
         write_audit("login_success", user=username, details={"role": role}, ip=client_ip)
 
         response = RedirectResponse("/", status_code=303)
-        # CSRF protection: SameSite=Strict prevents cross-origin form submissions.
-        # Combined with httponly=True, this provides robust CSRF defense.
+        # Defense-in-depth: SameSite=Strict blocks most CSRF. The
+        # _CsrfMiddleware adds a per-session double-submit token check
+        # for unsafe methods. HttpOnly keeps the token out of JS.
         response.set_cookie(
             "admin_session",
             session_token,

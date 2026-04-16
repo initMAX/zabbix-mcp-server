@@ -85,13 +85,23 @@ class _RateLimiter:
 
 
 class ClientManager:
-    """Manages connections to multiple Zabbix servers with lazy connect and auto-reconnect."""
+    """Manages connections to multiple Zabbix servers with lazy connect and auto-reconnect.
+
+    Thread-safety: tool handlers run under `asyncio.to_thread`, so two
+    concurrent first-calls for the same server can race on dict
+    assignment and leak a connection. We serialize connect/reconnect
+    per server with an RLock. Read-only lookups (server_names,
+    default_server, get_version) are intentionally lock-free because
+    the underlying dicts are only mutated behind the lock and Python's
+    GIL makes single reads atomic.
+    """
 
     def __init__(self, config: AppConfig) -> None:
         self._config = config
         self._clients: dict[str, ZabbixAPI] = {}
         self._versions: dict[str, str] = {}
         self._rate_limiter = _RateLimiter(config.server.rate_limit)
+        self._lock = threading.RLock()
 
     @property
     def server_names(self) -> list[str]:
@@ -114,26 +124,46 @@ class ClientManager:
         srv = self.get_server_config(name)
         logger.info("Connecting to Zabbix server '%s' at %s", name, srv.url)
 
-        api = ZabbixAPI(url=srv.url, validate_certs=srv.verify_ssl, skip_version_check=srv.skip_version_check)
+        # A hung Zabbix frontend must not stall the MCP thread pool
+        # indefinitely. zabbix-utils accepts `timeout` seconds on the
+        # ZabbixAPI constructor and plumbs it through to urllib. The
+        # 300 s default matches Zabbix PHP frontend's max_execution_time
+        # so expensive exports / long history.get ranges can complete.
+        timeout = getattr(srv, "request_timeout", 300) or 300
+        api = ZabbixAPI(
+            url=srv.url,
+            validate_certs=srv.verify_ssl,
+            skip_version_check=srv.skip_version_check,
+            timeout=timeout,
+        )
         api.login(token=srv.api_token)
 
         version = api.api_version()
-        logger.info("Connected to '%s' — Zabbix %s", name, version)
+        logger.info("Connected to '%s' - Zabbix %s", name, version)
         return api
 
     def _get_client(self, name: str) -> ZabbixAPI:
         """Get or create a client for the given server."""
-        if name not in self._clients:
-            self._clients[name] = self._connect(name)
-        return self._clients[name]
+        # Fast path: already connected, return without taking the lock.
+        client = self._clients.get(name)
+        if client is not None:
+            return client
+        # Slow path: at most one thread creates the connection.
+        with self._lock:
+            client = self._clients.get(name)
+            if client is None:
+                client = self._connect(name)
+                self._clients[name] = client
+            return client
 
     def _reconnect(self, name: str) -> ZabbixAPI:
         """Force reconnect to a server."""
         logger.warning("Reconnecting to Zabbix server '%s'", name)
-        self._clients.pop(name, None)
-        client = self._connect(name)
-        self._clients[name] = client
-        return client
+        with self._lock:
+            self._clients.pop(name, None)
+            client = self._connect(name)
+            self._clients[name] = client
+            return client
 
     def resolve_server(self, server: str | None) -> str:
         """Resolve server name, falling back to default."""
