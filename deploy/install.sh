@@ -512,7 +512,14 @@ check_health() {
     # install step.
     local scheme="http"
     local curl_opts=()
-    if [[ -r "$CONFIG_FILE" ]] && grep -qE '^[[:space:]]*tls_cert_file[[:space:]]*=[[:space:]]*"[^"]+"' "$CONFIG_FILE" 2>/dev/null; then
+    # The rest of install.sh uses $CONFIG_DIR/config.toml; an earlier
+    # version of this block referenced an undefined $CONFIG_FILE and
+    # aborted under `set -euo pipefail` with
+    # "CONFIG_FILE: unbound variable" right after the actual update
+    # finished. Use the correct variable so the TLS detection is a
+    # simple opportunistic check, not a hard failure.
+    local config_toml="$CONFIG_DIR/config.toml"
+    if [[ -r "$config_toml" ]] && grep -qE '^[[:space:]]*tls_cert_file[[:space:]]*=[[:space:]]*"[^"]+"' "$config_toml" 2>/dev/null; then
         scheme="https"
         # Self-signed certs are common in test installs; skip cert
         # validation here since we are hitting the loopback interface.
