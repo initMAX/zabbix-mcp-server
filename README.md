@@ -688,6 +688,7 @@ The `report_generate` tool produces professional PDF reports from Zabbix data. R
 | `capacity_host` | CPU / memory / disk usage (avg, min, max) per host from trend data | host group, period |
 | `capacity_network` | Network bandwidth (Mbit/s) per interface + per-host CPU stats | host group, period |
 | `backup` | Daily success/fail matrix (hosts x days), auto-detects backup item keys (`veeam`, `bacula`, `borg`, `restic`, ...) | host group, period |
+| `showcase` | Demonstrates every widget the v1.23 visual editor ships with (gauge, metric cards, bars, two/three-column layout, page breaks, note callout, hosts loop, backup matrix, network interfaces) - duplicate and trim as a starting point for your own template | host group, period |
 
 **Enabling reports:**
 
@@ -718,7 +719,22 @@ report_subtitle = "IT Monitoring Service"        # header subtitle
 
 The tool returns the PDF as a base64-encoded data URI. Most clients (Claude Desktop, Claude Code) render or save the file automatically.
 
-**Custom templates** can be authored either via the admin portal (visual editor + HTML editor + live preview) or by hand in `/etc/zabbix-mcp/templates/` and registered in `config.toml`:
+**Custom templates** can be authored three ways - pick whichever fits your workflow:
+
+1. **Visual editor** in the admin portal (`/templates/create`) - drag-and-drop widgets from three categories:
+   - **Zabbix** - report widgets (Report Header, Title, Info Table, Host Table, SLA Gauge, Graph Placeholder, Metric Card, Progress Bars, Hosts Loop)
+   - **Layout** - structural blocks (Spacers, Page Break, Two/Three Columns, Section Heading, Note callout)
+   - **Shortcuts** - one-click chips for every template variable (Logo, Company, Subtitle, Period, Availability %, Host count, Events count, Generated at)
+
+   Plus a **Use logo** toolbar button on any image component that swaps it for the Logo widget (so you don't have to type `{{ logo_base64 }}` by hand), a live Preview button, and a built-in Insert variable dropdown for HTML mode.
+
+   <p align="center"><img src=".readme/visual-editor-v123.png" alt="Visual template editor with Shortcuts widget category" width="900"></p>
+
+2. **AI-assisted generation (new in v1.23, beta)** - click "Generate with AI" on the template editor, describe the report in plain English, and an LLM produces a validated Jinja2 template. Seven providers supported (Anthropic Claude, OpenAI GPT, Google Gemini, Azure OpenAI, Ollama self-hosted, Mistral, Groq) configurable from the admin portal at `/settings` -> AI Template Generation - no need to hand-edit `config.toml`. Output is rendered through a `SandboxedEnvironment` before hitting the editor; malformed templates come back with a specific error instead of silently getting saved. Admin + operator roles only (viewer cannot generate).
+
+   <p align="center"><img src=".readme/ai-settings-v123.png" alt="AI Template Generation settings section with provider + key + timeout" width="900"></p>
+
+3. **Hand-written HTML** in `/etc/zabbix-mcp/templates/` registered in `config.toml`:
 
 ```toml
 [report_templates.my_custom]
@@ -727,7 +743,7 @@ description   = "Short description"
 template_file = "/etc/zabbix-mcp/templates/my_custom.html"
 ```
 
-See [`docs/REPORTING.md`](docs/REPORTING.md) for the full authoring guide: available Jinja2 context variables per report type, base CSS classes provided by `base.html`, and a worked example.
+All three paths write to the same `/etc/zabbix-mcp/templates/` directory and are validated against the same `SandboxedEnvironment` before save in v1.23+, so a broken template never reaches disk. See [`docs/REPORTING.md`](docs/REPORTING.md) for the full authoring guide: available Jinja2 context variables per report type, base CSS classes provided by `base.html`, and a worked example.
 
 ## Token Budget
 
