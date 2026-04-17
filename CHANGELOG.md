@@ -1,6 +1,38 @@
 # Changelog
 
-## v1.23b2 - 2026-04-17 (reporting beta2)
+## v1.23 - 2026-04-17
+
+AI-assisted report template generation graduates from beta1 to the
+stable 1.23 release, combining the original template wizard with a
+second iteration that fixed everything real testers hit: template
+mangling on save, limited provider choice, hard-coded timeouts, and
+missing operator UI. The "AI-assisted" feature itself still wears a
+"beta" label in the UI so operators know the LLM-generated output
+needs human review, but everything around it (the Settings editor
+for `[admin.ai]`, the Tool Exposure bubble for the extensions group,
+the Shortcuts widget category, the Report Header widget fix) is
+stable and ready for general use.
+
+### Highlights
+
+- Visual editor gains a **Shortcuts** widget category (Logo + nine
+  one-click variable chips) replacing the "Insert variable..."
+  dropdown.
+- **Seven** LLM providers supported end-to-end: Anthropic, OpenAI,
+  Google Gemini, Azure OpenAI, Ollama (self-hosted, API key
+  optional), Mistral, Groq. Configurable from a new "AI Template
+  Generation" section in `/settings` instead of hand-editing
+  `config.toml`.
+- Server-side Jinja validation on every template save so a broken
+  template never reaches `/etc/zabbix-mcp/templates` - the operator
+  gets an actionable error in the editor instead of a preview that
+  silently dies.
+- Auto-header removed from `base.html`; each builtin report
+  (availability / capacity_host / capacity_network / backup / new
+  `showcase`) owns its own header block, so custom templates have
+  full control via the Shortcuts widgets.
+
+### Changes since v1.23b1 (beta1 -> stable)
 
 Iteration on the v1.23b1 reporting beta. Focuses on the gaps real
 testers hit in the AI template wizard (mangled Jinja on save,
@@ -31,14 +63,14 @@ editor emit templates that actually render.
 - **`ReportEngine` mutated shared module-level template registry** - `load_custom_templates()` used to write into `_REPORT_TEMPLATES` (the module-level dict), so adding a custom template in one engine instance leaked into every other instance and made custom templates show up under "Built-in" in the dashboard. Now scoped to `self._templates = dict(_REPORT_TEMPLATES)` per engine instance.
 - **Tool Exposure UI missing the `extensions` group** - the Settings page had `TOOL_DATA` hardcoded with only the five Zabbix-API groups (monitoring / data_collection / alerts / users / administration), so the initMAX extension tools (`graph_render`, `anomaly_detect`, `capacity_forecast`, `report_generate`, `action_prepare`, `action_confirm`, `zabbix_raw_api_call`, `health_check`) were invisible to the bubble editor. Operators who wanted to disable reporting but keep monitoring had no way to do it from the portal. Added the `extensions` group to the UI; the tool allowlist hint and `config.example.toml` comments now list it too. Also corrected the stale `config.example.toml` claim that `health_check` / `zabbix_raw_api_call` were "always registered" - they have been in the extensions group and gated by `_ext_allowed()` since v1.16.
 
-## v1.23b1 - 2026-04-16 (reporting beta1)
+### Initial v1.23 beta1 scope (2026-04-16)
 
-### Added
+The feature that made v1.23 and the reason the release exists in the first place:
 
-- **AI-assisted report template generation (beta)** - a new "Generate with AI" button on `/templates/create` and `/templates/<id>` opens a dialog where the operator describes the report they want in plain English ("Weekly SRE review with a big availability gauge, total-hosts/total-events summary row, and a table of hosts sorted by event count"). The dialog calls an LLM (Anthropic Claude or OpenAI GPT via `[admin.ai]` config), receives a valid Jinja2 template, validates it in the `SandboxedEnvironment` with the same sample context the preview uses, and loads it into the HTML editor. No valid template = clear validation error back to the operator so they can refine the prompt. Feature is off by default - add `[admin.ai]` to `config.toml` with `provider` + `api_key` to enable. Admin + operator roles only (viewer cannot generate).
+- **AI-assisted report template generation (beta)** - a new "Generate with AI" button on `/templates/create` and `/templates/<id>` opens a dialog where the operator describes the report they want in plain English ("Weekly SRE review with a big availability gauge, total-hosts/total-events summary row, and a table of hosts sorted by event count"). The dialog calls an LLM via `[admin.ai]` config, receives a valid Jinja2 template, validates it in the `SandboxedEnvironment` with the same sample context the preview uses, and loads it into the HTML editor. No valid template = clear validation error back to the operator so they can refine the prompt. Feature is off by default - add `[admin.ai]` to `config.toml` with `provider` + `api_key` to enable. Admin + operator roles only (viewer cannot generate).
 - **`POST /templates/generate` endpoint** - JSON API backing the UI, CSRF-protected, audit-logged (provider, model, request/response character counts, elapsed ms - not the request content to avoid leaking NDA'd descriptions). Returns 412 when AI is disabled, 400 on validation failure (malformed Jinja, unknown variables, sandbox denied operation), 502 on upstream LLM failure, 200 with `{html, provider, model, elapsed_ms}` on success.
-- **`[admin.ai]` config section** - `provider` (`anthropic` or `openai`), `api_key` (supports `${ENV_VAR}` expansion so the key never hits the audit log or UI), `model` (empty = provider default), `max_tokens`, `timeout`. Documented in `config.example.toml`. Missing section or empty key = feature silently disabled, no error at startup.
-- **`src/zabbix_mcp/admin/ai_template.py` module** - provider-agnostic LLM abstraction (`LLMProvider` protocol + `AnthropicProvider` + `OpenAIProvider` concrete classes using stdlib `urllib` so no new pinned dependency is needed), prompt builder with full variable catalog derived from `reporting.data_fetcher` return shapes, CSS class list from `base.html`, one worked example (availability.html), and validation via `jinja2.sandbox.SandboxedEnvironment` before returning to the UI. Sandboxed rendering means a malicious/hallucinated template cannot escape through Python introspection even if the operator tries to save it.
+- **`[admin.ai]` config section** - `provider`, `api_key` (supports `${ENV_VAR}` expansion so the key never hits the audit log or UI), `model` (empty = provider default), `max_tokens`, `timeout`. Documented in `config.example.toml`. Missing section or empty key = feature silently disabled, no error at startup.
+- **`src/zabbix_mcp/admin/ai_template.py` module** - provider-agnostic LLM abstraction (`LLMProvider` protocol + per-provider concrete classes using stdlib `urllib` so no new pinned dependency is needed), prompt builder with full variable catalog derived from `reporting.data_fetcher` return shapes, CSS class list from `base.html`, one worked example (availability.html), and validation via `jinja2.sandbox.SandboxedEnvironment` before returning to the UI. Sandboxed rendering means a malicious/hallucinated template cannot escape through Python introspection even if the operator tries to save it.
 
 ## v1.22 - 2026-04-16
 

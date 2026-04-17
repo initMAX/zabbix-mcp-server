@@ -83,7 +83,7 @@ We will acknowledge your report within 48 hours and work with you on a fix.
 
 | Version | Supported |
 |---|---|
-| 1.23 (beta, latest) | Yes |
+| 1.23 (latest) | Yes |
 | 1.22 | Yes |
 | 1.21 | Yes |
 | 1.20 | Yes |
