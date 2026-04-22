@@ -30,7 +30,7 @@
 
 <p align="center">
   <b>Overview:</b> <a href="#what-is-this">What is this?</a> · <a href="#features">Features</a><br>
-  <b>Install:</b> <a href="#quick-start">Quick Start</a> · <a href="#installation">Installation</a> · <a href="#installer-cli">Installer CLI</a><br>
+  <b>Install:</b> <a href="#quick-start">Quick Start</a> · <a href="#installation">Installation</a> · <a href="#upgrade">Upgrade</a> · <a href="#installer-cli">Installer CLI</a><br>
   <b>Configure:</b> <a href="#configuration-reference">Reference</a> · <a href="#tls--https">TLS / HTTPS</a> · <a href="#token-budget">Token Budget</a><br>
   <b>Use:</b> <a href="#client-mcp-wizard-beta">Client Wizard</a> · <a href="#connecting-ai-clients">AI Clients</a> · <a href="#example-prompts">Prompts</a> · <a href="#available-tools">Tools</a> · <a href="#common-parameters-get-methods">Parameters</a> · <a href="#pdf-reports-beta">PDF Reports</a><br>
   <b>More:</b> <a href="#zabbix-compatibility">Compatibility</a> · <a href="#development">Development</a> · <a href="#related-projects">Related Projects</a> · <a href="#license">License</a> · <a href="#about-initmax">About initMAX</a>
@@ -106,13 +106,39 @@ The install script will:
 
 ```bash
 cd zabbix-mcp-server
-git fetch origin && git reset --hard origin/main
 sudo ./deploy/install.sh update
 ```
 
-The `git fetch + reset` ensures a clean sync with upstream regardless of local state or history rewrites. The update command will then upgrade the package, refresh the systemd unit and logrotate config, check file permissions (and offer to fix any issues), and restart the service if it is running.
+That's the whole procedure — no manual steps afterwards. From v1.15+ the `update` command handles git sync, package reinstall, systemd reload, validation, and service restart in one shot.
 
-> **Note:** From v1.15+, `sudo ./deploy/install.sh update` handles git sync automatically — the explicit `git fetch + reset` is only needed when upgrading from older versions.
+**What `update` does:**
+
+1. **Pulls latest code** from the current branch (fast-forward; falls back to `fetch + reset --hard origin/<branch>` if history diverged), then re-executes itself from the updated script.
+2. **Reinstalls** the Python package into `/opt/zabbix-mcp/venv`.
+3. **Refreshes** the systemd unit and logrotate config (in case they changed between releases).
+4. **Checks file permissions** and offers to fix any ownership issues.
+5. **Runs small migrations** (legacy token, report templates) and **validates** `config.toml` — aborts if the config is invalid.
+6. **Restarts the service** via `systemctl restart zabbix-mcp-server` and performs an HTTP health check on the configured port.
+
+**What is preserved (never overwritten):**
+
+- `/etc/zabbix-mcp/config.toml` — your Zabbix URL, API token, MCP tokens, scopes, TLS settings, etc.
+- Admin portal users and sessions (stored in `/var/lib/zabbix-mcp/`).
+- Audit log, report templates, and any custom data.
+
+You'll see `✓ Config preserved at /etc/zabbix-mcp/config.toml (not overwritten)` during the update. Check `config.example.toml` afterwards for any new options added in the release.
+
+> **Upgrading from very old versions (pre-v1.15)?** If `update` fails, do a one-time manual sync first:
+> ```bash
+> git fetch origin && git reset --hard origin/main
+> sudo ./deploy/install.sh update
+> ```
+>
+> **Troubleshooting:** if something goes wrong, inspect:
+> ```bash
+> sudo ./deploy/install.sh test-config       # validate config.toml
+> sudo journalctl -u zabbix-mcp-server -n 50 --no-pager
+> ```
 
 ### Configure
 
