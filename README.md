@@ -128,6 +128,20 @@ That's the whole procedure — no manual steps afterwards. From v1.15+ the `upda
 
 You'll see `✓ Config preserved at /etc/zabbix-mcp/config.toml (not overwritten)` during the update. Check `config.example.toml` afterwards for any new options added in the release.
 
+**PDF reporting during update:**
+
+By default `update` keeps your current reporting state — if PDF reporting was installed, it stays; if it wasn't, it is not added. To change that:
+
+```bash
+# Enable PDF reporting on an existing install that didn't have it
+sudo ./deploy/install.sh update --with-reporting
+
+# Update without PDF reporting dependencies (smaller install)
+sudo ./deploy/install.sh update --without-reporting
+```
+
+The `--with-reporting` flag pulls in `weasyprint`, `jinja2`, and system libs (`cairo`, `pango`, `gdk-pixbuf`). See [PDF Reports](#pdf-reports-beta) for what you get.
+
 > **Upgrading from very old versions (pre-v1.15)?** If `update` fails, do a one-time manual sync first:
 > ```bash
 > git fetch origin && git reset --hard origin/main
