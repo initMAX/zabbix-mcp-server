@@ -39,7 +39,11 @@ logger = logging.getLogger("zabbix_mcp.admin.update_check")
 # GitHub releases endpoint - public, no auth, 60 req/h per IP. We hit
 # it at most once an hour so the rate limit is not a concern.
 RELEASES_URL = "https://api.github.com/repos/initMAX/zabbix-mcp-server/releases/latest"
-CACHE_PATH = Path("/var/lib/zabbix-mcp/.version-cache")
+# Cache lives next to the audit log + config dir which is always
+# writable by the service user (chown'd by the installer / Docker
+# entrypoint). /var/lib/zabbix-mcp does not exist in the container
+# image, so we keep persistent state under /etc/zabbix-mcp/state/.
+CACHE_PATH = Path("/etc/zabbix-mcp/state/version-cache.json")
 CHECK_INTERVAL_SECONDS = 3600  # 1 hour
 HTTP_TIMEOUT_SECONDS = 5
 

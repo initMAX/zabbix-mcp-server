@@ -51,9 +51,9 @@
                 <div class="password-strength-bar" id="password-bar"></div>
             </div>
             <ul class="password-checklist" id="password-checklist" style="list-style:none; padding:0; margin:6px 0 0; font-size:0.85rem;">
-                <li id="pw-check-len" style="color:var(--color-muted);">&#x25CB; At least 10 characters</li>
-                <li id="pw-check-upper" style="color:var(--color-muted);">&#x25CB; One uppercase letter</li>
-                <li id="pw-check-digit" style="color:var(--color-muted);">&#x25CB; One digit</li>
+                <li id="pw-check-len" style="color:var(--color-muted);"><span class="check-mark">&#x25CB;</span> At least 10 characters</li>
+                <li id="pw-check-upper" style="color:var(--color-muted);"><span class="check-mark">&#x25CB;</span> One uppercase letter</li>
+                <li id="pw-check-digit" style="color:var(--color-muted);"><span class="check-mark">&#x25CB;</span> One digit</li>
             </ul>
             <div class="form-hint" id="password-hint">{% if edit_mode %}Leave empty to keep current password.{% endif %}</div>
         </div>
@@ -103,7 +103,8 @@ function checkPasswordStrength(password) {
         var el = document.getElementById(id);
         if (!el) return;
         el.style.color = pass ? 'var(--color-success)' : 'var(--color-muted)';
-        el.firstChild.nodeValue = pass ? '✔ ' : '○ ';
+        var mark = el.querySelector('.check-mark');
+        if (mark) mark.textContent = pass ? '✔' : '○';
     };
     setItem('pw-check-len', checks.len);
     setItem('pw-check-upper', checks.upper);

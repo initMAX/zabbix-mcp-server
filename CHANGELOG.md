@@ -1,5 +1,143 @@
 # Changelog
 
+## v1.24 - 2026-04-27
+
+Field-test feedback round. Two testers (G0nz0uk and Dmitry Lambert)
+spent a few hours stress-testing v1.23 and turned up a long list of
+papercuts and one real connectivity bug. v1.24 ships fixes for all
+of them plus a few quality-of-life features that follow from the
+same observations.
+
+### Highlights
+
+- **OAuth discovery now respects `[server].public_url`** so remote
+  MCP clients (Claude Desktop, mcp-remote) reach the server through
+  its public DNS name even when bound to `0.0.0.0`. Without this,
+  discovery advertised `https://0.0.0.0:8080/` and the client
+  bailed with HTTP 404 (discussion #19).
+- **MCP no longer dies at boot when one Zabbix server is
+  misconfigured**. A typo in the URL (e.g. `0.0.0.0.0.0.0`) used to
+  take down the whole service; now that one server is skipped with
+  a warning and everything else loads.
+- **"Restart needed" banner clears automatically when the operator
+  reverts a change** instead of staying sticky until an actual
+  restart. The flag is now driven by a TOML diff between the
+  on-disk config and the running snapshot.
+- **Update notifications**: a background poll of the GitHub
+  releases API once an hour shows an "Update vX.Y available" pill
+  in the top bar when a newer stable release is out. Disabled by
+  setting `[admin].update_check_enabled = false`.
+
+### Added
+
+- **`[server].public_url` config option** - operator-supplied
+  external URL that overrides the auto-derived `{scheme}://{host}:{port}`
+  when populating OAuth discovery (`issuer_url`, `resource_server_url`)
+  and the Client MCP Wizard. Validated server-side: `http(s)://`
+  scheme, no path/query/fragment, host cannot be a wildcard,
+  `https://` required when TLS is enabled. Settable from
+  `Settings -> MCP Server -> Public URL`. The wizard locks its
+  host-override picker when `public_url` is set since the
+  canonical URL is already declared.
+- **OAuth discovery banner on every admin page** when the bind
+  host is `0.0.0.0` / `::` and `public_url` is missing - quotes
+  the URL the server is currently advertising and offers a
+  Configure button that scrolls to the Settings field.
+- **Update check (Bug 34)**: new `admin/update_check.py` module
+  with a daemon poller, on-disk cache at
+  `/var/lib/zabbix-mcp/.version-cache`, and Settings UI toggle.
+- **Type-the-name-to-confirm (Bug 30)**: `confirmDeleteTyped()`
+  helper requires the operator to type the target's name before
+  the destructive button enables. Wired into Users list deletion
+  for admin-role accounts.
+- **Multi-tab logout coordination (Bug 33)**: every tab on the
+  same origin redirects to `/login` when one of them logs out -
+  no more sibling tabs showing stale UI until the next click.
+- **Audit log sortable columns (Bug 3) + pagination (Bug 25)**:
+  Timestamp / Action / User / Target / IP are now click-sortable
+  (server-side via `?sort=&order=`); the `?offset=&limit=` pair
+  drives a Load more button. Default page size dropped 200 -> 50.
+- **Audit CSV export uses `csv.QUOTE_ALL` (Bug 26)** so commas,
+  quotes and newlines in the details field cannot break the file.
+- **Showcase report template** carried over from v1.23 unchanged.
+
+### Changed
+
+- **SSRF check on `/servers` test endpoint allows RFC1918 private
+  ranges (Bug 1)** - 10/8, 172.16/12, 192.168/16. Loopback,
+  link-local, reserved (incl. AWS metadata 169.254.169.254) stay
+  blocked. The original blanket private-IP block made it
+  impossible to add a typical Zabbix on the same LAN.
+- **Restart-needed flag is computed from a TOML diff (Bugs 4, 17)**.
+  `AdminApp` snapshots `tomlkit.dumps()` of the live config at
+  boot; the banner appears only when the on-disk file differs. No
+  more stale "Restart needed" after the operator reverts a change.
+- **Audit log filter / sort use a partial template (Bug 2)**.
+  `audit_view()` returns `audit_table_partial.html` when the
+  request has the `HX-Request` header, so htmx swaps the table
+  body without nesting the entire page inside `#audit-table`.
+- **Wizard scroll preserved across step clicks (Bug 7)**. Each
+  step has an `id="wiz-step-N"` anchor and every navigation link
+  appends `#wiz-step-N`, so picking a transport at the bottom of
+  the page no longer jumps back to step 1.
+- **Test Connection in Edit-server form sends X-CSRF-Token (Bug
+  10)**. Was failing CSRF and showing the raw 403 JSON to the
+  operator.
+- **Server test response parsed via DOMParser (Bug 8)**. HTML
+  entities now decode before reaching `textContent`, so users no
+  longer see `URL can&#x27;t contain control characters` verbatim.
+- **Friendly error messages on Test Connection (Bug 21)**.
+  `_friendly_error()` maps the common errno / SSL / HTTP cases to
+  one-line actionable messages ("Connection refused. Is Zabbix
+  running on this URL?") and never truncates mid-word.
+- **Empty-state rows do not paint hover background (Bug 22)**.
+  `tbody tr:hover` is scoped to `:not([data-empty])`; the "No
+  entries" placeholder rows are tagged `data-empty="true"`.
+- **Long token / username / target text truncates with ellipsis
+  (Bugs 13, 18)**. New `.cell-truncate` CSS class applied to the
+  affected columns; full text lives in the `title` attribute.
+- **Password rule UX (Bug 14)**: strength meter replaced with a
+  three-item explicit checklist (≥10 chars, uppercase, digit) that
+  mirrors the server-side rules. The previous green "Strong
+  password" bar lied when the password lacked an uppercase letter.
+- **Username validated as `[a-z0-9_-]{2,50}` (Bug 6)**. Prevents
+  the 500 from tomlkit when an admin tries to create `šáš`.
+- **Token name capped at 100 chars (Bug 18 server-side)**.
+- **Form invalid feedback is inline (Bug 19)**. The native browser
+  tooltip is suppressed; a red border + message land under the
+  offending input and the page scrolls to it.
+- **Status indicator persists last known state (Bug 12)**. The
+  MCP/Zabbix dot in the top bar paints from `sessionStorage`
+  immediately and only flips to error after a 5 s grace period.
+- **"Disable admin portal" toggle removed from the UI (Bug 5)** -
+  disabling the portal from inside the portal was a foot-gun. To
+  disable: edit `[admin].enabled = false` in `config.toml` and
+  restart.
+- **"Writes allowed" / "Read-only" rendered as flat status labels
+  (Bug 20)** with `pointer-events: none` so they can never be
+  mistaken for a clickable button.
+- **Installer credentials banner lists ALL detected non-loopback
+  IPs (Bug 23b)** plus a hint for resetting the password
+  (`sudo install.sh set-admin-password`) - reported as "I tried
+  to find password" / "address with multiple IPs is confusing".
+
+### Fixed
+
+- **`tokens/create.html` form gets `autocomplete="off"` (Bug 9)**.
+  Browser autofill no longer leaks values from `/tokens/<id>` into
+  the create form.
+
+### Deferred to v1.25 (not yet implemented)
+
+- Bulk select-all on tokens / users / templates pages (Bug 27)
+- Mobile / responsive layout polish (Bug 28)
+- Concurrent-edit detection with `If-Match` headers (Bug 31)
+- Form auto-save to localStorage on session timeout (Bug 24)
+- Inline tooltips for every non-trivial setting (Bug 15)
+
+These are tracked but did not fit into the v1.24 cycle. Open an
+issue if any of them blocks you so we can prioritize.
+
 ## v1.23 - 2026-04-17
 
 AI-assisted report template generation graduates from beta1 to the
