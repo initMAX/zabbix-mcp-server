@@ -184,6 +184,7 @@ async def template_create(request: Request) -> Response:
             "create_mode": True,
             "error": "Template name is required.",
             "initial_content": html_content,
+            "initial_description": description,
             **_ai_template_ctx(admin_app.config),
         })
 
@@ -200,6 +201,8 @@ async def template_create(request: Request) -> Response:
             "create_mode": True,
             "error": f"A template with name '{safe_name}' already exists.",
             "initial_content": html_content,
+            "initial_name": name,
+            "initial_description": description,
             **_ai_template_ctx(admin_app.config),
         })
 
@@ -230,6 +233,8 @@ async def template_create(request: Request) -> Response:
             "create_mode": True,
             "error": f"Failed to write template file: {e}",
             "initial_content": html_content,
+            "initial_name": name,
+            "initial_description": description,
             **_ai_template_ctx(admin_app.config),
         })
 

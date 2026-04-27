@@ -115,7 +115,7 @@ async def user_create(request: Request) -> Response:
     existing = _get_admin_users(admin_app.config_path)
     if username in existing:
         return admin_app.render("users/create.html", request, {
-            "active": "users",
+            **form_ctx,
             "error": f"User '{username}' already exists.",
         })
 
@@ -139,7 +139,7 @@ async def user_create(request: Request) -> Response:
     except Exception as e:
         logger.exception("Failed to create user: %s", e)
         return admin_app.render("users/create.html", request, {
-            "active": "users",
+            **form_ctx,
             "error": f"Failed to save: {e}",
         })
 

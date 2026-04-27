@@ -19,31 +19,38 @@
 </div>
 
 {% if current_user_role != 'viewer' %}
-<!-- Add Server Form (hidden by default) -->
-<div id="add-server-form" class="card mb-4" style="display:none; max-width:640px;">
+{# Add Server form: hidden until "+ Add Server" is clicked, OR re-opened
+   when the create handler bounced back with an `add_form_error` so the
+   operator does not lose what they typed (especially the API token). #}
+<div id="add-server-form" class="card mb-4" style="display:{% if add_form_open %}block{% else %}none{% endif %}; max-width:640px;">
     <h3 style="margin-top:0;">Add Zabbix Server</h3>
+    {% if add_form_error %}
+    <div class="alert alert-danger" role="alert" style="padding:12px 16px;margin-bottom:16px;border-radius:var(--radius-md);background:rgba(239,68,68,0.10);border:1px solid var(--color-danger);color:var(--color-danger);">
+        &#x26A0;&#xFE0F; {{ add_form_error }}
+    </div>
+    {% endif %}
     <form method="post" action="/servers/create" class="form-autosave" id="form-server-create">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-group">
             <label class="form-label">Server Name</label>
-            <input type="text" name="name" class="form-input" placeholder="e.g. production, staging" required pattern="[a-zA-Z][a-zA-Z0-9_-]*">
+            <input type="text" name="name" class="form-input" placeholder="e.g. production, staging" required pattern="[a-zA-Z][a-zA-Z0-9_-]*" value="{{ form_name | default('') }}">
             <small class="text-muted">Identifier used in MCP tool calls (letters, numbers, dashes)</small>
         </div>
         <div class="form-group">
             <label class="form-label">Zabbix URL</label>
-            <input type="url" name="url" class="form-input" placeholder="https://zabbix.example.com" required>
+            <input type="url" name="url" class="form-input" placeholder="https://zabbix.example.com" required value="{{ form_url | default('') }}">
         </div>
         <div class="form-group">
             <label class="form-label">API Token</label>
-            <input type="text" name="api_token" class="form-input" placeholder="Zabbix API token" required>
+            <input type="text" name="api_token" class="form-input" placeholder="Zabbix API token" required value="{{ form_api_token | default('') }}">
             <small class="text-muted">Create in Zabbix: User settings &rarr; API tokens</small>
         </div>
         <div class="form-group" style="display:flex; gap:24px;">
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;" tabindex="0" data-tooltip="When checked, MCP tools that mutate Zabbix data (host_create, item_update, ...) are blocked at the server level. Recommended for production: leave checked and grant per-token write scope only when needed.">
-                <input type="checkbox" name="read_only" checked> Read-only <span class="tooltip-icon">&#x1F6C8;</span>
+                <input type="checkbox" name="read_only" {% if add_form_open %}{% if form_read_only %}checked{% endif %}{% else %}checked{% endif %}> Read-only <span class="tooltip-icon">&#x1F6C8;</span>
             </label>
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;" tabindex="0" data-tooltip="Verify the Zabbix frontend's TLS certificate against the system trust store. Uncheck only for self-signed certs in dev / lab environments. Off in production = MITM risk.">
-                <input type="checkbox" name="verify_ssl" checked> Verify SSL <span class="tooltip-icon">&#x1F6C8;</span>
+                <input type="checkbox" name="verify_ssl" {% if add_form_open %}{% if form_verify_ssl %}checked{% endif %}{% else %}checked{% endif %}> Verify SSL <span class="tooltip-icon">&#x1F6C8;</span>
             </label>
         </div>
         <div id="add-test-result" style="margin-bottom:12px;"></div>
@@ -179,9 +186,7 @@
                 <button class="btn btn-ghost btn-sm"
                         hx-post="/servers/{{ server.name }}/test"
                         hx-target="#server-status-{{ server.name }}"
-                        hx-swap="innerHTML"
-                        hx-indicator="this">
-                <span class="htmx-indicator spinner-sm"></span>
+                        hx-swap="innerHTML">
                 Test Connection
             </button>
                 {% if current_user_role != 'viewer' %}

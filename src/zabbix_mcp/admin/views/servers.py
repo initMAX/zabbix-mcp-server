@@ -51,12 +51,13 @@ def _parse_timeout(raw) -> int:
     return v
 
 
-async def servers_view(request: Request) -> Response:
-    admin_app = request.app.state.admin_app
-    session = admin_app.require_auth(request)
-    if not session:
-        return RedirectResponse("/login", status_code=303)
-
+def _render_servers_list(request: Request, admin_app, extra: dict | None = None) -> Response:
+    """Render the /servers page. Shared by `servers_view` (GET) and
+    `server_create` so that a validation failure on Add Server can
+    re-render the same page with `add_form_open=True` plus the form
+    values the operator already typed - instead of `flash_redirect`
+    which wipes the form (especially the API token, which the user
+    would have to retype from scratch)."""
     client_manager = admin_app.client_manager
     servers = []
     drift_detected = False
@@ -123,10 +124,21 @@ async def servers_view(request: Request) -> Response:
     if drift_detected:
         admin_app.restart_needed = True
 
-    return admin_app.render("servers.html", request, {
+    ctx = {
         "active": "servers",
         "servers": servers,
-    })
+    }
+    if extra:
+        ctx.update(extra)
+    return admin_app.render("servers.html", request, ctx)
+
+
+async def servers_view(request: Request) -> Response:
+    admin_app = request.app.state.admin_app
+    session = admin_app.require_auth(request)
+    if not session:
+        return RedirectResponse("/login", status_code=303)
+    return _render_servers_list(request, admin_app)
 
 
 async def server_create(request: Request) -> Response:
@@ -144,11 +156,25 @@ async def server_create(request: Request) -> Response:
     verify_ssl = "verify_ssl" in form
     request_timeout = _parse_timeout(form.get("request_timeout"))
 
+    # Re-render the /servers page with the Add Server card open and
+    # the typed values preserved so a typo (especially in the URL)
+    # does not wipe the API token the operator just pasted.
+    def _err(msg: str) -> Response:
+        return _render_servers_list(request, admin_app, {
+            "add_form_open": True,
+            "add_form_error": msg,
+            "form_name": name,
+            "form_url": url,
+            "form_api_token": api_token,
+            "form_read_only": read_only,
+            "form_verify_ssl": verify_ssl,
+        })
+
     if not name or not re.match(r"^[a-zA-Z][a-zA-Z0-9_-]*$", name):
-        return admin_app.flash_redirect("/servers", "Invalid server name. Must start with a letter and contain only letters, digits, dashes, and underscores.", "danger")
+        return _err("Invalid server name. Must start with a letter and contain only letters, digits, dashes, and underscores.")
 
     if not url.startswith(("http://", "https://")):
-        return admin_app.flash_redirect("/servers", "Invalid URL. Must start with http:// or https://.", "danger")
+        return _err("Invalid URL. Must start with http:// or https://.")
 
     # Strict hostname validation: reject malformed inputs like
     # "http://0.0.0.0.0.0.0" or "http://host with spaces" before they
@@ -162,7 +188,7 @@ async def server_create(request: Request) -> Response:
             "api_token": api_token or "x",  # token validated separately above
         })
     except Exception as exc:
-        return admin_app.flash_redirect("/servers", f"Invalid URL: {exc}", "danger")
+        return _err(f"Invalid URL: {exc}")
 
     try:
         server_data = {
@@ -180,7 +206,7 @@ async def server_create(request: Request) -> Response:
         return admin_app.flash_redirect("/servers", f"Server '{name}' added. Restart required.")
     except Exception as e:
         logger.error("Failed to add server: %s", e)
-        return admin_app.flash_redirect("/servers", f"Failed to add server: {e}", "danger")
+        return _err(f"Failed to add server: {e}")
 
 
 async def server_edit(request: Request) -> Response:

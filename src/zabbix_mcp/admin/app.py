@@ -71,7 +71,17 @@ class _PostRateLimitMiddleware:
 
     Keyed by client IP (not session cookie prefix) - rotating the cookie
     must not create a fresh bucket.
+
+    Test-connection probes (`/servers/<name>/test`) are exempt because
+    `/servers` fan-outs one POST per server card on page load via
+    `hx-trigger="load"`. With 30+ servers (or a quick reload) this would
+    eat the bucket and silently leave half the cards stuck in "Checking..."
+    They are idempotent reads, no auth-state mutation, no write to disk.
     """
+
+    # Path predicates evaluated against scope["path"]. The endpoint is
+    # `/servers/<server_name>/test` so we match by suffix.
+    EXEMPT_SUFFIXES = ("/test", "/test-new")
 
     def __init__(self, app: Starlette, max_requests: int = 30, window: int = 60) -> None:
         self.app = app
@@ -83,7 +93,10 @@ class _PostRateLimitMiddleware:
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
             method = scope.get("method", "GET")
-            if method == "POST":
+            path = scope.get("path", "")
+            if method == "POST" and not (
+                path.startswith("/servers/") and path.endswith(self.EXEMPT_SUFFIXES)
+            ):
                 import time
                 key = _peer_ip(scope)
                 now = time.time()
