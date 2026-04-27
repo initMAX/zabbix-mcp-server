@@ -1282,24 +1282,45 @@ except ImportError:
 
     chown "$SERVICE_USER:$SERVICE_USER" "$config_file"
 
-    # List ALL detected IPs (not just the first) - reported by tester
-    # 2026-04-17 with `ip a` showing 4 interfaces; the installer only
-    # printed the NAT one and the user did not know which to use.
+    # Match the URL list to the actual bind host. With the default
+    # `host = 127.0.0.1` the server is loopback-only and listing the
+    # box's public IPs in the banner is misleading - the operator
+    # would type http://<public-ip>:9090 in the browser and get
+    # connection refused. Reported 2026-04-27 from a fresh install on
+    # a public VPS where the credentials banner showed the public IP
+    # while the server was bound to 127.0.0.1.
     local lines=()
-    local first_ip=true
-    while IFS= read -r ip; do
-        [[ -z "$ip" ]] && continue
-        local url
-        url=$(_format_url "$ip" 9090)
+    local bind_host
+    bind_host=$(get_configured_host)
+    if [[ "$bind_host" == "0.0.0.0" || "$bind_host" == "::" ]]; then
+        # Listening on all interfaces - list every detected IP so the
+        # operator can pick the one their browser can reach.
+        local first_ip=true
+        while IFS= read -r ip; do
+            [[ -z "$ip" ]] && continue
+            local url
+            url=$(_format_url "$ip" 9090)
+            if $first_ip; then
+                lines+=("  URL:      $url")
+                first_ip=false
+            else
+                lines+=("            $url")
+            fi
+        done <<< "$(_get_host_ips)"
         if $first_ip; then
-            lines+=("  URL:      $url")
-            first_ip=false
-        else
-            lines+=("            $url")
+            lines+=("  URL:      http://127.0.0.1:9090")
         fi
-    done <<< "$(_get_host_ips)"
-    if $first_ip; then
-        lines+=("  URL:      http://127.0.0.1:9090")
+    else
+        # Bound to a specific interface (default 127.0.0.1). Show
+        # exactly that, plus a hint how to expose externally if
+        # that's what the operator actually wants.
+        lines+=("  URL:      $(_format_url "$bind_host" 9090)")
+        if [[ "$bind_host" == "127.0.0.1" || "$bind_host" == "::1" ]]; then
+            lines+=("            (loopback only - to expose externally:")
+            lines+=("             set [server].host = \"0.0.0.0\" in $CONFIG_DIR/config.toml")
+            lines+=("             and configure [server].public_url for OAuth discovery,")
+            lines+=("             then run: sudo systemctl restart $SERVICE_NAME)")
+        fi
     fi
     lines+=(
         "  Username: admin"

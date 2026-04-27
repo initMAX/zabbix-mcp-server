@@ -198,6 +198,15 @@ same observations.
   IPs (Bug 23b)** plus a hint for resetting the password
   (`sudo install.sh set-admin-password`) - reported as "I tried
   to find password" / "address with multiple IPs is confusing".
+- **Installer credentials banner now matches the actual bind host**
+  - reported 2026-04-27: a fresh install on a public VPS printed
+  `URL: http://<public-ip>:9090` while the server was bound to
+  `127.0.0.1`, so the operator typed the URL in their browser
+  and got connection refused. The banner now only lists every
+  detected IP when `host = 0.0.0.0`; with a specific bind it
+  shows exactly that address plus a hint how to expose externally
+  if that's what was intended (set `host = "0.0.0.0"` and
+  `public_url`, then restart the service).
 - **Mobile / responsive polish (Bug 28)**: tighter `cell-truncate`
   width caps under 768 px (240 → 140 px), header-center wraps so
   the MCP URL + Restart needed + Update available pill stack on a
