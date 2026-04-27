@@ -237,9 +237,21 @@ async def token_create(request: Request) -> Response:
         if not ok:
             return _err(f"Expiry date '{expires_at}' is not a recognized format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS.")
 
-    # Parse allowed_servers
+    # Parse allowed_servers and validate each entry refers to a real
+    # configured Zabbix server (or is the wildcard '*'). Without this
+    # check a typo silently locks the token out of every server at
+    # call time with no UI hint where the mismatch is.
     servers_raw = str(form.get("allowed_servers", "*")).strip()
     allowed_servers = [s.strip() for s in servers_raw.split(",") if s.strip()] if servers_raw else ["*"]
+    known_servers = set(admin_app.client_manager.server_names)
+    for sname in allowed_servers:
+        if sname == "*":
+            continue
+        if sname not in known_servers:
+            return _err(
+                f"Allowed server '{sname}' is not a configured Zabbix server. "
+                f"Known: {', '.join(sorted(known_servers)) or '(none)'}."
+            )
 
     # Generate token
     raw_token, token_hash = TokenStore.generate_token()
@@ -355,16 +367,55 @@ async def token_detail(request: Request) -> Response:
 
         allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
         if allowed_ips_raw:
-            updates["allowed_ips"] = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()]
+            ips = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()]
+            for ip in ips:
+                try:
+                    _ipnet(ip, strict=False)
+                except ValueError:
+                    return admin_app.flash_redirect(
+                        f"/tokens/{token_id}",
+                        f"IP allowlist entry '{ip}' is not a valid IP address or CIDR range.",
+                        "danger",
+                    )
+            updates["allowed_ips"] = ips
         else:
             updates["allowed_ips"] = []
 
         expires_at = str(form.get("expires_at", "")).strip()
         if expires_at:
+            # Mirror the create-path expiry-format check so the edit
+            # path doesn't silently accept gibberish dates.
+            ok = False
+            for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S",
+                        "%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+                try:
+                    from datetime import datetime
+                    datetime.strptime(expires_at, fmt)
+                    ok = True
+                    break
+                except ValueError:
+                    continue
+            if not ok:
+                return admin_app.flash_redirect(
+                    f"/tokens/{token_id}",
+                    f"Expiry date '{expires_at}' is not a recognized format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS.",
+                    "danger",
+                )
             updates["expires_at"] = expires_at
 
         servers_raw = str(form.get("allowed_servers", "*")).strip()
-        updates["allowed_servers"] = [s.strip() for s in servers_raw.split(",") if s.strip()] if servers_raw else ["*"]
+        servers_list = [s.strip() for s in servers_raw.split(",") if s.strip()] if servers_raw else ["*"]
+        known_servers = set(admin_app.client_manager.server_names)
+        for sname in servers_list:
+            if sname == "*":
+                continue
+            if sname not in known_servers:
+                return admin_app.flash_redirect(
+                    f"/tokens/{token_id}",
+                    f"Allowed server '{sname}' is not a configured Zabbix server. Known: {', '.join(sorted(known_servers)) or '(none)'}.",
+                    "danger",
+                )
+        updates["allowed_servers"] = servers_list
 
         try:
             # Read current, merge updates

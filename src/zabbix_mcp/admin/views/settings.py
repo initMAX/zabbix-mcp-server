@@ -76,6 +76,63 @@ SECTION_CONFIG = {
 # to rotate the stored secret; treat that as "keep current value".
 SECRET_KEEP_EMPTY = {"api_key"}
 
+
+def _validate_list_entry(key: str, entry: str) -> str | None:
+    """Per-list-key value sanity check. Returns an error string when
+    the entry is malformed, None when OK.
+
+    Catches bad input at form submit instead of letting it land in
+    config.toml and bricking the next boot. Token IP Restriction
+    already validates each line; this brings the global / settings
+    parallel of that validation up to the same bar.
+    """
+    if key == "allowed_hosts":
+        # Global IP allowlist - same shape as token allowed_ips.
+        try:
+            from ipaddress import ip_network
+            ip_network(entry, strict=False)
+        except (ValueError, TypeError):
+            return f"'{entry}' is not a valid IP address or CIDR range."
+        return None
+    if key == "cors_origins":
+        # Browser CORS Origin header - must be scheme://host[:port],
+        # no trailing path, no wildcards beyond '*'.
+        if entry == "*":
+            return None
+        if not entry.startswith(("http://", "https://")):
+            return f"CORS origin '{entry}' must start with http:// or https://"
+        from urllib.parse import urlsplit
+        try:
+            parts = urlsplit(entry)
+        except ValueError:
+            return f"CORS origin '{entry}' is not a valid URL."
+        if not parts.netloc:
+            return f"CORS origin '{entry}' is missing a host."
+        if parts.path not in ("", "/"):
+            return f"CORS origin '{entry}' must not include a path - drop everything after the host[:port]."
+        if parts.query or parts.fragment:
+            return f"CORS origin '{entry}' must not include query / fragment - just scheme://host[:port]."
+        return None
+    if key == "allowed_import_dirs":
+        # Filesystem path. Reject null bytes (Linux abuse) and
+        # Windows-style backslashes that would break os.path checks.
+        if "\x00" in entry:
+            return f"Import directory '{entry}' contains a null byte."
+        if not entry.startswith("/"):
+            return f"Import directory '{entry}' must be an absolute path (start with /)."
+        return None
+    if key in ("tools", "disabled_tools"):
+        # Tool group names + tool names. Whitelist against the
+        # known catalog so a typo (e.g. 'monitorng') does not
+        # silently disable nothing.
+        from zabbix_mcp.config import TOOL_GROUPS, _expand_tool_groups
+        all_groups = set(TOOL_GROUPS.keys())
+        all_tools = set(_expand_tool_groups(list(TOOL_GROUPS.keys())))
+        if entry not in all_groups and entry not in all_tools:
+            return f"'{entry}' is not a known tool or tool group."
+        return None
+    return None
+
 # Integer fields with explicit bounds. Without these, an operator can
 # accidentally submit `timeout = 0` (request blocks until the AI
 # provider gives up - minutes per call) or `max_tokens = 999999999`
@@ -237,7 +294,16 @@ async def settings_update(request: Request) -> Response:
             elif key in LIST_KEYS:
                 raw = str(form.get(key, "")).strip()
                 if raw:
-                    config_section[key] = [s.strip() for s in raw.split(",") if s.strip()]
+                    # Tools list comes from the drag-and-drop bubbles
+                    # which use newline separators; everything else
+                    # comes from comma-separated text inputs.
+                    sep = "\n" if "\n" in raw else ","
+                    parsed = [s.strip() for s in raw.split(sep) if s.strip()]
+                    for entry in parsed:
+                        err = _validate_list_entry(key, entry)
+                        if err:
+                            return admin_app.flash_redirect("/settings", err, "danger")
+                    config_section[key] = parsed
                 elif key in config_section:
                     del config_section[key]
             elif key in form:
