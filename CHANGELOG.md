@@ -82,14 +82,47 @@ same observations.
   Catches the silent last-write-wins race when two admins edit
   Settings concurrently. Token / user / server edit paths still
   last-write-wins - extension scoped to v1.25.
-- **Inline tooltips (Bug 15, partial)**: new `.tooltip-icon` CSS
-  class (info circle) rendered next to non-trivial fields.
-  Read-only and Verify SSL checkboxes on Add Server now carry a
-  `data-tooltip` explaining the trade-offs; surface on hover or
-  keyboard focus via the existing `[data-tooltip]` rules. More
-  fields will get tooltips incrementally as we touch them - a
-  complete sweep was scoped to v1.25 in favor of getting per-
-  field text right one form at a time.
+- **Inline tooltips plošně (Bug 15)**: every non-trivial form field
+  in `/tokens/create`, `/tokens/<id>`, `/users/create + /<u>`,
+  `/servers` (Add + Edit), `/settings` (every section), `/wizard`
+  (4 steps) and `/templates` editor now carries a `tooltip-icon`
+  next to the label. Icon is a ?-in-circle SVG (no font dependency,
+  centered), stays visible on hover so the operator does not lose
+  the visual anchor while reading the popover. Popover text bumped
+  to 1 rem with 380 px max-width for body-text legibility.
+- **Bulk select-all + bulk-delete (Bug 27)** on `/tokens`,
+  `/users`, `/templates` lists. Per-row checkbox + master select-all
+  in the table header; sticky `.bulk-bar` floats below the page
+  header showing "N selected" + Delete + Clear actions. Confirmation
+  goes through the existing type-to-confirm modal: operator must
+  type `DELETE N` before the destructive button enables. Bulk
+  endpoints (`/tokens/bulk-delete`, `/users/bulk-delete`,
+  `/templates/bulk-delete`) write the whole batch in a single
+  tomlkit save and emit one audit row per id. Self-row gets no
+  checkbox on `/users`; double-checked server-side too.
+- **Concurrent-edit guard on tokens / users / servers (Bug 31,
+  closed)**. The mtime-diff check that landed on `/settings` in
+  v1.24 RC1 now also covers `/tokens/<id>`, `/users/<u>`, and
+  `/servers/<n>/edit`. Shared `config_mtime()` helper in
+  `admin/config_writer.py`. Blocks last-write-wins between two
+  admins editing the same record concurrently; surfaces a flash
+  asking the operator to reload, instead of silently overwriting.
+- **Settings range bounds for numeric fields**: `INT_BOUNDS` in
+  `views/settings.py` rejects out-of-range values at form-submit
+  with a clear message, instead of writing `port = 0` /
+  `max_tokens = 999999999` to disk and bricking the next boot.
+  Covers port (1-65535), rate_limit (0-100k), response_max_chars
+  (1k-1M), AI timeout (5-600 s), AI max_tokens (256-200k).
+- **Plošná validace list-typed inputs**: the IP/CIDR validation
+  Token IP Restriction had since v1.23 now also runs on Settings
+  -> IP Allowlist (allowed_hosts), so a typo in the global
+  allowlist fails fast at save instead of locking everyone out at
+  next boot. Same idea covers CORS Origins (must be
+  scheme://host[:port]), Import Directories (absolute path, no NUL
+  byte), Tool Allowlist (whitelisted against TOOL_GROUPS catalog).
+  Token allowed_servers now rejects names that aren't configured
+  Zabbix servers. Token edit path gained the IP allowlist + expiry
+  format checks the create path already had - was a documented gap.
 - **Showcase report template** carried over from v1.23 unchanged.
 
 ### Changed
@@ -162,6 +195,59 @@ same observations.
 - **`tokens/create.html` form gets `autocomplete="off"` (Bug 9)**.
   Browser autofill no longer leaks values from `/tokens/<id>` into
   the create form.
+- **Token Name silent-failure on > 100 chars (kokos report)**.
+  `tokens/create.html` was missing the `{% if error %}` block, so
+  server-side rejection rendered an empty form that looked like
+  success. Added the alert banner, plus `maxlength="100"`, a live
+  `(N/100)` counter, a warning border at >= 90 chars, and form
+  value preservation across re-renders. Detail / edit form mirrors
+  the same UX. Defensive `.page-title` ellipsis cap (max-width
+  80vw) so an oversized name cannot push the layout off-screen.
+- **htmx floating square in /servers Test Connection**. The
+  `<span class="htmx-indicator spinner-sm">` combined a global
+  `position: fixed` page-top progress-bar class with a 16x16
+  spinner, producing a stray gradient square at the top of the
+  content area during every test. Span deleted - results land in
+  the per-card status row and indicator is no longer needed.
+- **/servers/create now preserves typed values across validation
+  errors**. Previous flash_redirect wiped name + URL + API token +
+  checkboxes on a single typo, forcing the operator to retype the
+  50-char API token from scratch. Re-renders the same page with
+  `add_form_open=True` plus form_* values. Same fix shape as the
+  kokos token form.
+- **/users/create form_ctx now propagated to ALL error branches**:
+  the "user already exists" and "save failed" branches were the
+  only two that didn't include it, so the username + role got
+  wiped on collision.
+- **/templates/create initial_description preserved on every
+  error branch**. Was preserved on the Jinja-syntax-error path
+  but missing on "name required" and "name collision" branches.
+- **POST rate-limit no longer fires on /servers/<n>/test**. With
+  30+ servers, the auto-`hx-trigger="load"` fan-out from the
+  /servers page would eat the 30 POST/min bucket and silently
+  leave half the cards stuck in "Checking..." Test endpoint is a
+  read-only auth-checked probe; safe to exempt.
+- **Test Connection reliability** (reported "obcas OK obcas ze to
+  nejde, debilne"). Three layers of fix:
+  1. `check_connection` always force-reconnects so a stale cached
+     client cannot poison the result.
+  2. `call()`'s auto-reconnect now also catches
+     `ConnectionError / TimeoutError / ssl.SSLError / OSError`,
+     not just session/auth errors.
+  3. `zabbix_utils.api.urlopen` is monkey-patched with a
+     browser-shaped `User-Agent` plus same-origin `Origin` and
+     `Referer` so Cloudflare-style WAFs in front of Zabbix stop
+     403'ing direct JSON-RPC POSTs. Verified 10/10 vs 0/10
+     against an initmax.com Zabbix behind Cloudflare. Plus
+     check_connection retries 4x with 0/1/1.5/2.5 s back-off on
+     transient 403/429/5xx. `_friendly_error()` now distinguishes
+     "WAF 403" from "token 403" so the operator knows where to
+     look.
+- **users delete-self silent redirect**. Was a bare 303 that
+  looked like success; now flash-error explaining you cannot
+  delete your own account. "User not found" branch on delete
+  also surfaced as a flash error instead of falling through to
+  None response.
 
 ### Audited but no action
 
@@ -174,18 +260,6 @@ same observations.
   admin views; every state-mutating endpoint already returns
   `RedirectResponse(303)` or `flash_redirect`. F5 / browser back
   is safe.
-
-### Deferred to v1.25
-
-- **Bulk select-all on tokens / users / templates pages (Bug 27)**
-  - non-trivial: needs select-all checkbox state machine,
-    bulk-delete endpoint with parsing, plus the type-to-confirm
-    flow extended to a list. Tracked.
-- **Concurrent-edit detection on token / user / server forms
-  (Bug 31, partial)**: only Settings has the mtime guard so far.
-  The other edit paths still last-write-wins between admins.
-
-If any of these block you, open an issue so we can prioritize.
 
 ## v1.23 - 2026-04-17
 
