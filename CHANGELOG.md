@@ -123,6 +123,14 @@ same observations.
   Token allowed_servers now rejects names that aren't configured
   Zabbix servers. Token edit path gained the IP allowlist + expiry
   format checks the create path already had - was a documented gap.
+- **IP allowlist duplicate detection + explicit IPv6 support**.
+  Token IP Restriction and Settings IP Allowlist now normalize
+  every entry through `ip_network()` and reject duplicates after
+  normalization, so `192.168.1.1` and `192.168.1.1/32` cannot both
+  end up in the list, and `2001:db8::1` vs `2001:0db8:0000::1`
+  collapse to the same address. Runtime auth check already
+  supported IPv6; admin form placeholders + error messages now
+  mention IPv6 explicitly so it doesn't read as an IPv4-only field.
 - **Showcase report template** carried over from v1.23 unchanged.
 
 ### Changed
