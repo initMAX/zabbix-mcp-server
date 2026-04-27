@@ -513,6 +513,55 @@ async def token_delete(request: Request) -> Response:
         return admin_app.flash_redirect("/tokens", f"Failed to delete token: {e}", "danger")
 
 
+async def token_bulk_delete(request: Request) -> Response:
+    """Delete multiple tokens in one shot (Bug 27).
+
+    The list page renders one checkbox per token; the operator picks
+    a set, types `DELETE N` to confirm, and we receive `ids=t1&ids=t2&...`
+    All ids are removed from config.toml in a single tomlkit save so
+    the file never sits in a half-deleted state. One audit row per
+    token id (so it shows up in the per-token audit history search).
+    """
+    admin_app = request.app.state.admin_app
+    session = admin_app.require_auth(request)
+    if not session or session.role != "admin":
+        return RedirectResponse("/tokens", status_code=303)
+
+    form = await request.form()
+    ids = [str(s).strip() for s in form.getlist("ids") if str(s).strip()]
+    if not ids:
+        return admin_app.flash_redirect("/tokens", "No tokens selected.", "danger")
+
+    try:
+        from zabbix_mcp.admin.config_writer import save_config_document
+        doc = load_config_document(admin_app.config_path)
+        tokens_section = doc.get("tokens")
+        if tokens_section is None:
+            return admin_app.flash_redirect("/tokens", "No tokens section in config.", "danger")
+        deleted: list[str] = []
+        missing: list[str] = []
+        for tid in ids:
+            if tid in tokens_section:
+                del tokens_section[tid]
+                deleted.append(tid)
+            else:
+                missing.append(tid)
+        save_config_document(admin_app.config_path, doc)
+        _reload_tokens(admin_app)
+        client_ip = request.client.host if request.client else ""
+        for tid in deleted:
+            write_audit("token_delete", user=session.user, target_type="token", target_id=tid, ip=client_ip)
+        logger.info("Bulk-deleted %d token(s) by %s: %s", len(deleted), session.user, deleted)
+        admin_app.restart_needed = True
+        msg = f"Deleted {len(deleted)} token(s). Restart required."
+        if missing:
+            msg += f" Skipped (not found): {', '.join(missing)}."
+        return admin_app.flash_redirect("/tokens", msg)
+    except Exception as e:
+        logger.error("Bulk-delete tokens failed: %s", e)
+        return admin_app.flash_redirect("/tokens", f"Bulk-delete failed: {e}", "danger")
+
+
 def _reload_tokens(admin_app) -> None:
     """Reload tokens from config.toml into the token store."""
     try:

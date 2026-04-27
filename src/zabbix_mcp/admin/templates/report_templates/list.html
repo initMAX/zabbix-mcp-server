@@ -49,10 +49,30 @@
 <div class="section">
     <h2 class="section-title">Custom Templates</h2>
     {% if custom_templates %}
+    {% if current_user_role != 'viewer' %}
+    <div id="bulk-bar" class="bulk-bar" hidden>
+        <span><span class="bulk-bar-count" id="bulk-count">0</span> template(s) selected</span>
+        <button type="button" class="btn btn-danger btn-sm" onclick="bulkDelete('template', '/templates/bulk-delete')">Delete selected</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="bulkSelectAll(false)">Clear selection</button>
+    </div>
+    <form id="bulk-delete-form" method="post" action="/templates/bulk-delete" style="display:none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    </form>
+    {% if custom_templates|length > 1 %}
+    <div style="margin-bottom: 8px;">
+        <label style="display:inline-flex; align-items:center; gap:6px; font-size:0.9rem; color:var(--text-muted);">
+            <input type="checkbox" id="bulk-select-all" onchange="bulkSelectAll(this.checked)"> Select all
+        </label>
+    </div>
+    {% endif %}
+    {% endif %}
     <div class="grid-3">
         {% for template in custom_templates %}
         <div class="card" id="template-{{ template.id }}">
             <div class="card-header">
+                {% if current_user_role != 'viewer' %}
+                <input type="checkbox" class="bulk-select" value="{{ template.id }}" aria-label="Select {{ template.name }}" style="margin-right:8px;">
+                {% endif %}
                 <h3 class="card-title">{{ template.name }}</h3>
                 <span class="badge badge-primary">Custom</span>
             </div>

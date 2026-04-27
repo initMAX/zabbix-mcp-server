@@ -663,6 +663,37 @@ textarea.input-invalid {
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23475569' stroke-width='1.5'><circle cx='8' cy='8' r='6.5'/><path d='M5.8 6.2c0-1.2 1-2.2 2.2-2.2s2.2 1 2.2 2.2c0 .9-.5 1.4-1.2 1.8-.7.4-1 .7-1 1.4v.4'/><circle cx='8' cy='12' r='.6' fill='%23475569' stroke='none'/></svg>");
 }
 
+/* Bulk-delete sticky action bar - appears once 1+ rows on a list
+   page are checked. Floats above the table on scroll so the user
+   does not lose the Delete button mid-table. */
+.bulk-bar {
+    position: sticky;
+    top: var(--header-height, 60px);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    margin-bottom: 12px;
+    border-radius: var(--radius-md, 6px);
+    background: var(--bg-card, #1e293b);
+    border: 1px solid var(--color-primary, #3b82f6);
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.15);
+    font-size: 0.95rem;
+}
+.bulk-bar[hidden] { display: none; }
+.bulk-bar .bulk-bar-count {
+    font-weight: 600;
+    color: var(--color-primary, #3b82f6);
+}
+
+/* Per-row select checkbox - keep small, vertically centered. */
+td.bulk-select-cell, th.bulk-select-cell {
+    width: 30px;
+    padding-left: 12px;
+    padding-right: 4px;
+}
+
 /* Defensive overflow guard - any user-controlled text rendered as a
    page heading (token name, server name, user name, ...) must not
    blow out the layout. Long names truncate visually with an ellipsis

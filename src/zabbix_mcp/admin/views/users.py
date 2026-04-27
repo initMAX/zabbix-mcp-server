@@ -240,6 +240,56 @@ async def user_detail(request: Request) -> Response:
     })
 
 
+async def user_bulk_delete(request: Request) -> Response:
+    """Delete multiple admin users at once (Bug 27).
+
+    Mirrors token_bulk_delete: pick rows, type DELETE N, submit.
+    Self-row checkbox is omitted in the list template, so the
+    operator can't even queue themselves; defensive check here too.
+    """
+    admin_app = request.app.state.admin_app
+    session = admin_app.require_auth(request)
+    if not session or session.role != "admin":
+        return RedirectResponse("/users", status_code=303)
+
+    form = await request.form()
+    ids = [str(s).strip() for s in form.getlist("ids") if str(s).strip()]
+    if not ids:
+        return admin_app.flash_redirect("/users", "No users selected.", "danger")
+    if session.user in ids:
+        return admin_app.flash_redirect(
+            "/users",
+            f"You cannot include your own account ({session.user}) in a bulk delete.",
+            "danger",
+        )
+
+    try:
+        doc = load_config_document(admin_app.config_path)
+        admin = doc.get("admin", {})
+        users = admin.get("users", {})
+        deleted: list[str] = []
+        missing: list[str] = []
+        for uid in ids:
+            if uid in users:
+                del users[uid]
+                deleted.append(uid)
+            else:
+                missing.append(uid)
+        save_config_document(admin_app.config_path, doc)
+        client_ip = request.client.host if request.client else ""
+        for uid in deleted:
+            write_audit("user_delete", user=session.user, target_type="user", target_id=uid, ip=client_ip)
+        logger.info("Bulk-deleted %d user(s) by %s: %s", len(deleted), session.user, deleted)
+        admin_app.restart_needed = True
+        msg = f"Deleted {len(deleted)} user(s). Restart required."
+        if missing:
+            msg += f" Skipped (not found): {', '.join(missing)}."
+        return admin_app.flash_redirect("/users", msg)
+    except Exception as e:
+        logger.error("Bulk-delete users failed: %s", e)
+        return admin_app.flash_redirect("/users", f"Bulk-delete failed: {e}", "danger")
+
+
 async def user_delete(request: Request) -> Response:
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)

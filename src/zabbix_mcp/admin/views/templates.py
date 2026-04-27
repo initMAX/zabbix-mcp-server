@@ -700,3 +700,61 @@ async def template_delete(request: Request) -> Response:
             return admin_app.flash_redirect("/templates", f"Failed to delete template: {e}", "danger")
 
     return RedirectResponse("/templates", status_code=303)
+
+
+async def template_bulk_delete(request: Request) -> Response:
+    """Delete multiple custom templates at once (Bug 27).
+
+    Same selection / type-to-confirm flow as token / user bulk delete.
+    Each template's HTML file is unlinked too (only when inside the
+    sanctioned custom-templates directory - same path-traversal guard
+    as the per-template delete handler).
+    """
+    admin_app = request.app.state.admin_app
+    session = admin_app.require_auth(request)
+    if not session or session.role != "admin":
+        return RedirectResponse("/templates", status_code=303)
+
+    form = await request.form()
+    ids = [str(s).strip() for s in form.getlist("ids") if str(s).strip()]
+    if not ids:
+        return admin_app.flash_redirect("/templates", "No templates selected.", "danger")
+
+    custom = _get_custom_templates(admin_app.config_path)
+    by_id = {t["id"]: t for t in custom}
+    deleted: list[str] = []
+    missing: list[str] = []
+    custom_dir = CUSTOM_TEMPLATE_DIR.resolve()
+
+    try:
+        from zabbix_mcp.admin.audit_writer import write_audit
+        client_ip = request.client.host if request.client else ""
+        for tid in ids:
+            tmpl = by_id.get(tid)
+            if not tmpl:
+                missing.append(tid)
+                continue
+            tmpl_file = tmpl.get("template_file", "")
+            file_path = Path(tmpl_file) if tmpl_file.startswith("/") else TEMPLATE_DIR / tmpl_file
+            try:
+                resolved = file_path.resolve()
+                if resolved.is_relative_to(custom_dir) and resolved.exists():
+                    resolved.unlink()
+            except Exception as exc:
+                logger.warning("template_bulk_delete: could not unlink %s: %s", file_path, exc)
+            try:
+                remove_config_table(admin_app.config_path, "report_templates", tid)
+                deleted.append(tid)
+                write_audit("template_delete", user=session.user, target_type="template", target_id=tid, ip=client_ip)
+            except Exception as exc:
+                logger.error("template_bulk_delete: config remove failed for %s: %s", tid, exc)
+                missing.append(tid)
+        admin_app.restart_needed = True
+        msg = f"Deleted {len(deleted)} template(s). Restart required."
+        if missing:
+            msg += f" Skipped (not found / failed): {', '.join(missing)}."
+        logger.info("Bulk-deleted %d template(s) by %s: %s", len(deleted), session.user, deleted)
+        return admin_app.flash_redirect("/templates", msg)
+    except Exception as e:
+        logger.error("Bulk-delete templates failed: %s", e)
+        return admin_app.flash_redirect("/templates", f"Bulk-delete failed: {e}", "danger")

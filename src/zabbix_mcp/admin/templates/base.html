@@ -381,6 +381,71 @@
         document.getElementById('confirm-action-btn').disabled = true;
     }
 
+    /**
+     * Bulk-delete UI helpers - power the "select N rows, delete all
+     * at once" workflow on /tokens, /users, /templates list pages.
+     *
+     * Markup contract for a list page:
+     *   - `<tbody>` rows have `<input type="checkbox" class="bulk-select" value="<id>">`
+     *   - One header `<input type="checkbox" id="bulk-select-all">` toggles them all
+     *   - One sticky bar with id `bulk-bar`, count span `bulk-count`,
+     *     and Delete button calling `bulkDelete('<resource_label>', '<post_url>')`.
+     *   - One hidden `<form id="bulk-delete-form" method="post" action="<post_url>">`
+     *     with CSRF and a placeholder `<input name="ids" multiple>`.
+     */
+    function bulkSelectAll(checked) {
+        document.querySelectorAll('.bulk-select').forEach(function(cb) {
+            if (!cb.disabled) cb.checked = !!checked;
+        });
+        updateBulkBar();
+    }
+    function updateBulkBar() {
+        var bar = document.getElementById('bulk-bar');
+        if (!bar) return;
+        var checked = document.querySelectorAll('.bulk-select:checked');
+        var n = checked.length;
+        var count = document.getElementById('bulk-count');
+        if (count) count.textContent = n;
+        bar.hidden = (n === 0);
+        // Sync the master checkbox tri-state.
+        var master = document.getElementById('bulk-select-all');
+        if (master) {
+            var total = document.querySelectorAll('.bulk-select:not([disabled])').length;
+            master.checked = (n > 0 && n === total);
+            master.indeterminate = (n > 0 && n < total);
+        }
+    }
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('bulk-select')) {
+            updateBulkBar();
+        }
+    });
+    function bulkDelete(label, url) {
+        var checked = Array.from(document.querySelectorAll('.bulk-select:checked'));
+        if (!checked.length) return;
+        var ids = checked.map(function(cb) { return cb.value; });
+        var n = ids.length;
+        // Build the hidden form contents fresh each time.
+        var form = document.getElementById('bulk-delete-form');
+        if (!form) return;
+        form.action = url;
+        // Drop any previous ids inputs.
+        Array.from(form.querySelectorAll('input[name="ids"]')).forEach(function(i) { i.remove(); });
+        ids.forEach(function(id) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'ids';
+            inp.value = id;
+            form.appendChild(inp);
+        });
+        // Type-to-confirm: operator must type the literal "DELETE N"
+        // string before the destructive button enables.
+        var target = 'DELETE ' + n;
+        var msg = 'You are about to delete ' + n + ' ' + label + (n === 1 ? '' : 's')
+            + '. This action cannot be undone. Type ' + target + ' to confirm.';
+        confirmDeleteTyped(target, msg, 'bulk-delete-form');
+    }
+
     function triggerRestart() { confirmRestart(); }
     function confirmRestart() {
         showConfirm('Restart MCP Server', 'The MCP server will be restarted. Active connections will be interrupted.', 'Restart Now', 'btn-warning', function() {

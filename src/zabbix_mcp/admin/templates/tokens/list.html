@@ -18,10 +18,26 @@
     {% endif %}
 </div>
 
+{% if current_user_role != 'viewer' and tokens %}
+<div id="bulk-bar" class="bulk-bar" hidden>
+    <span><span class="bulk-bar-count" id="bulk-count">0</span> token(s) selected</span>
+    <button type="button" class="btn btn-danger btn-sm" onclick="bulkDelete('token', '/tokens/bulk-delete')">Delete selected</button>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="bulkSelectAll(false)">Clear selection</button>
+</div>
+<form id="bulk-delete-form" method="post" action="/tokens/bulk-delete" style="display:none;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+</form>
+{% endif %}
+
 <div class="table-container">
     <table>
         <thead>
             <tr>
+                {% if current_user_role != 'viewer' %}
+                <th class="bulk-select-cell">
+                    <input type="checkbox" id="bulk-select-all" onchange="bulkSelectAll(this.checked)" aria-label="Select all">
+                </th>
+                {% endif %}
                 <th class="sortable">Name</th>
                 <th>Prefix</th>
                 <th>Scopes</th>
@@ -37,6 +53,11 @@
             {% if tokens %}
             {% for token in tokens %}
             <tr id="token-{{ token.id }}">
+                {% if current_user_role != 'viewer' %}
+                <td class="bulk-select-cell">
+                    <input type="checkbox" class="bulk-select" value="{{ token.id }}" aria-label="Select {{ token.name }}">
+                </td>
+                {% endif %}
                 <td class="cell-truncate" title="{{ token.name }}">
                     <a href="/tokens/{{ token.id }}" class="text-primary" style="font-weight:500;">{{ token.name }}</a>
                     {% if token.is_legacy %}
@@ -121,7 +142,7 @@
             {% endfor %}
             {% else %}
             <tr data-empty="true">
-                <td colspan="8">
+                <td colspan="{% if current_user_role != 'viewer' %}10{% else %}9{% endif %}">
                     <div class="empty-state">
                         <div class="empty-state-icon">&#x1F511;</div>
                         <div class="empty-state-text">No tokens created yet</div>
