@@ -33,7 +33,8 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-group">
             <label class="form-label">Server Name <span class="tooltip-icon" tabindex="0" data-tooltip="Identifier used as the `server` argument in MCP tool calls. Letters, digits, dashes, underscores. Must start with a letter. Can be renamed later (token allowed_servers references update automatically).">&#x1F6C8;</span></label>
-            <input type="text" name="name" class="form-input" placeholder="e.g. production, staging" required pattern="[a-zA-Z][a-zA-Z0-9_-]*" value="{{ form_name | default('') }}">
+            <input type="text" name="name" class="form-input" placeholder="e.g. production, staging" required pattern="[a-zA-Z][a-zA-Z0-9_-]*" value="{{ form_name | default('') }}"
+                   data-existing-names='{{ existing_server_names | default([]) | tojson }}'>
             <small class="text-muted">Identifier used in MCP tool calls (letters, numbers, dashes)</small>
         </div>
         <div class="form-group">

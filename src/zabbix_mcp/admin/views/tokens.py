@@ -117,6 +117,12 @@ def _get_global_context(admin_app) -> dict:
             if s not in zabbix_servers:
                 zabbix_servers.append(s)
 
+    # Existing token display names for the on-blur duplicate-check
+    # client-side validator (base.html _zmcpDupCheck). The same check
+    # also runs server-side at submit, this is purely a UX hint so
+    # the operator sees the conflict before hitting Save.
+    existing_token_names = [t.name for t in admin_app.token_store.list_tokens()]
+
     return {
         "disabled_groups": [g for g in disabled_tools if g in _ALL_GROUPS],
         "disabled_tools_list": disabled_tools,
@@ -124,6 +130,7 @@ def _get_global_context(admin_app) -> dict:
         "global_allowed_hosts": global_allowed_hosts,
         "tool_data": _TOOL_DATA,
         "zabbix_servers": zabbix_servers,
+        "existing_token_names": existing_token_names,
     }
 
 

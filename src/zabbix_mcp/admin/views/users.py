@@ -60,9 +60,15 @@ async def user_create(request: Request) -> Response:
     if not session or session.role != "admin":
         return RedirectResponse("/users", status_code=303)
 
+    # Existing usernames for the on-blur duplicate-check on the
+    # Username input (base.html _zmcpDupCheck). Reused across every
+    # render path on this handler.
+    existing_usernames = list(_get_admin_users(admin_app.config_path).keys())
+
     if request.method == "GET":
         return admin_app.render("users/create.html", request, {
             "active": "users",
+            "existing_usernames": existing_usernames,
         })
 
     form = await request.form()
@@ -70,7 +76,12 @@ async def user_create(request: Request) -> Response:
     password = str(form.get("password", ""))
     role = str(form.get("role", "viewer"))
 
-    form_ctx = {"active": "users", "form_username": username, "form_role": role}
+    form_ctx = {
+        "active": "users",
+        "form_username": username,
+        "form_role": role,
+        "existing_usernames": existing_usernames,
+    }
 
     # Validation: ASCII-only, length 2-50, [a-z0-9_-]+. Without this, a
     # Unicode username like "šáš" passes through to tomlkit and breaks

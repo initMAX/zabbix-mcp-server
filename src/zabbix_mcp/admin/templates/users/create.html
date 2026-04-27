@@ -30,7 +30,8 @@
             {% if edit_mode %}
             <input type="text" id="username" name="username" class="form-input" value="{{ edit_username }}" readonly style="opacity:0.7;">
             {% else %}
-            <input type="text" id="username" name="username" class="form-input" placeholder="Enter username" required autocomplete="off" value="{{ form_username or '' }}">
+            <input type="text" id="username" name="username" class="form-input" placeholder="Enter username" required autocomplete="off" value="{{ form_username or '' }}"
+                   data-existing-names='{{ existing_usernames | default([]) | tojson }}'>
             {% endif %}
         </div>
 

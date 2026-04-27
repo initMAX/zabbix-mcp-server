@@ -452,6 +452,57 @@
         }
     });
 
+    /**
+     * On-blur duplicate-name check. Wired up to any input that
+     * carries `data-existing-names='[...json...]'`. When the operator
+     * tabs out / clicks elsewhere, we compare the trimmed value
+     * against the JSON array; if it's already taken, paint the input
+     * red and append a short hint underneath. Reported 2026-04-27 by
+     * a tester who wanted the duplicate-name error visible BEFORE
+     * hitting Save, not as a flash after server-side rejection.
+     *
+     * `data-current-name` exempts the current value on edit forms -
+     * operator should be allowed to save the same name they came in
+     * with.
+     */
+    function _zmcpDupCheck(input) {
+        var raw;
+        try { raw = JSON.parse(input.dataset.existingNames || '[]'); }
+        catch (_) { return; }
+        var taken = new Set(raw);
+        var current = input.dataset.currentName || '';
+        var value = (input.value || '').trim();
+        var hintId = (input.id || input.name || 'name') + '-dup-hint';
+        var hint = document.getElementById(hintId);
+        if (!value || value === current || !taken.has(value)) {
+            input.classList.remove('input-invalid');
+            if (hint) hint.remove();
+            return;
+        }
+        input.classList.add('input-invalid');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.id = hintId;
+            hint.className = 'form-hint dup-hint';
+            hint.style.color = 'var(--color-danger)';
+            hint.style.marginTop = '4px';
+            input.parentNode.appendChild(hint);
+        }
+        hint.textContent = '⚠ “' + value + '” already exists. Pick a different name.';
+    }
+    document.addEventListener('blur', function (e) {
+        if (e.target && e.target.dataset && e.target.dataset.existingNames !== undefined) {
+            _zmcpDupCheck(e.target);
+        }
+    }, true);
+    // Also re-check on input so the red border clears the moment the
+    // operator types a unique value, instead of waiting for blur.
+    document.addEventListener('input', function (e) {
+        if (e.target && e.target.dataset && e.target.dataset.existingNames !== undefined) {
+            _zmcpDupCheck(e.target);
+        }
+    });
+
     function bulkSelectAll(checked) {
         document.querySelectorAll('.bulk-select').forEach(function(cb) {
             if (!cb.disabled) cb.checked = !!checked;

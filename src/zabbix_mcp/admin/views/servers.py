@@ -135,6 +135,9 @@ def _render_servers_list(request: Request, admin_app, extra: dict | None = None)
     ctx = {
         "active": "servers",
         "servers": servers,
+        # Existing server names for the on-blur duplicate-check on
+        # the Add Server form (base.html _zmcpDupCheck).
+        "existing_server_names": list(config_zabbix.keys()),
     }
     if extra:
         ctx.update(extra)
@@ -251,11 +254,19 @@ async def server_edit(request: Request) -> Response:
             return RedirectResponse("/servers", status_code=303)
 
         from zabbix_mcp.admin.config_writer import config_mtime
+        # Existing server names for the on-blur duplicate-check on
+        # the rename input. data-current-name on the input excludes
+        # the current value so the operator can save without rename.
+        try:
+            all_servers = list(load_config_document(admin_app.config_path).get("zabbix", {}).keys())
+        except Exception:
+            all_servers = []
         return admin_app.render("servers_edit.html", request, {
             "active": "servers",
             "edit_server_name": server_name,
             "server": srv,
             "config_mtime": config_mtime(admin_app.config_path),
+            "existing_server_names": all_servers,
         })
 
     # POST — save changes

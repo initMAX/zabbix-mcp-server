@@ -22,7 +22,9 @@
             <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
         <div class="form-group">
             <label class="form-label">Server name <span class="tooltip-icon" tabindex="0" data-tooltip="Identifier used as the `server` argument in MCP tool calls. Letters, digits, dashes, underscores. Must start with a letter. Rename rewrites token allowed_servers references automatically.">&#x1F6C8;</span></label>
-            <input type="text" name="name" id="srv-name" class="form-input" value="{{ edit_server_name }}" pattern="[a-zA-Z][a-zA-Z0-9_-]*" required>
+            <input type="text" name="name" id="srv-name" class="form-input" value="{{ edit_server_name }}" pattern="[a-zA-Z][a-zA-Z0-9_-]*" required
+                   data-existing-names='{{ existing_server_names | default([]) | tojson }}'
+                   data-current-name="{{ edit_server_name }}">
             <small class="text-muted">Letters, digits, dashes, underscores. Must start with a letter. Renaming also updates token <code>allowed_servers</code> references.</small>
         </div>
         <div class="form-group">

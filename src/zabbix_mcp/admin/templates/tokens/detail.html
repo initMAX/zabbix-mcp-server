@@ -37,6 +37,8 @@
             <div class="form-group">
                 <label class="form-label" for="name">Token Name <span class="text-muted" style="font-weight:400; font-size:0.78rem;">(<span id="name-counter">{{ token.name|length }}</span>/100)</span> <span class="tooltip-icon" tabindex="0" data-tooltip="Free-form label shown in the token list and audit log. Renaming does not affect the token id used in MCP client configs.">&#x1F6C8;</span></label>
                 <input type="text" id="name" name="name" class="form-input" value="{{ token.name }}" required maxlength="100"
+                       data-existing-names='{{ existing_token_names | default([]) | tojson }}'
+                       data-current-name="{{ token.name }}"
                        oninput="document.getElementById('name-counter').textContent = this.value.length; this.classList.toggle('input-near-limit', this.value.length >= 90);">
             </div>
 

@@ -74,6 +74,7 @@
                    required autocomplete="off"
                    maxlength="100"
                    value="{{ form_name | default('') }}"
+                   data-existing-names='{{ existing_token_names | default([]) | tojson }}'
                    oninput="document.getElementById('name-counter').textContent = this.value.length; this.classList.toggle('input-near-limit', this.value.length >= 90);">
             <div class="form-hint">A descriptive name to identify this token. Maximum 100 characters.</div>
         </div>
