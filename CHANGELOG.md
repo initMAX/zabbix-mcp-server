@@ -207,7 +207,7 @@ same observations.
 - **`tokens/create.html` form gets `autocomplete="off"` (Bug 9)**.
   Browser autofill no longer leaks values from `/tokens/<id>` into
   the create form.
-- **Token Name silent-failure on > 100 chars (kokos report)**.
+- **Token Name silent-failure on > 100 chars**.
   `tokens/create.html` was missing the `{% if error %}` block, so
   server-side rejection rendered an empty form that looked like
   success. Added the alert banner, plus `maxlength="100"`, a live
@@ -226,7 +226,7 @@ same observations.
   checkboxes on a single typo, forcing the operator to retype the
   50-char API token from scratch. Re-renders the same page with
   `add_form_open=True` plus form_* values. Same fix shape as the
-  kokos token form.
+  token-name form preservation above.
 - **/users/create form_ctx now propagated to ALL error branches**:
   the "user already exists" and "save failed" branches were the
   only two that didn't include it, so the username + role got

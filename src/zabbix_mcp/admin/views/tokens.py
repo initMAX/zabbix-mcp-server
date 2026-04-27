@@ -547,6 +547,16 @@ async def token_bulk_delete(request: Request) -> Response:
     ids = [str(s).strip() for s in form.getlist("ids") if str(s).strip()]
     if not ids:
         return admin_app.flash_redirect("/tokens", "No tokens selected.", "danger")
+    # Cap the batch so a malicious / typo'd POST cannot pin the
+    # tomlkit save under 10000 deletions. 500 is way above any
+    # realistic operator workflow (production deployments rarely
+    # have more than ~50 active tokens).
+    if len(ids) > 500:
+        return admin_app.flash_redirect(
+            "/tokens",
+            f"Bulk delete is capped at 500 tokens per request (got {len(ids)}).",
+            "danger",
+        )
 
     try:
         from zabbix_mcp.admin.config_writer import save_config_document

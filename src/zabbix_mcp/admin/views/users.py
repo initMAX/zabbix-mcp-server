@@ -256,6 +256,12 @@ async def user_bulk_delete(request: Request) -> Response:
     ids = [str(s).strip() for s in form.getlist("ids") if str(s).strip()]
     if not ids:
         return admin_app.flash_redirect("/users", "No users selected.", "danger")
+    if len(ids) > 500:
+        return admin_app.flash_redirect(
+            "/users",
+            f"Bulk delete is capped at 500 users per request (got {len(ids)}).",
+            "danger",
+        )
     if session.user in ids:
         return admin_app.flash_redirect(
             "/users",

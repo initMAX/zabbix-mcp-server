@@ -116,6 +116,66 @@ class _PostRateLimitMiddleware:
         await self.app(scope, receive, send)
 
 
+class _SecurityHeadersMiddleware:
+    """ASGI middleware that adds the standard hardening headers to
+    every response. Cheap defense-in-depth on top of the existing
+    CSRF / SameSite / rate-limit protections.
+
+    - Cache-Control: no-store on authenticated HTML so browser back
+      buttons / forward proxies cannot replay an admin page that
+      contains an API token (e.g. /servers/create after validation
+      failure now re-renders with the typed token in the input).
+    - X-Content-Type-Options: nosniff stops IE/old-browser MIME
+      guessing tricks.
+    - X-Frame-Options: DENY blocks clickjacking by refusing to be
+      embedded in another site's iframe.
+    - Referrer-Policy: same-origin keeps token names / URL paths
+      out of the Referer header on outbound clicks.
+    - Strict-Transport-Security (only when TLS is on) tells the
+      browser HTTPS for next 6 months.
+    """
+
+    def __init__(self, app: Starlette, *, tls_enabled: bool = False) -> None:
+        self.app = app
+        self.state = app.state
+        self.tls_enabled = tls_enabled
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "") or ""
+        # Static files can be cached normally - they are public, no
+        # secrets, and forcing no-store would tank performance.
+        is_static = path.startswith("/static/")
+
+        async def _wrapped_send(event):
+            if event["type"] == "http.response.start":
+                headers = list(event.get("headers", []))
+                # Don't double-add - some endpoints already set
+                # specific cache directives (login redirect, etc.).
+                seen = {h[0].lower() for h in headers}
+                add: list[tuple[bytes, bytes]] = []
+                if not is_static:
+                    if b"cache-control" not in seen:
+                        add.append((b"cache-control", b"no-store, no-cache, must-revalidate"))
+                if b"x-content-type-options" not in seen:
+                    add.append((b"x-content-type-options", b"nosniff"))
+                if b"x-frame-options" not in seen:
+                    add.append((b"x-frame-options", b"DENY"))
+                if b"referrer-policy" not in seen:
+                    add.append((b"referrer-policy", b"same-origin"))
+                if self.tls_enabled and b"strict-transport-security" not in seen:
+                    # 6 months, no preload / subdomains - safe default
+                    # for self-hosted deployments behind their own DNS.
+                    add.append((b"strict-transport-security", b"max-age=15552000"))
+                event = dict(event)
+                event["headers"] = headers + add
+            await send(event)
+
+        await self.app(scope, receive, _wrapped_send)
+
+
 class _CsrfMiddleware:
     """ASGI middleware: validate CSRF token on unsafe methods.
 
@@ -418,12 +478,17 @@ class AdminApp:
         app = Starlette(routes=routes, exception_handlers={404: not_found})
         app.state.admin_app = self
 
-        # Wrap with CSRF validation first (innermost), then POST rate
-        # limiting (outermost). Order matters: rate limit rejects before
-        # we decode the body, CSRF reads the body for form-urlencoded
-        # submissions.
+        # Wrap (innermost first):
+        #   1. CSRF validates the body
+        #   2. POST rate limit rejects before body decode
+        #   3. Security headers add Cache-Control / X-Frame / nosniff
+        #      / Referrer-Policy / HSTS to every response (and short-
+        #      circuit doesn't strip them - the wrapped send hook
+        #      runs after the inner app produces the response).
+        tls_on = bool(getattr(self.config.server, "tls_cert_file", None))
         csrf_app = _CsrfMiddleware(app)
-        return _PostRateLimitMiddleware(csrf_app)
+        rate_app = _PostRateLimitMiddleware(csrf_app)
+        return _SecurityHeadersMiddleware(rate_app, tls_enabled=tls_on)
 
     def render(self, template_name: str, request: Request, context: dict | None = None, status_code: int = 200) -> HTMLResponse:
         """Render a Jinja2 template with common context."""

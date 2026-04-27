@@ -719,6 +719,12 @@ async def template_bulk_delete(request: Request) -> Response:
     ids = [str(s).strip() for s in form.getlist("ids") if str(s).strip()]
     if not ids:
         return admin_app.flash_redirect("/templates", "No templates selected.", "danger")
+    if len(ids) > 500:
+        return admin_app.flash_redirect(
+            "/templates",
+            f"Bulk delete is capped at 500 templates per request (got {len(ids)}).",
+            "danger",
+        )
 
     custom = _get_custom_templates(admin_app.config_path)
     by_id = {t["id"]: t for t in custom}
@@ -726,9 +732,19 @@ async def template_bulk_delete(request: Request) -> Response:
     missing: list[str] = []
     custom_dir = CUSTOM_TEMPLATE_DIR.resolve()
 
+    # Single TOML load + N section deletes + single save (instead of
+    # N load+save cycles via remove_config_table) - prevents disk DoS
+    # when a large batch is submitted, matches the token / user
+    # bulk-delete pattern.
+    from zabbix_mcp.admin.config_writer import (
+        load_config_document,
+        save_config_document,
+    )
+    from zabbix_mcp.admin.audit_writer import write_audit
+    client_ip = request.client.host if request.client else ""
     try:
-        from zabbix_mcp.admin.audit_writer import write_audit
-        client_ip = request.client.host if request.client else ""
+        doc = load_config_document(admin_app.config_path)
+        rt_section = doc.get("report_templates") if hasattr(doc, "get") else None
         for tid in ids:
             tmpl = by_id.get(tid)
             if not tmpl:
@@ -742,13 +758,13 @@ async def template_bulk_delete(request: Request) -> Response:
                     resolved.unlink()
             except Exception as exc:
                 logger.warning("template_bulk_delete: could not unlink %s: %s", file_path, exc)
-            try:
-                remove_config_table(admin_app.config_path, "report_templates", tid)
+            if rt_section is not None and tid in rt_section:
+                del rt_section[tid]
                 deleted.append(tid)
                 write_audit("template_delete", user=session.user, target_type="template", target_id=tid, ip=client_ip)
-            except Exception as exc:
-                logger.error("template_bulk_delete: config remove failed for %s: %s", tid, exc)
+            else:
                 missing.append(tid)
+        save_config_document(admin_app.config_path, doc)
         admin_app.restart_needed = True
         msg = f"Deleted {len(deleted)} template(s). Restart required."
         if missing:
