@@ -12,7 +12,12 @@
     {# Expose per-session CSRF token to inline JS (fetch/htmx requests). #}
     <meta name="csrf-token" content="{{ csrf_token }}">
     <title>{% block title %}Zabbix MCP Server{% endblock %} — Admin</title>
-    <link rel="stylesheet" href="/static/style.css">
+    {# Append the running version as a cache-buster to our own assets so
+       returning users do not get the previous release's CSS / JS from
+       the browser cache. Vendor libraries (flatpickr, grapes, htmx)
+       are pinned to a specific minified file by name and rarely
+       change - they can keep relying on regular cache. #}
+    <link rel="stylesheet" href="/static/style.css?v={{ version }}">
     <link rel="stylesheet" href="/static/flatpickr.min.css">
     <link rel="stylesheet" href="/static/grapes.min.css">
     <script src="/static/htmx.min.js"></script>
