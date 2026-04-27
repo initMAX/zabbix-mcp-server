@@ -186,7 +186,7 @@
         <div class="settings-row">
             <div class="settings-label">IP Allowlist <span class="tooltip-icon" tabindex="0" data-tooltip="Server-wide IP/CIDR allowlist. Applies BEFORE per-token IP restriction - this is the floor, individual tokens can only narrow it further. Empty = any IP allowed (use with care).">&#x1F6C8;</span></div>
             <div>
-                <textarea name="allowed_hosts" class="form-input" rows="2" placeholder="192.168.1.0/24, 10.0.0.1">{{ settings.allowed_hosts | join(', ') if settings.allowed_hosts else '' }}</textarea>
+                <textarea name="allowed_hosts" class="form-input" rows="2" placeholder="192.168.1.0/24, 10.0.0.1, 2001:db8::/32">{{ settings.allowed_hosts | join(', ') if settings.allowed_hosts else '' }}</textarea>
                 <div class="form-hint">Comma-separated IP/CIDR ranges. Empty = allow all.</div>
             </div>
         </div>

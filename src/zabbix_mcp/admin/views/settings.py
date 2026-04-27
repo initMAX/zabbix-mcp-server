@@ -77,6 +77,21 @@ SECTION_CONFIG = {
 SECRET_KEEP_EMPTY = {"api_key"}
 
 
+def _normalize_ip_entry(entry: str) -> str:
+    """Return the canonical string form of an IP / CIDR entry.
+
+    Collapses equivalent forms so a duplicate check can catch them:
+        192.168.1.1            -> 192.168.1.1/32
+        192.168.001.001        -> 192.168.1.1/32
+        2001:db8::1            -> 2001:db8::1/128
+        2001:0db8::0001        -> 2001:db8::1/128
+    Raises ValueError for invalid input - callers should already
+    have validated via ip_network() before calling this.
+    """
+    from ipaddress import ip_network
+    return str(ip_network(entry, strict=False))
+
+
 def _validate_list_entry(key: str, entry: str) -> str | None:
     """Per-list-key value sanity check. Returns an error string when
     the entry is malformed, None when OK.
@@ -85,14 +100,18 @@ def _validate_list_entry(key: str, entry: str) -> str | None:
     config.toml and bricking the next boot. Token IP Restriction
     already validates each line; this brings the global / settings
     parallel of that validation up to the same bar.
+
+    Note: this is a per-entry check. Cross-entry checks (duplicate
+    detection) live in the LIST_KEYS save loop because they need to
+    see all entries together.
     """
     if key == "allowed_hosts":
         # Global IP allowlist - same shape as token allowed_ips.
+        # Both IPv4 and IPv6 (with and without CIDR suffix) accepted.
         try:
-            from ipaddress import ip_network
-            ip_network(entry, strict=False)
+            _normalize_ip_entry(entry)
         except (ValueError, TypeError):
-            return f"'{entry}' is not a valid IP address or CIDR range."
+            return f"'{entry}' is not a valid IPv4 / IPv6 address or CIDR range."
         return None
     if key == "cors_origins":
         # Browser CORS Origin header - must be scheme://host[:port],
@@ -303,7 +322,29 @@ async def settings_update(request: Request) -> Response:
                         err = _validate_list_entry(key, entry)
                         if err:
                             return admin_app.flash_redirect("/settings", err, "danger")
-                    config_section[key] = parsed
+                    # Duplicate detection. For IP-typed keys we
+                    # normalize first so 192.168.1.1 and 192.168.1.1/32
+                    # collapse to the same canonical form (and IPv6
+                    # variants like 2001:0db8::1 vs 2001:db8::1).
+                    seen: dict[str, str] = {}
+                    deduped: list[str] = []
+                    for entry in parsed:
+                        if key == "allowed_hosts":
+                            try:
+                                key_norm = _normalize_ip_entry(entry)
+                            except ValueError:
+                                key_norm = entry  # validator above would have caught it
+                        else:
+                            key_norm = entry
+                        if key_norm in seen:
+                            return admin_app.flash_redirect(
+                                "/settings",
+                                f"Duplicate entry: '{entry}' is the same as '{seen[key_norm]}'.",
+                                "danger",
+                            )
+                        seen[key_norm] = entry
+                        deduped.append(entry)
+                    config_section[key] = deduped
                 elif key in config_section:
                     del config_section[key]
             elif key in form:

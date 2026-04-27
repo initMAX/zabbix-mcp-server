@@ -215,11 +215,19 @@ async def token_create(request: Request) -> Response:
     # token-auth check later.
     if allowed_ips:
         from ipaddress import ip_network as _ipnet
+        # IPv4 and IPv6 both supported; '2001:db8::/32' or '10.0.0.0/8'
+        # work either way. Normalize via str(ip_network()) so
+        # 192.168.1.1, 192.168.1.1/32 and 192.168.001.001 collapse to
+        # the same canonical form for duplicate detection.
+        seen: dict[str, str] = {}
         for ip in allowed_ips:
             try:
-                _ipnet(ip, strict=False)
+                norm = str(_ipnet(ip, strict=False))
             except ValueError:
-                return _err(f"IP allowlist entry '{ip}' is not a valid IP address or CIDR range.")
+                return _err(f"IP allowlist entry '{ip}' is not a valid IPv4 / IPv6 address or CIDR range.")
+            if norm in seen:
+                return _err(f"Duplicate IP allowlist entry: '{ip}' is the same as '{seen[norm]}'.")
+            seen[norm] = ip
     expires_at = str(form.get("expires_at", "")).strip() or None
     if expires_at:
         # Accept the same ISO 8601 form the token store consumes
@@ -368,15 +376,23 @@ async def token_detail(request: Request) -> Response:
         allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
         if allowed_ips_raw:
             ips = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()]
+            seen_ips: dict[str, str] = {}
             for ip in ips:
                 try:
-                    _ipnet(ip, strict=False)
+                    norm = str(_ipnet(ip, strict=False))
                 except ValueError:
                     return admin_app.flash_redirect(
                         f"/tokens/{token_id}",
-                        f"IP allowlist entry '{ip}' is not a valid IP address or CIDR range.",
+                        f"IP allowlist entry '{ip}' is not a valid IPv4 / IPv6 address or CIDR range.",
                         "danger",
                     )
+                if norm in seen_ips:
+                    return admin_app.flash_redirect(
+                        f"/tokens/{token_id}",
+                        f"Duplicate IP allowlist entry: '{ip}' is the same as '{seen_ips[norm]}'.",
+                        "danger",
+                    )
+                seen_ips[norm] = ip
             updates["allowed_ips"] = ips
         else:
             updates["allowed_ips"] = []
