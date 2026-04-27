@@ -201,7 +201,42 @@ async def token_create(request: Request) -> Response:
     read_only = "read_only" in form
     allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
     allowed_ips = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()] if allowed_ips_raw else None
+    # Validate every IP / CIDR before write so a typo cannot park a
+    # malformed string in config.toml and surface as a 500 at every
+    # token-auth check later.
+    if allowed_ips:
+        from ipaddress import ip_network as _ipnet
+        for ip in allowed_ips:
+            try:
+                _ipnet(ip, strict=False)
+            except ValueError:
+                ctx = {
+                    "active": "tokens", "return_to": return_to,
+                    "error": f"IP allowlist entry '{ip}' is not a valid IP address or CIDR range.",
+                }
+                ctx.update(_get_global_context(admin_app))
+                return admin_app.render("tokens/create.html", request, ctx)
     expires_at = str(form.get("expires_at", "")).strip() or None
+    if expires_at:
+        # Accept the same ISO 8601 form the token store consumes
+        # (YYYY-MM-DD or full timestamp). Reject everything else
+        # so we don't have to deal with parse errors later.
+        from datetime import datetime as _dt
+        ok = False
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S"):
+            try:
+                _dt.strptime(expires_at, fmt)
+                ok = True
+                break
+            except ValueError:
+                continue
+        if not ok:
+            ctx = {
+                "active": "tokens", "return_to": return_to,
+                "error": f"Expiry date '{expires_at}' is not a recognized format. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS.",
+            }
+            ctx.update(_get_global_context(admin_app))
+            return admin_app.render("tokens/create.html", request, ctx)
 
     # Parse allowed_servers
     servers_raw = str(form.get("allowed_servers", "*")).strip()
