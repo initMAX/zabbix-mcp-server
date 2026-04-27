@@ -220,4 +220,28 @@
     </div>
 </div>
 {% endif %}
+
+{# Visible "Testing..." in-flight state for the Test Connection
+   buttons. The body sets hx-indicator="#loader" which routes the
+   default htmx-request class to the top progress bar instead of
+   the trigger, so we can't rely on it for per-button feedback.
+   Toggle a small `is-testing` class on the actual button
+   (matched via `hx-target` starting with "server-status-") so the
+   operator sees it ghost out and show " (testing...)" while the
+   probe is in flight. #}
+<script>
+(function () {
+    function isTestButton(el) {
+        if (!el || el.tagName !== 'BUTTON') return false;
+        var t = el.getAttribute('hx-target') || '';
+        return t.indexOf('server-status-') !== -1;
+    }
+    document.addEventListener('htmx:beforeRequest', function (e) {
+        if (isTestButton(e.target)) e.target.classList.add('is-testing');
+    });
+    document.addEventListener('htmx:afterRequest', function (e) {
+        if (isTestButton(e.target)) e.target.classList.remove('is-testing');
+    });
+})();
+</script>
 {% endblock %}

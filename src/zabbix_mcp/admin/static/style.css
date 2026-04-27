@@ -1253,21 +1253,19 @@ tbody tr:last-child td {
     font-size: 0.85rem;
 }
 
-/* While the Test Connection htmx request is in flight, htmx adds the
-   `htmx-request` class to the triggering element. Surface that to the
-   operator with a clear "Testing..." indicator on the status row so
-   they know something is happening - reported 2026-04-27 by a viewer
-   who waited several seconds and gave up because the only visible cue
-   was the existing pulse dot. */
-.server-card-meta .status-inline.htmx-request,
-.server-card-footer button.htmx-request {
-    position: relative;
-}
-.server-card-footer button.htmx-request {
+/* While the Test Connection request is in flight, the inline JS in
+   servers.html adds the `is-testing` class to the triggering button.
+   We can't rely on htmx's own `htmx-request` class because the body
+   element sets `hx-indicator="#loader"` which directs all indicators
+   to the top progress bar, never decorating the trigger.
+   Reported 2026-04-27 by a viewer who waited several seconds and
+   gave up because the only visible cue was the existing pulse dot. */
+.btn.is-testing {
     opacity: 0.65;
     pointer-events: none;
+    position: relative;
 }
-.server-card-footer button.htmx-request::after {
+.btn.is-testing::after {
     content: ' (testing...)';
     color: var(--text-muted);
     font-style: italic;
