@@ -10,7 +10,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">{% if edit_mode %}Edit User: {{ edit_username }}{% else %}Create User{% endif %}</h1>
+        <h1 class="page-title" {% if edit_mode %}title="Edit User: {{ edit_username }}"{% endif %}>{% if edit_mode %}Edit User: {{ edit_username }}{% else %}Create User{% endif %}</h1>
         <p class="page-subtitle">{% if edit_mode %}Update user account settings{% else %}Add a new admin portal user account{% endif %}</p>
     </div>
     <a href="/users" class="btn btn-ghost">&larr; Back to Users</a>

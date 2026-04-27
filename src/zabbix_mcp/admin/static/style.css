@@ -445,6 +445,17 @@ a:hover {
     font-size: 1.05rem;
     font-weight: 600;
     color: var(--text-primary);
+    /* Truncate when the title carries user-controlled text (token name,
+       template name, server name) so a 5000-character paste cannot
+       blow the card layout out across the whole viewport. Reported
+       2026-04-27 with a video of a long token name forcing horizontal
+       overflow. The full string lives in the `title` attribute the
+       templates already set. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .card-body {
@@ -1445,6 +1456,15 @@ tbody tr:last-child td {
 .server-card-name {
     font-weight: 600;
     font-size: 1.05rem;
+    /* Same truncation guard as .card-title - user can name a server
+       with arbitrary text, do not let one absurd value distort the
+       whole grid. Full string lives in the `title` attribute. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 auto;
 }
 
 .server-card-badges {

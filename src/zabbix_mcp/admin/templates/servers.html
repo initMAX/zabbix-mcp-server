@@ -150,7 +150,7 @@
     {% for server in servers %}
     <div class="server-card" id="server-{{ server.name }}">
         <div class="server-card-header">
-            <span class="server-card-name">{{ server.name }}</span>
+            <span class="server-card-name" title="{{ server.name }}">{{ server.name }}</span>
             <div class="server-card-badges">
                 {% if server.read_only %}
                 <span class="badge badge-warning">Read-only</span>

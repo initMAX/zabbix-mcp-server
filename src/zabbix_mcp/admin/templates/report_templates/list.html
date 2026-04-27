@@ -29,7 +29,7 @@
         {% for template in builtin_templates %}
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">{{ template.name }}</h3>
+                <h3 class="card-title" title="{{ template.name }}">{{ template.name }}</h3>
                 <span class="badge badge-muted">Built-in</span>
             </div>
             <div class="card-body">
@@ -73,7 +73,7 @@
                 {% if current_user_role != 'viewer' %}
                 <input type="checkbox" class="bulk-select" value="{{ template.id }}" aria-label="Select {{ template.name }}" style="margin-right:8px;">
                 {% endif %}
-                <h3 class="card-title">{{ template.name }}</h3>
+                <h3 class="card-title" title="{{ template.name }}">{{ template.name }}</h3>
                 <span class="badge badge-primary">Custom</span>
             </div>
             <div class="card-body">

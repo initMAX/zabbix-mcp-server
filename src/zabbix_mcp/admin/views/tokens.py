@@ -234,6 +234,12 @@ async def token_create(request: Request) -> Response:
     # 5000-char name that pushed the Delete button off-screen).
     if len(name) > 100:
         return _err(f"Token name must be 100 characters or fewer (you entered {len(name)}).")
+    # Display-name uniqueness - matches the same check on the edit
+    # path. Two tokens with the same visible name (different ids)
+    # render ambiguously in the list.
+    for t in admin_app.token_store.list_tokens():
+        if t.name == name:
+            return _err(f"Another token already uses the name '{name}'. Pick a different one.")
 
     # Parse scopes from hidden input (comma-separated) or checkboxes
     scopes_raw = str(form.get("scopes", "")).strip()
@@ -386,6 +392,18 @@ async def token_detail(request: Request) -> Response:
                     f"Token name must be 100 characters or fewer (you entered {len(name)}).",
                     "danger",
                 )
+            # Display-name uniqueness across tokens - without this two
+            # tokens can end up with the same visible name (different
+            # ids, same label), which renders ambiguously in the list.
+            # Reported 2026-04-27: renaming a token to an existing
+            # token's name silently dropped the change with no error.
+            for t in admin_app.token_store.list_tokens():
+                if t.id != token_id and t.name == name:
+                    return admin_app.flash_redirect(
+                        f"/tokens/{token_id}",
+                        f"Another token already uses the name '{name}'. Pick a different one.",
+                        "danger",
+                    )
             updates["name"] = name
 
         scopes_raw = str(form.get("scopes", "")).strip()

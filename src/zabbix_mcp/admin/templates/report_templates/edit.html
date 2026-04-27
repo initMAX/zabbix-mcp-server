@@ -11,7 +11,7 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">{% if t.id %}{{ t.name }}{% else %}New Template{% endif %}</h1>
+        <h1 class="page-title" {% if t.id %}title="{{ t.name }}"{% endif %}>{% if t.id %}{{ t.name }}{% else %}New Template{% endif %}</h1>
         <p class="page-subtitle">Design report templates with drag & drop or raw HTML</p>
     </div>
     <a href="/templates" class="btn btn-ghost">&larr; Back to Templates</a>
