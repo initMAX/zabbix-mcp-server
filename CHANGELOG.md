@@ -23,10 +23,12 @@ same observations.
   reverts a change** instead of staying sticky until an actual
   restart. The flag is now driven by a TOML diff between the
   on-disk config and the running snapshot.
-- **Update notifications**: a background poll of the GitHub
-  releases API once an hour shows an "Update vX.Y available" pill
-  in the top bar when a newer stable release is out. Disabled by
-  setting `[admin].update_check_enabled = false`.
+- **Update notifications**: every successful admin login lazily
+  polls the GitHub releases API (throttled to once per 30 min,
+  silent on failure). When a newer stable release is out, an
+  "Update vX.Y available" pill appears in the top bar. Idle
+  deployments make zero outbound traffic. Disabled by setting
+  `[admin].update_check_enabled = false`.
 - **Form auto-save**: token / user / server create forms snapshot
   every input change to `localStorage` so a session timeout in the
   middle of filling them does not lose the operator's draft. After
