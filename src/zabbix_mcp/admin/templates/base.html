@@ -682,13 +682,48 @@
         }
     });
 
-    // Copy to clipboard
+    // Copy to clipboard with HTTP-context fallback.
+    //
+    // navigator.clipboard.writeText() requires a secure context
+    // (HTTPS / localhost / 127.0.0.1). On a LAN IP over plain HTTP -
+    // which is the typical first-install flow before TLS is wired up -
+    // navigator.clipboard is `undefined` and the previous code silently
+    // failed (`undefined.writeText(...).then(...)` -> TypeError swallowed
+    // by the click handler). Reported 2026-04-27 from
+    // http://192.168.90.3:9090/wizard - copy button looked dead.
+    //
+    // Fallback uses an off-screen <textarea> + document.execCommand('copy'),
+    // deprecated but still implemented by every browser shipping today
+    // and works in any context.
     function copyToClipboard(text, btn) {
-        navigator.clipboard.writeText(text).then(function() {
+        var done = function (ok) {
+            if (!btn) return;
             var orig = btn.innerHTML;
-            btn.textContent = '\u2713';
-            setTimeout(function() { btn.innerHTML = orig; }, 2000);
-        });
+            btn.textContent = ok ? '\u2713' : '\u2717';
+            setTimeout(function () { btn.innerHTML = orig; }, 2000);
+        };
+        if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(
+                function () { done(true); },
+                function () { _legacyCopy(text, done); }
+            );
+            return;
+        }
+        _legacyCopy(text, done);
+    }
+    function _legacyCopy(text, done) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        // Off-screen but selectable. position:fixed avoids viewport scroll.
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none;';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+        document.body.removeChild(ta);
+        done(ok);
     }
 
     // Initialize flatpickr on all date inputs (native type="date" + class="flatpickr-date")
