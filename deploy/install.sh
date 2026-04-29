@@ -596,6 +596,16 @@ RestartSec=5
 # by exiting the current process. The previous Restart=on-failure value
 # treated clean SIGTERM exits as success and did not respawn.
 
+# File descriptor limit. systemd's default soft limit is 1024 which is
+# not enough once a few MCP clients connect simultaneously - each
+# request needs an accept() socket plus a cached ZabbixAPI HTTP socket
+# per backend, and a few admin portal htmx swaps on top. Reported
+# 2026-04-29: production crashed with "OSError: [Errno 24] Too many
+# open files" in asyncio's accept loop, lsof showed ~1000 sockets.
+# 65535 is way above any realistic concurrent-client count and well
+# under the kernel's hard limit (524288 on this distro).
+LimitNOFILE=65535
+
 # Logging — application writes to log_file from config.toml directly.
 # Startup errors (before logging init) go to journal:
 #   journalctl -u zabbix-mcp-server
