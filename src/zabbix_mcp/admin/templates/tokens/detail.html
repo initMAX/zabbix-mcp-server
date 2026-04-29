@@ -159,6 +159,14 @@
                     <button type="button" class="btn btn-ghost" onclick="showConfirm('Revoke Token', 'This token will immediately stop working for MCP authentication.', 'Revoke', 'btn-warning', function(){ document.getElementById('revoke-form').submit(); })">Revoke Token</button>
                 </form>
                 {% endif %}
+                {# Regenerate keeps the token id (no client config update
+                   needed) but issues a fresh secret. The previous raw
+                   value stops working as soon as the new hash is saved.
+                   Use when the bearer leaks or for routine rotation. #}
+                <form method="post" action="/tokens/{{ token.id }}/regenerate" style="display:inline;" id="regen-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="button" class="btn btn-warning" onclick="showConfirm('Regenerate Token', 'A new bearer value will be issued. The current token stops working immediately - every MCP client config using it will need the new value.', 'Regenerate', 'btn-warning', function(){ document.getElementById('regen-form').submit(); })">Regenerate</button>
+                </form>
                 <button class="btn btn-danger" onclick="openModal('delete-modal')">Delete Token</button>
             </div>
         </div>

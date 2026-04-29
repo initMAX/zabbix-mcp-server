@@ -104,6 +104,13 @@
                 <td class="text-sm text-muted">{{ token.last_used_at or 'Never' }}</td>
                 <td>
                     <div class="actions">
+                        {% if current_user_role != 'viewer' %}
+                        {# Duplicate clones every setting (scopes, allowed_servers,
+                           IP allowlist, expiry, read_only) into the create form
+                           under a "(copy)" name suffix. Operator adjusts and
+                           saves -> brand new id + fresh raw secret. #}
+                        <a href="/tokens/create?duplicate_from={{ token.id | urlencode }}" class="btn btn-ghost btn-sm" title="Clone this token's settings into a new token">Duplicate</a>
+                        {% endif %}
                         {% if token.revoked %}
                         <form method="post" action="/tokens/{{ token.id }}/revoke" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

@@ -413,7 +413,7 @@ class AdminApp:
 
     def _build_app(self) -> Starlette:
         from zabbix_mcp.admin.views.dashboard import dashboard
-        from zabbix_mcp.admin.views.tokens import token_list, token_create, token_detail, token_revoke, token_delete, token_bulk_delete
+        from zabbix_mcp.admin.views.tokens import token_list, token_create, token_detail, token_revoke, token_delete, token_bulk_delete, token_regenerate
         from zabbix_mcp.admin.views.users import user_list, user_create, user_detail, user_delete, user_bulk_delete
         from zabbix_mcp.admin.views.servers import servers_view, server_create, server_edit, server_delete, server_test, server_restart, server_test_new
         from zabbix_mcp.admin.views.templates import template_list, template_create, template_edit, template_preview, template_delete, template_generate, template_bulk_delete
@@ -435,6 +435,7 @@ class AdminApp:
             Route("/tokens/bulk-delete", token_bulk_delete, methods=["POST"]),
             Route("/tokens/{token_id}", token_detail, methods=["GET", "POST"]),
             Route("/tokens/{token_id}/revoke", token_revoke, methods=["POST"]),
+            Route("/tokens/{token_id}/regenerate", token_regenerate, methods=["POST"]),
             Route("/tokens/{token_id}/delete", token_delete, methods=["POST"]),
             Route("/users", user_list),
             Route("/users/create", user_create, methods=["GET", "POST"]),

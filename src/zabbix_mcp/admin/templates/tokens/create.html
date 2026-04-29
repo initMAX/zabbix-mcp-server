@@ -25,7 +25,7 @@
    scrolling. #}
 <div class="token-display" id="token-display">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <span class="text-success" style="font-weight:600;">&#x2713; Token created successfully</span>
+        <span class="text-success" style="font-weight:600;">&#x2713; Token {% if regenerated %}regenerated{% else %}created{% endif %} successfully</span>
         <button class="btn btn-ghost btn-sm" onclick="copyToClipboard('{{ created_token }}', this)">&#x1F4CB; Copy</button>
     </div>
     <div class="token-value">{{ created_token }}</div>
