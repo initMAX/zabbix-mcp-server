@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.26 - unreleased
+
+### Added
+
+- **Token Regenerate** (`/tokens/<id>` Danger Zone). Issues a fresh raw bearer for the same token id - same name / scopes / allowed_servers / allowed_ips / expiry / read_only flag, only the secret value changes. Old raw stops working immediately, new value shown once via the existing create-success card with a `regenerated` flag so the header reads "regenerated" instead of "created". Use case: leak suspected, scheduled rotation - operator does not want to rebuild the token's permission set, just rotate the secret.
+- **Token Duplicate** (button on `/tokens` list). `/tokens/create?duplicate_from=<id>` pre-fills every field from the source token under a `(copy)` name suffix. Operator adjusts (typically the name + IP allowlist) and saves -> brand new id + fresh raw secret, source token untouched. Use case: spinning up a sibling token with the same scopes but narrower IPs.
+
+### Fixed
+
+- **Copy buttons work over plain HTTP / LAN IPs.** `navigator.clipboard.writeText()` is only available in secure contexts (HTTPS / localhost / 127.0.0.1). On a LAN IP over plain HTTP - the typical first-install flow before TLS is wired up - `navigator.clipboard` was `undefined` and the previous one-liner threw a swallowed TypeError. Copy buttons looked dead on every page that uses them (most visibly the wizard's snippet card). Reported from `http://192.168.90.3:9090/wizard`. `copyToClipboard()` now falls back to the off-screen textarea + `document.execCommand('copy')` trick when the secure-context API is missing or rejects, with ✓ / ✗ feedback on the button so the operator knows whether to fall back to manual selection.
+- **systemd unit `LimitNOFILE=65535`** (was the default soft 1024). Production crashed with `OSError: [Errno 24] Too many open files` in asyncio's accept loop on both the admin portal and MCP ports. 1024 is fine when idle but runs out fast under realistic load: each MCP client request needs an accept() socket plus the cached ZabbixAPI HTTP keepalive sockets (one per `[zabbix.<n>]` backend), plus htmx swaps from the admin portal. Existing deployments get the fix automatically on `install.sh upgrade` (the upgrade path always rewrites the unit and calls daemon-reload). For deployments staying on v1.25, apply a systemd drop-in:
+
+  ```
+  mkdir -p /etc/systemd/system/zabbix-mcp-server.service.d
+  cat > /etc/systemd/system/zabbix-mcp-server.service.d/limits.conf <<EOF
+  [Service]
+  LimitNOFILE=65535
+  EOF
+  systemctl daemon-reload
+  systemctl restart zabbix-mcp-server
+  ```
+
 ## v1.25 - 2026-04-27
 
 Live testing session immediately after v1.24 shipped. Tester ran a fresh install on a public VPS and worked through every form in the admin portal; this release ships fixes for everything they hit, plus a real-time validation layer so the operator sees most of the rejections before they hit Save.
