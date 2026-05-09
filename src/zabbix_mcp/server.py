@@ -2759,10 +2759,12 @@ def run_server(
             "other Zabbix objects. Most 'get' tools support filtering via 'filter', "
             "'search', and 'limit' parameters. Write operations (create/update/delete) "
             "are only allowed on servers not configured as read_only. The server can "
-            "be extended with additional MCP integrations (iDoklad, WordPress, "
-            "FastSpring, ...) installed as plugins from the initmax-mcp catalog, in "
-            "which case more tools appear alongside the Zabbix ones with their own "
-            "per-plugin prefix (e.g. idoklad__invoice_create, wordpress__post_update)."
+            "be extended with additional MCP integrations installed as plugins from "
+            "the initmax-mcp catalog - the focus is monitoring and the surrounding "
+            "DevOps stack (Nagios, PRTG, Atlassian Jira/Confluence, FastSpring "
+            "billing, ...). Plugin tools appear alongside the Zabbix ones with a "
+            "per-plugin prefix (e.g. nagios__service_status, jira__issue_create, "
+            "fastspring__order_get)."
         ),
         website_url="https://github.com/initMAX/zabbix-mcp-server",
         icons=_load_server_icons(),
