@@ -296,6 +296,108 @@ covering the audit guarantees:
    the extractor drops everything not in TARGET / FILTER keys, and the
    redactor's denylist provides defence-in-depth.
 
+## Settings -> Audit log admin panel
+
+Mirrors the Zabbix admin-panel "Audit log" UX 1:1 (same field names,
+same defaults, same Reset defaults semantics):
+
+| Field | What it does |
+|---|---|
+| `Enable audit logging` | Master toggle. Off -> no rows are written to either audit.log or client-audit.log; the in-memory ring buffer for `audit_self_get` also stops accepting pushes. The toggle change itself is always recorded (action `audit.toggle`). Disabling requires typing `DISABLE` in a confirmation field. |
+| `Log system actions` | Default off. When on, automated server events (`housekeeping.cycle`, `forwarder.queue_full`, `system.config_reload`, ...) also land in the audit log. Useful for forensics; off by default to keep the operator log focused on user-driven actions. |
+| `Enable internal housekeeping` | Default on. When on, the server itself does daily rotation + age-based purge. Disable when an external rsyslog / Fluentd / cron job manages rotation. |
+| `Data storage period` | Zabbix time period (`31d` default, `90d`, `1y`, `6h`, ...). Files older than this window are deleted by the housekeeping cycle. `0` disables time-based purge (size-based rotation still applies). |
+| `Max file size` (MB) | Per-file rotation threshold. When the live audit.log grows past this, it is archived under today's date and a new live file starts. Default 50 MB. |
+
+Persistent danger banner: while audit is disabled, a red banner
+appears on every admin-portal page so the operator cannot forget
+they are running without an audit trail.
+
+## Daily rotation + retention purge (housekeeping)
+
+When `housekeeping_enabled` is true, a background daemon runs every
+60 seconds and performs three steps per audit log file:
+
+1. **Size rotation.** If the live file is larger than `max_file_size_bytes`,
+   archive it under today's date as `audit.log.YYYY-MM-DD.gz` (gzip).
+2. **Daily rotation.** If the live file has any content and we have not
+   archived today yet, do the same archive step. Same-day archives are
+   appended (gzip member concatenation, valid per RFC 1952 §2.2).
+3. **Age purge.** Walk the directory; delete any
+   `audit.log.YYYY-MM-DD.gz` whose mtime is older than
+   `retention_seconds`. The live file and the legacy `.1` / `.2`
+   rotation backups are left alone.
+
+A summary line is emitted as a `housekeeping.cycle` audit event when
+`log_system_actions` is on so the operator can see the daemon working.
+
+## External SIEM / syslog forwarder
+
+When `[audit.forward].enabled = true`, every audit row written
+locally is also enqueued for shipping to an external SOC / SIEM. The
+local audit log files are the **primary** source of truth - a drop
+or reconnect on the wire never affects them.
+
+Eleven destination protocols across four wire formats:
+
+| Wire format | Transport | Use case |
+|---|---|---|
+| `rfc5424_udp` / `_tcp` / `_tls` | Standard syslog | Generic syslog daemon, rsyslog, syslog-ng |
+| `cef_udp` / `_tcp` / `_tls` | ArcSight Common Event Format | Splunk Universal Forwarder, Microsoft Sentinel, ArcSight |
+| `leef_udp` / `_tcp` / `_tls` | IBM QRadar Log Event Extended Format | IBM QRadar |
+| `json_tcp` / `_tls` | Newline-delimited JSON wrapped in syslog framing | ELK, Graylog, generic HTTP receivers, Wazuh |
+
+Connection management:
+
+- **UDP** is fire-and-forget; the OS may drop datagrams silently
+  under load. Acceptable on a LAN to a known receiver, less so for
+  cross-WAN or cloud SIEM destinations.
+- **TCP** delivers in order with octet-counted framing per RFC 6587
+  §3.4.1 (length-prefix + space + message). Reconnect with
+  exponential backoff (1s, 2s, 4s, ... capped at 60s) on drop.
+- **TLS** is TCP with `ssl.create_default_context()`. An optional
+  `ca_cert` path lets operators trust a private CA without altering
+  the system trust store.
+
+Backpressure: the forwarder maintains a bounded in-memory queue
+(default 10,000 rows) between the audit write path and the worker
+thread. When the queue fills, the OLDEST entries are dropped first -
+recent events matter more for incident review than week-old already-
+aged-out ones. A `messages_dropped_queue_full` counter is exposed in
+the admin UI status indicator so the operator notices when their SOC
+is lagging.
+
+Live status surface in Settings -> External SIEM forwarding:
+
+- Connection state: `connected` / `connecting` / `disconnected` /
+  `stopped`
+- Queue depth + capacity
+- Counters: messages sent, messages failed, queue overflow drops
+- Last successful send timestamp + last error message + error
+  timestamp
+
+## Auditor role
+
+A new admin-portal role ``auditor`` (alongside admin / operator /
+viewer) is scoped to the audit log surface only. The
+``_AuditorRoleMiddleware`` bounces any non-/audit URL to /audit
+(303). Operators, viewers, and admins who also need to read the
+audit log keep their existing access; the auditor role is for SOC /
+compliance reviewers who must NOT see token prefixes, OAuth client
+metadata, server configuration, or any other admin-sensitive
+surface.
+
+Allowed paths for an auditor session:
+
+- `/audit` - audit log viewer + filters
+- `/audit/export` - audit log export (CSV)
+- `/api/check-updates` - read-only update poll
+- `/static/*` - assets
+- `/login`, `/logout`, `/admin/health`, `/mcp-status` - infra
+- `/` - dashboard
+
+Any other URL redirects to `/audit`.
+
 ## See also
 
 - [SECURITY.md](../SECURITY.md) for the broader threat model and
@@ -304,6 +406,7 @@ covering the audit guarantees:
 - [`audit_writer.py`](../plugins/zabbix/zabbix_mcp/admin/audit_writer.py)
   + [`audit_redactor.py`](../plugins/zabbix/zabbix_mcp/admin/audit_redactor.py)
   + [`audit_extractors.py`](../plugins/zabbix/zabbix_mcp/audit_extractors.py)
+  + [`audit_forwarder.py`](../plugins/zabbix/zabbix_mcp/admin/audit_forwarder.py)
   for the implementation.
 - [ROLES.md](ROLES.md) for who can read the audit log via the admin
   portal.

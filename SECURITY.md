@@ -144,6 +144,34 @@ OAuth Clients page surfaces a per-client `Last activity` column derived from a 5
 
 Negative-test contract for the audit pipeline lives in [`tests/test_audit_negatives.py`](tests/test_audit_negatives.py): scope-deny rows carry the right `policy_decision`; severity-bypass attempts via raw `problem_get` land in `filters` so a reviewer sees what was actually requested; expired tokens fail closed; same-session calls correlate via `oauth_subject + mcp_session_id`; denied requests expose resource references but never raw kwargs.
 
+#### Enterprise audit panel (v1.31)
+
+The Settings -> Audit log admin panel mirrors Zabbix's own audit log panel field for field. Four user-visible knobs:
+
+- **Enable audit logging** - master toggle. Off silences `write_audit` / `write_tool_audit` and the `audit_self_get` ring buffer. The toggle change itself is always recorded (action `audit.toggle`) bypassing the gate. Disabling requires typing `DISABLE` in a confirmation field; the admin portal renders a persistent red banner across every page until audit is re-enabled.
+- **Log system actions** - off by default. When on, automated server events (`housekeeping.cycle`, `forwarder.queue_full`, `system.config_reload`) also land in the audit log. Useful for forensics; off by default to keep the operator log focused on user-driven actions.
+- **Enable internal housekeeping** - default on. Daily rotation to `audit.log.YYYY-MM-DD.gz` plus age-based purge per the data storage period. Disable when an external rsyslog / Fluentd / cron job manages rotation.
+- **Data storage period** - Zabbix-style time period (`31d` default, `90d`, `1y`, `6h`, ...). Files older than this window are deleted by the housekeeping cycle.
+
+#### External SIEM / syslog forwarder (v1.31)
+
+When `[audit.forward].enabled = true`, every audit row written locally is also enqueued for shipping to an external SOC / SIEM. The local audit log files remain the primary source of truth - a drop on the wire never affects them.
+
+Eleven destination protocols across four wire formats:
+
+- **RFC 5424 syslog** over UDP / TCP / TLS
+- **CEF** (ArcSight Common Event Format) over UDP / TCP / TLS - for ArcSight, Splunk, Microsoft Sentinel
+- **LEEF** (IBM QRadar Log Event Extended Format) over UDP / TCP / TLS
+- **JSON** over TCP / TLS - for ELK, Graylog, generic HTTP receivers, Wazuh
+
+TLS uses `ssl.create_default_context()` with strict server-cert validation; an optional `ca_cert` path lets operators trust a private CA without altering the system trust store. TCP / TLS framing is octet-counted per RFC 6587 §3.4.1 (length-prefix + space + message). Reconnect with exponential backoff (1s, 2s, 4s, ... capped at 60s).
+
+Backpressure: the forwarder maintains a bounded in-memory queue (default 10,000 rows) between the audit write path and the worker. When full, the OLDEST entries are dropped first - recent events matter more for incident review than week-old already-aged-out ones. The `messages_dropped_queue_full` counter exposes "SOC is lagging" status to the admin UI.
+
+#### Auditor role (v1.31)
+
+A new admin-portal role `auditor` (alongside admin / operator / viewer) is scoped to the audit log surface only. The `_AuditorRoleMiddleware` bounces any non-/audit URL to `/audit` (303) so a SOC / compliance reviewer reads the audit trail without seeing token prefixes, OAuth client metadata, server configuration, or any other admin-sensitive surface. Allowed paths: `/audit`, `/audit/export`, `/`, `/login`, `/logout`, `/static/*`, `/admin/health`, `/mcp-status`, `/api/check-updates`. Everything else redirects to `/audit`.
+
 #### Conservative OAuth DCR profile (v1.31, [issue #49](https://github.com/initMAX/zabbix-mcp-server/issues/49) Track B)
 
 `POST /register` (RFC 7591 dynamic client registration) defaults to `[oauth].dcr_profile = "conservative"` in v1.31 (was implicit "permissive" before). The conservative profile rejects wildcard scope grants at registration time (`scope = "*"` returns `invalid_client_metadata`), enforces exact-string redirect URI matching at `/authorize` (no pattern / wildcard allowed), and short-circuits a few other footguns. Operators who need the v1.30 behaviour can opt back in with `dcr_profile = "permissive"`. The consent screen surfaces a danger-styled warning banner when the operator considers granting wildcard scope so the blast radius is unambiguous.

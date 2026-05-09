@@ -14,6 +14,7 @@ parity audit).
 | `admin` | Operator who deploys and configures the server. | Everything. Adds/removes Zabbix servers, manages users, edits all settings, deletes tokens, uploads logos, can grant elevated tokens. |
 | `operator` | Day-to-day operator. Runs the wizard, mints tokens for clients, reviews audit log. | Token + OAuth client lifecycle, settings edits (most sections), template editing, file uploads. Cannot manage users or Zabbix servers, cannot delete tokens, cannot enable global OAuth. |
 | `viewer` | Read-only role for compliance / audit / NOC observers. | View dashboard, audit log, modules page. Cannot mint tokens, cannot edit settings, cannot run the wizard write-side. |
+| `auditor` | SOC / compliance reviewer scoped to the audit log only. | View and export the audit log. **Nothing else** - any other URL bounces to `/audit` (303). Separation of duties: the auditor reads the audit trail without seeing token prefixes, OAuth client metadata, server config, or any other admin-sensitive surface. |
 
 ## Permission matrix
 
@@ -100,10 +101,18 @@ authenticated user" - all three roles can reach those routes.
 
 ### Audit log
 
-| Action | View | admin | operator | viewer |
+| Action | View | admin | operator | viewer | auditor |
+|---|---|---|---|---|---|
+| View audit log (`/audit`) | `audit.py:83` (require_auth) | yes | yes | yes | yes |
+| Export audit log (`/audit/export`) | `audit.py:157` (require_auth) | yes | yes | yes | yes |
+
+### Other resources for the auditor role
+
+| Action | admin | operator | viewer | auditor |
 |---|---|---|---|---|
-| View audit log (`/audit`) | `audit.py:83` (require_auth) | yes | yes | yes |
-| Export audit log (`/audit/export`) | `audit.py:157` (require_auth) | yes | yes | yes |
+| Tokens / OAuth Clients / Servers / Users / Settings / Templates / Wizard / Uploads | per matrix above | per matrix above | per matrix above | **no** - middleware redirects to `/audit` |
+| Modules page | yes | yes | yes | redirected to `/audit` |
+| Dashboard | yes | yes | yes | yes (auditor allowlist) |
 
 ### Modules / dashboard
 
