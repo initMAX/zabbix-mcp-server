@@ -288,6 +288,20 @@ class AuditConfig:
     """
 
     enabled: bool = True
+    # Three orthogonal audit categories the operator can mute
+    # individually under the master toggle:
+    #
+    # * portal operations - admin UI / OAuth events (login, token CRUD,
+    #   settings change, server CRUD, OAuth client lifecycle, consent).
+    # * MCP actions - per-tool ``tool.invoke`` rows from the #49
+    #   tool-level audit pipeline.
+    # * background events - server-side automation (housekeeping cycle,
+    #   forwarder reconnect, retention purge, system config reload).
+    #
+    # All on by default - a fresh install records every category so
+    # the operator sees the full picture.
+    log_portal_operations: bool = True
+    log_mcp_actions: bool = True
     log_background_events: bool = True
     housekeeping_enabled: bool = True
     # Stored as seconds for runtime simplicity; the original Zabbix-style
@@ -849,17 +863,18 @@ def load_config(path: str | Path) -> AppConfig:
         ) from None
     if audit_max_size_mb < 1:
         raise ConfigError("[audit].max_file_size_mb must be >= 1")
-    # The field renamed from ``log_system_actions`` (v1.31 dev) to
-    # ``log_background_events`` (final v1.31). Read the old key as a
-    # fallback so an operator who set it during the v1.31 dev cycle is
-    # not surprised by the toggle silently flipping back to default.
-    log_bg_default = True
+    # ``log_background_events`` was previously named ``log_system_actions``
+    # (v1.31 dev). Read the old key as a fallback so an operator who
+    # set it during the v1.31 dev cycle is not surprised by the toggle
+    # silently flipping back to default.
     log_bg_raw = audit_raw.get(
         "log_background_events",
-        audit_raw.get("log_system_actions", log_bg_default),
+        audit_raw.get("log_system_actions", True),
     )
     audit_cfg = AuditConfig(
         enabled=bool(audit_raw.get("enabled", True)),
+        log_portal_operations=bool(audit_raw.get("log_portal_operations", True)),
+        log_mcp_actions=bool(audit_raw.get("log_mcp_actions", True)),
         log_background_events=bool(log_bg_raw),
         housekeeping_enabled=bool(audit_raw.get("housekeeping_enabled", True)),
         data_storage_period_seconds=audit_period_seconds,

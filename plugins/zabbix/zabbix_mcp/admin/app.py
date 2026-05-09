@@ -419,6 +419,8 @@ class AdminApp:
             _audit_cfg = self.config.audit
             _aw.configure(
                 enabled=_audit_cfg.enabled,
+                log_portal_operations=_audit_cfg.log_portal_operations,
+                log_mcp_actions=_audit_cfg.log_mcp_actions,
                 log_background_events=_audit_cfg.log_background_events,
                 housekeeping_enabled=_audit_cfg.housekeeping_enabled,
                 retention_seconds=_audit_cfg.data_storage_period_seconds,

@@ -437,6 +437,40 @@
         </div>
         <div class="settings-row">
             <div class="settings-label">
+                Log portal operations
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Admin portal user actions: login, logout, token CRUD, settings change, OAuth client lifecycle, server CRUD, consent grants. Default on. Turn off only when the local audit log file should carry MCP-side actions only (e.g. portal events go to a separate SIEM tenant).">&#x1F6C8;</span>
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="log_portal_operations" value="true"
+                               {% if settings.audit_log_portal_operations %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Record admin portal events (login, token, settings, OAuth)
+                </label>
+                <div class="form-hint">User-driven events from the admin UI. Default on.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Log MCP actions
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Per-tool tool.invoke audit row for every MCP tool call (236 wrapped Zabbix tools + 13 extension tools). Issue #49 hardening. Carries oauth_subject, mapped_zabbix_user, mcp_session_id, scopes, target / filters, policy_decision, result_count. Required by most compliance frameworks - turn off only on lab boxes.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="log_mcp_actions" value="true"
+                               {% if settings.audit_log_mcp_actions %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Record per-tool tool.invoke rows (issue #49)
+                </label>
+                <div class="form-hint">One audit row per MCP tool invocation (allow + deny). Compliance-grade evidence trail.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
                 Log background events
                 <span class="tooltip-icon" tabindex="0" data-tooltip="Records server-side events that happen without an operator action: daily log rotation, retention purge, SIEM forwarder reconnects + queue overflow, and background config reloads. Useful for forensics and verifying the housekeeping daemon is doing its job. Turn off when the operator log is noisy and you only want user-driven actions.">&#x1F6C8;</span>
             </div>
@@ -447,7 +481,7 @@
                                {% if settings.audit_log_background_events %}checked{% endif %}>
                         <span class="toggle-slider"></span>
                     </span>
-                    Record housekeeping, retention, forwarder, and config-reload events
+                    Record housekeeping, retention, forwarder, config-reload events
                 </label>
                 <div class="form-hint">Server-side events that happen without an operator action. Useful for forensics and to verify the housekeeping daemon is running.</div>
             </div>
@@ -483,7 +517,7 @@
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Max file size
+                Per-file size
                 <span class="tooltip-icon" tabindex="0" data-tooltip="Per-file rotation threshold in MB. When the live audit.log grows past this, it is archived under today's date and a new live file starts. Default 50 MB.">&#x1F6C8;</span>
             </div>
             <div>
@@ -516,6 +550,8 @@ function resetAuditDefaults() {
     var form = document.getElementById('audit-settings-form');
     if (!form) return;
     form.querySelector('[name=enabled]').checked = true;
+    form.querySelector('[name=log_portal_operations]').checked = true;
+    form.querySelector('[name=log_mcp_actions]').checked = true;
     form.querySelector('[name=log_background_events]').checked = true;
     form.querySelector('[name=housekeeping_enabled]').checked = true;
     form.querySelector('[name=data_storage_period]').value = '31d';

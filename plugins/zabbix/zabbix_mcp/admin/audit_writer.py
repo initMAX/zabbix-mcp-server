@@ -64,6 +64,8 @@ MAX_AUDIT_SIZE = 50 * 1024 * 1024  # 50 MB - default, overridden by configure()
 # ----------------------------------------------------------------------
 
 _AUDIT_ENABLED: bool = True
+_LOG_PORTAL_OPERATIONS: bool = True
+_LOG_MCP_ACTIONS: bool = True
 _LOG_BACKGROUND_EVENTS: bool = True
 _HOUSEKEEPING_ENABLED: bool = True
 _RETENTION_SECONDS: int = 31 * 86400  # 31 days
@@ -74,6 +76,8 @@ _state_lock = threading.Lock()
 def configure(
     *,
     enabled: bool = True,
+    log_portal_operations: bool = True,
+    log_mcp_actions: bool = True,
     log_background_events: bool = True,
     housekeeping_enabled: bool = True,
     retention_seconds: int = 31 * 86400,
@@ -85,10 +89,13 @@ def configure(
     :class:`AuditConfig`) and again on every successful Settings save.
     Idempotent - re-applying the same values is a no-op.
     """
-    global _AUDIT_ENABLED, _LOG_BACKGROUND_EVENTS, _HOUSEKEEPING_ENABLED
+    global _AUDIT_ENABLED, _LOG_PORTAL_OPERATIONS, _LOG_MCP_ACTIONS
+    global _LOG_BACKGROUND_EVENTS, _HOUSEKEEPING_ENABLED
     global _RETENTION_SECONDS, _MAX_FILE_SIZE_BYTES
     with _state_lock:
         _AUDIT_ENABLED = bool(enabled)
+        _LOG_PORTAL_OPERATIONS = bool(log_portal_operations)
+        _LOG_MCP_ACTIONS = bool(log_mcp_actions)
         _LOG_BACKGROUND_EVENTS = bool(log_background_events)
         _HOUSEKEEPING_ENABLED = bool(housekeeping_enabled)
         _RETENTION_SECONDS = int(retention_seconds)
@@ -100,6 +107,8 @@ def get_runtime_state() -> dict:
     with _state_lock:
         return {
             "enabled": _AUDIT_ENABLED,
+            "log_portal_operations": _LOG_PORTAL_OPERATIONS,
+            "log_mcp_actions": _LOG_MCP_ACTIONS,
             "log_background_events": _LOG_BACKGROUND_EVENTS,
             "housekeeping_enabled": _HOUSEKEEPING_ENABLED,
             "retention_seconds": _RETENTION_SECONDS,
@@ -147,13 +156,33 @@ def _enqueue_forward(entry: dict) -> None:
         pass
 
 
+def _categorise(action: str) -> str:
+    """Classify an action into one of three audit categories.
+
+    The category drives the per-category mute toggle in
+    :func:`_should_emit`. Actions that do not match a more specific
+    category fall through to ``portal_operations`` so a future admin-UI
+    event with no explicit prefix is captured by default.
+    """
+    if action == "tool.invoke":
+        return "mcp_actions"
+    if _is_background_event(action):
+        return "background_events"
+    return "portal_operations"
+
+
 def _should_emit(action: str) -> bool:
-    """Apply the audit master + background-event gates."""
+    """Apply the audit master toggle and per-category mute gates."""
     if action in _ALWAYS_AUDIT_ACTIONS:
         return True
     if not _AUDIT_ENABLED:
         return False
-    if _is_background_event(action) and not _LOG_BACKGROUND_EVENTS:
+    cat = _categorise(action)
+    if cat == "mcp_actions" and not _LOG_MCP_ACTIONS:
+        return False
+    if cat == "background_events" and not _LOG_BACKGROUND_EVENTS:
+        return False
+    if cat == "portal_operations" and not _LOG_PORTAL_OPERATIONS:
         return False
     return True
 
@@ -493,10 +522,11 @@ def write_tool_audit(
     what tool was called, with what scope, was it allowed, how many
     results came back.
 
-    Honours the master ``[audit].enabled`` toggle. When audit is off
-    the function returns silently without writing to either stream.
+    Honours the master ``[audit].enabled`` toggle and the
+    ``log_mcp_actions`` sub-toggle. When either is off the function
+    returns silently without writing to either stream.
     """
-    if not _AUDIT_ENABLED:
+    if not _AUDIT_ENABLED or not _LOG_MCP_ACTIONS:
         return
     safe_target = redact(target or {})
     safe_filters = redact(filters or {})
