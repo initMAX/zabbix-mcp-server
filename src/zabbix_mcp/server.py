@@ -2753,7 +2753,7 @@ def run_server(
         host=host,
         port=port,
         instructions=(
-            "Zabbix MCP Server provides full access to the Zabbix monitoring API. "
+            "initMAX MCP Server provides full access to the Zabbix monitoring API. "
             "Use the tools to query hosts, problems, triggers, items, and all other "
             "Zabbix objects. Most 'get' tools support filtering via 'filter', 'search', "
             "and 'limit' parameters. Write operations (create/update/delete) are only "
@@ -3062,10 +3062,10 @@ def run_server(
                 admin_scheme = "https" if config.server.tls_cert_file else "http"
                 logger.info("Admin portal: %s://%s:%d/", admin_scheme, admin_host, admin_port)
 
-            logger.info("#### Zabbix MCP Server started successfully ####")
+            logger.info("#### initMAX MCP Server started successfully ####")
             uvicorn.run(asgi_app, **uvicorn_kwargs)
         else:
-            logger.info("#### Zabbix MCP Server started successfully (stdio) ####")
+            logger.info("#### initMAX MCP Server started successfully (stdio) ####")
             mcp.run(transport="stdio")
     finally:
         client_manager.close()

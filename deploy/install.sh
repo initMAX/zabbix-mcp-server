@@ -158,7 +158,7 @@ need_root() {
 
 show_help() {
     cat <<'HELP'
-Zabbix MCP Server — Install / Update script
+initMAX MCP Server — Install / Update script
 
 Usage:
   sudo ./deploy/install.sh [COMMAND] [OPTIONS]
@@ -580,7 +580,7 @@ install_systemd_unit() {
     info "Installing systemd unit..."
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<'UNIT'
 [Unit]
-Description=Zabbix MCP Server
+Description=initMAX MCP Server
 Documentation=https://github.com/initMAX/zabbix-mcp-server
 After=network.target
 
@@ -826,7 +826,7 @@ install_package() {
 # Dry run — check prerequisites only
 # --------------------------------------------------------------------------- #
 do_dry_run() {
-    info "=== Zabbix MCP Server - Dry Run (prerequisite check) ==="
+    info "=== initMAX MCP Server - Dry Run (prerequisite check) ==="
     echo
 
     # Root check
@@ -873,7 +873,7 @@ do_dry_run() {
 # Fresh install
 # --------------------------------------------------------------------------- #
 do_install() {
-    info "=== Zabbix MCP Server - Installation ==="
+    info "=== initMAX MCP Server - Installation ==="
     echo
 
     # Verify we're in the repo
@@ -999,7 +999,7 @@ do_install() {
 # Update existing installation
 # --------------------------------------------------------------------------- #
 do_update() {
-    info "=== Zabbix MCP Server - Update ==="
+    info "=== initMAX MCP Server - Update ==="
     echo
 
     if [[ ! -d "$INSTALL_DIR/venv" ]]; then
@@ -1124,7 +1124,7 @@ do_update() {
 # Uninstall — complete removal
 # --------------------------------------------------------------------------- #
 do_uninstall() {
-    info "=== Zabbix MCP Server - Uninstall ==="
+    info "=== initMAX MCP Server - Uninstall ==="
     echo
 
     warn "This will permanently remove:"
@@ -1663,7 +1663,7 @@ PY
 }
 
 do_generate_token() {
-    info "=== Zabbix MCP Server - Generate MCP Token ==="
+    info "=== initMAX MCP Server - Generate MCP Token ==="
     echo
 
     if [[ ! -d "$INSTALL_DIR/venv" ]]; then
@@ -1803,7 +1803,7 @@ with open(config_file, 'w') as f:
 }
 
 do_set_admin_password() {
-    info "=== Zabbix MCP Server - Set Admin Password ==="
+    info "=== initMAX MCP Server - Set Admin Password ==="
     echo
 
     if [[ ! -d "$INSTALL_DIR/venv" ]]; then
@@ -1923,7 +1923,7 @@ do_request_tls() {
         esac
     done
 
-    info "=== Zabbix MCP Server - Let's Encrypt cert request ==="
+    info "=== initMAX MCP Server - Let's Encrypt cert request ==="
     echo
 
     if [[ -z "$hostname" ]]; then

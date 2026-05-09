@@ -11,7 +11,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     {# Expose per-session CSRF token to inline JS (fetch/htmx requests). #}
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <title>{% block title %}Zabbix MCP Server{% endblock %} — Admin</title>
+    <title>{% block title %}initMAX MCP{% endblock %} — Admin</title>
     {# Append the running version as a cache-buster to our own assets so
        returning users do not get the previous release's CSS / JS from
        the browser cache. Vendor libraries (flatpickr, grapes, htmx)
@@ -39,7 +39,7 @@
             <a href="/" class="logo" style="text-decoration:none;">
                 <img src="/static/logo-symbol-white.svg" alt="initMAX" class="logo-dark-theme" style="height: 28px;">
                 <img src="/static/logo-symbol-color.svg" alt="initMAX" class="logo-light-theme" style="height: 28px;">
-                <span class="logo-text">Zabbix MCP</span>
+                <span class="logo-text">initMAX MCP</span>
             </a>
         </div>
         <ul class="nav-menu">
