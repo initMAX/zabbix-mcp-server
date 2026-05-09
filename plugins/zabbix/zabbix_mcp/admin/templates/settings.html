@@ -437,7 +437,7 @@
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Log background server events
+                Log background events
                 <span class="tooltip-icon" tabindex="0" data-tooltip="Records server-side events that happen without an operator action: daily log rotation, retention purge, SIEM forwarder reconnects + queue overflow, and background config reloads. Useful for forensics and verifying the housekeeping daemon is doing its job. Turn off when the operator log is noisy and you only want user-driven actions.">&#x1F6C8;</span>
             </div>
             <div>
@@ -454,7 +454,7 @@
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Enable internal housekeeping
+                Internal housekeeping
                 <span class="tooltip-icon" tabindex="0" data-tooltip="When enabled, MCP automatically rotates the audit log files daily and purges archives older than the data storage period. Disable only if you have an external rsyslog / Fluentd / cron job handling rotation - the size-based rotation still applies.">&#x1F6C8;</span>
             </div>
             <div>
@@ -483,8 +483,8 @@
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Max file size (MB)
-                <span class="tooltip-icon" tabindex="0" data-tooltip="Per-file rotation threshold. When the live audit.log grows past this, it is archived under today's date and a new live file starts. Default 50 MB.">&#x1F6C8;</span>
+                Max file size
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Per-file rotation threshold in MB. When the live audit.log grows past this, it is archived under today's date and a new live file starts. Default 50 MB.">&#x1F6C8;</span>
             </div>
             <div>
                 <div class="number-input-group">
