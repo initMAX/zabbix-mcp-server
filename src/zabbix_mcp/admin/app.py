@@ -428,6 +428,7 @@ class AdminApp:
         from zabbix_mcp.admin.views.uploads import upload_logo, upload_tls_cert, upload_tls_key
         from zabbix_mcp.admin.views.audit import audit_view, audit_export
         from zabbix_mcp.admin.views.wizard import wizard_view
+        from zabbix_mcp.admin.views.modules import modules_list
         from zabbix_mcp.admin.views.oauth_clients import (
             oauth_clients_list, oauth_client_detail, oauth_client_revoke,
             oauth_client_scope_update, oauth_client_settings_update, oauth_enable,
@@ -442,6 +443,7 @@ class AdminApp:
             Route("/logout", self._logout, methods=["POST"]),
             Route("/", dashboard),
             Route("/wizard", wizard_view, methods=["GET"]),
+            Route("/modules", modules_list, methods=["GET"]),
             Route("/tokens", token_list),
             Route("/tokens/create", token_create, methods=["GET", "POST"]),
             Route("/tokens/bulk-delete", token_bulk_delete, methods=["POST"]),

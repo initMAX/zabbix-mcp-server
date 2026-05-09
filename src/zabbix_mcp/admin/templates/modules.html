@@ -1,0 +1,84 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
+{% extends "base.html" %}
+{% block title %}MCP Modules{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">MCP Modules</h1>
+        <p class="page-subtitle">
+            Plugins extending this MCP server with additional integrations.
+            Today only the bundled Zabbix module ships; the full plugin loader
+            (install / enable / disable / update) lands in v2.0.
+        </p>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 16px;">
+    <h3 class="card-title">
+        Installed (1)
+        <span class="tooltip-icon" tabindex="0" data-tooltip="Modules currently registered with this server. Each module is a separate MCP integration; tools land in tools/list with the module's own prefix once full plugin support arrives in v2.0.">&#x1F6C8;</span>
+    </h3>
+    <table class="data-table" style="margin-top: 10px;">
+        <thead>
+            <tr>
+                <th style="width: 220px;">Module</th>
+                <th>Description</th>
+                <th style="width: 110px;">Version</th>
+                <th style="width: 100px;">Status</th>
+                <th style="width: 220px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <strong>&#x1F441;&#xFE0F; Zabbix</strong><br>
+                    <span class="text-sm text-muted">Bundled, default-installed</span>
+                </td>
+                <td>
+                    Full Zabbix API integration: hosts, problems, triggers, items,
+                    templates, dashboards, history, plus extensions like
+                    <code>graph_render</code>, <code>anomaly_detect</code>,
+                    <code>capacity_forecast</code>, <code>report_generate</code>,
+                    and pre-correlated views.
+                </td>
+                <td><code>v{{ version }}</code></td>
+                <td><span class="badge badge-success">Enabled</span></td>
+                <td>
+                    <a href="/servers" class="btn btn-sm btn-secondary">Configure servers</a>
+                    <a href="/templates" class="btn btn-sm btn-secondary">Templates</a>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h3 class="card-title">
+        Coming in v2.0
+        <span class="tooltip-icon" tabindex="0" data-tooltip="Roadmap preview - will become a real install / enable / update / uninstall page when the plugin loader lands.">&#x1F6C8;</span>
+    </h3>
+    <p class="text-muted" style="margin-top: 8px;">
+        v2.0 ships a plugin loader that installs additional MCP integrations
+        from the upcoming <a href="https://github.com/initMAX/initmax-mcp" target="_blank" rel="noopener"><code>initmax-mcp</code></a>
+        catalog. Focus is monitoring + the surrounding DevOps stack:
+    </p>
+    <ul class="text-muted" style="margin-top: 8px; line-height: 1.8;">
+        <li><strong>Nagios / PRTG</strong> - peer monitoring systems, query problems and host status from inside the same MCP session that already has Zabbix tools.</li>
+        <li><strong>Atlassian Jira / Confluence</strong> - create and link incident tickets, pull runbook docs, attach Zabbix problem context.</li>
+        <li><strong>FastSpring</strong> - subscription / order data when monitoring SaaS-billing pipelines.</li>
+        <li>... and any community-contributed plugin that follows the plugin contract (a standalone MCP server speaking MCP 2025-11-25 over stdio).</li>
+    </ul>
+    <p class="text-muted" style="margin-top: 12px;">
+        See <a href="https://github.com/initMAX/zabbix-mcp-server/issues/47" target="_blank" rel="noopener">issue #47</a>
+        for the full design + roadmap, and the upcoming <code>docs/PLUGIN-DEVELOPMENT.md</code>
+        + <code>examples/example-plugin/</code> reference implementation for
+        plugin authors.
+    </p>
+</div>
+{% endblock %}

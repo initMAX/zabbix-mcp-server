@@ -265,6 +265,54 @@ a:hover {
     flex-shrink: 0;
 }
 
+/* Section group label - "Authentication & Clients", "MCP Modules", "System" */
+.nav-section-label {
+    padding: 18px 20px 6px 20px;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Plugin/module group parent - non-clickable header for the module's
+   own sub-pages (Servers, Report Templates, ...). Stays visible at the
+   same indent level as a normal .nav-item but does not get the hover/
+   active states because it has no own page (yet). */
+.nav-module-parent {
+    padding: 8px 20px 4px 20px;
+    color: #cbd5e1;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: default;
+    user-select: none;
+}
+.nav-module-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.nav-module-status {
+    margin-left: auto;
+    color: var(--color-success, #16a34a);
+    font-size: 1.4rem;
+    line-height: 0;
+    padding-bottom: 2px;
+}
+
+/* Sub-items under a module parent - indented, smaller font, no own
+   icon (parent already shows the module's icon). */
+.nav-sub-item {
+    padding-left: 50px;
+    font-size: 0.86rem;
+    color: #94a3b8;
+}
+.nav-sub-item:hover {
+    color: #f1f5f9;
+}
+
 .sidebar-footer {
     padding: 12px 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
