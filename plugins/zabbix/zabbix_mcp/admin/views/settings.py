@@ -24,10 +24,10 @@ logger = logging.getLogger("zabbix_mcp.admin")
 RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file", "log_file"}
 
 # List fields — split comma-separated into TOML arrays
-LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools"}
+LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools", "trusted_proxies", "default_scopes"}
 
 # Boolean fields — checkbox present = True, absent = False
-BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_portal_operations", "log_mcp_actions", "log_background_events", "housekeeping_enabled"}
+BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_portal_operations", "log_mcp_actions", "log_background_events", "housekeeping_enabled", "dynamic_registration_enabled"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -85,6 +85,29 @@ SECTION_CONFIG = {
         "allowed_keys": {"enabled", "host", "port", "protocol", "ca_cert", "queue_size"},
         "min_role": "admin",
     },
+    # [oauth] - full editor for the embedded OAuth 2.1 server. The
+    # OAuth Clients page has a first-time enable form (sets `enabled`
+    # + `public_url`); this section is the long-term config surface
+    # for everything else (TTLs, default scopes, DCR profile).
+    "oauth": {
+        "toml_section": "oauth",
+        "allowed_keys": {
+            "enabled", "dynamic_registration_enabled", "default_scopes",
+            "auth_code_ttl_seconds", "access_token_ttl_seconds",
+            "refresh_token_ttl_seconds", "dcr_profile",
+            "dcr_conservative_access_ttl_seconds",
+        },
+        "min_role": "admin",
+    },
+    # [server].trusted_proxies - reverse-proxy IP allowlist that the
+    # ASGI middleware trusts when reading X-Forwarded-For. Lives under
+    # [server] but exposed as its own UI section so operators can find
+    # it without digging through the dense TLS / Network panel.
+    "trusted_proxies": {
+        "toml_section": "server",
+        "allowed_keys": {"trusted_proxies"},
+        "min_role": "admin",
+    },
 }
 
 # Keys that must not be cleared when the submitted value is empty.
@@ -121,9 +144,9 @@ def _validate_list_entry(key: str, entry: str) -> str | None:
     detection) live in the LIST_KEYS save loop because they need to
     see all entries together.
     """
-    if key == "allowed_hosts":
-        # Global IP allowlist - same shape as token allowed_ips.
-        # Both IPv4 and IPv6 (with and without CIDR suffix) accepted.
+    if key in ("allowed_hosts", "trusted_proxies"):
+        # IP allowlist / trusted-proxy CIDRs - same shape. Both IPv4
+        # and IPv6, with or without explicit CIDR suffix.
         try:
             _normalize_ip_entry(entry)
         except (ValueError, TypeError):
@@ -201,6 +224,12 @@ INT_BOUNDS = {
     "response_max_chars": (1024, 1_000_000),
     "timeout":          (5, 600),
     "max_tokens":       (256, 200_000),
+    # OAuth TTLs (seconds). Lower bounds intentionally non-zero so the
+    # operator cannot accidentally configure a useless 0-second TTL.
+    "auth_code_ttl_seconds":              (60, 3600),         # 1 min - 1h
+    "access_token_ttl_seconds":           (300, 86400),       # 5 min - 24h
+    "refresh_token_ttl_seconds":          (3600, 31536000),   # 1h - 1y
+    "dcr_conservative_access_ttl_seconds": (300, 86400),
 }
 
 
@@ -305,6 +334,28 @@ async def settings_view(request: Request) -> Response:
                     "last_success_at": None, "last_error": "",
                 }
             settings["audit_forward_status"] = _fwd_state
+
+            # [oauth] - read all knobs from the doc so the form
+            # round-trips operator edits exactly. Defaults match
+            # OAuthConfig.
+            oauth_cfg = dict(doc.get("oauth", {})) if isinstance(doc.get("oauth"), dict) else {}
+            settings["oauth_enabled"] = bool(oauth_cfg.get("enabled", False))
+            settings["oauth_dynamic_registration_enabled"] = bool(oauth_cfg.get("dynamic_registration_enabled", True))
+            ds = oauth_cfg.get("default_scopes", ["*"])
+            if isinstance(ds, str):
+                ds = [ds]
+            settings["oauth_default_scopes"] = list(ds) if ds else ["*"]
+            settings["oauth_auth_code_ttl_seconds"] = int(oauth_cfg.get("auth_code_ttl_seconds") or 600)
+            settings["oauth_access_token_ttl_seconds"] = int(oauth_cfg.get("access_token_ttl_seconds") or 3600)
+            settings["oauth_refresh_token_ttl_seconds"] = int(oauth_cfg.get("refresh_token_ttl_seconds") or 30 * 24 * 3600)
+            settings["oauth_dcr_profile"] = str(oauth_cfg.get("dcr_profile", "conservative") or "conservative")
+            settings["oauth_dcr_conservative_access_ttl_seconds"] = int(oauth_cfg.get("dcr_conservative_access_ttl_seconds") or 1800)
+
+            # [server].trusted_proxies - CIDR allowlist for X-Forwarded-For.
+            tp = server_cfg.get("trusted_proxies", [])
+            if isinstance(tp, str):
+                tp = [tp]
+            settings["trusted_proxies"] = list(tp) if tp else []
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 
@@ -366,6 +417,18 @@ async def settings_update(request: Request) -> Response:
                 return admin_app.flash_redirect(
                     "/settings", f"Public URL is invalid: {exc}", "danger"
                 )
+
+    # [oauth] pre-save validation: dcr_profile enum + TTL bounds
+    # come from INT_BOUNDS via the generic int handler. Default scopes
+    # checkboxes - submitted as repeated form values per scope.
+    if section == "oauth":
+        prof = str(form.get("dcr_profile", "") or "").strip().lower()
+        if prof and prof not in ("conservative", "permissive"):
+            return admin_app.flash_redirect(
+                "/settings",
+                "DCR profile must be 'conservative' or 'permissive'.",
+                "danger",
+            )
 
     # [audit.forward] pre-save validation: protocol enum + port range
     # + queue size bounds.
@@ -492,13 +555,24 @@ async def settings_update(request: Request) -> Response:
             if key in BOOL_KEYS:
                 config_section[key] = key in form
             elif key in LIST_KEYS:
-                raw = str(form.get(key, "")).strip()
+                # Three input shapes get folded into the same parsed list:
+                # (1) repeated form fields (checkbox group, e.g.
+                #     default_scopes - one <input name=default_scopes value=X>
+                #     per ticked scope), (2) tools drag-and-drop bubbles using
+                #     newline-separated text, (3) comma-separated text input.
+                multi = form.getlist(key) if hasattr(form, "getlist") else []
+                if len(multi) > 1:
+                    parsed = [str(v).strip() for v in multi if str(v).strip()]
+                    raw = ",".join(parsed)
+                else:
+                    raw = str(form.get(key, "")).strip()
                 if raw:
-                    # Tools list comes from the drag-and-drop bubbles
-                    # which use newline separators; everything else
-                    # comes from comma-separated text inputs.
-                    sep = "\n" if "\n" in raw else ","
-                    parsed = [s.strip() for s in raw.split(sep) if s.strip()]
+                    if len(multi) > 1:
+                        # already parsed above
+                        pass
+                    else:
+                        sep = "\n" if "\n" in raw else ","
+                        parsed = [s.strip() for s in raw.split(sep) if s.strip()]
                     for entry in parsed:
                         err = _validate_list_entry(key, entry)
                         if err:
