@@ -112,6 +112,42 @@ When `public_url`, `allowed_origins`, and `allowed_hosts` are all unset on a non
 - Log rotation at 50 MB with backup scheme
 - Audit log viewable and exportable (CSV) via admin portal
 
+#### Tool-level audit logging (v1.31, [issue #49](https://github.com/initMAX/zabbix-mcp-server/issues/49))
+
+Every MCP tool invocation writes one structured audit row in addition to the admin-portal events above. The schema is **fixed and bounded** so an incident reviewer can grep for "did anyone call tool X targeting host Y" without reconstructing intent from MCP session logs.
+
+Per-tool audit row fields:
+
+- `oauth_subject` - bearer token name (`token:<name>`) or OAuth identity (`oauth:<client_id>:<user>`)
+- `mapped_zabbix_user` - operator-set Zabbix user (`[tokens.<id>].zbx_user`) for cross-correlation with the Zabbix-side auditlog
+- `mcp_session_id` - MCP streamable-HTTP session id, correlates a sequence of calls inside one client session
+- `tool_name` - canonical tool name (with `[server].tool_prefix` stripped)
+- `scopes` - granted scopes from the bearer token
+- `policy_decision` - one of `allow`, `deny_scope`, `deny_read_only`, `deny_token_invalid`, `deny_token_expired`, `deny_server`, `deny_ip`, `deny_other`, `error`
+- `denial_reason` - operator-readable cause when denied
+- `target` - bounded resource references the call targeted (`hostid`, `groupid`, `itemid`, `eventid`, ... - never raw kwargs)
+- `filters` - bounded filter flags (`severities`, `monitored`, `active_only`, ...)
+- `result_count` - bucketed `0` / `1` / `"N"`
+- `ip` - client IP from the ASGI middleware
+
+Two streams: an **operator log** at `/var/log/zabbix-mcp/audit.log` carries the full schema; a **client log** at `/var/log/zabbix-mcp/client-audit.log` is a redacted-twice copy that an operator can hand to a connected AI client (Claude Desktop, ChatGPT) for self-review without exposing operator-internal context. The client log drops `oauth_subject`, `mapped_zabbix_user`, `mcp_session_id`, full `denial_reason`, `scopes`, `ip`, and `filters` - keeping only what the AI client itself already knows.
+
+Defence-in-depth redaction at every audit-bound write boundary ([`audit_redactor.py`](plugins/zabbix/zabbix_mcp/admin/audit_redactor.py)):
+
+- **Bounded extractor** ([`audit_extractors.py`](plugins/zabbix/zabbix_mcp/audit_extractors.py)) is the **first** scrub - it splits a tool's kwargs into `target` and `filters` buckets, dropping anything not in the allow-list of resource-reference keys. Even on a denied request, the audit row gets only the resource references the caller targeted (`hostid`, `eventid`, ...), never the full kwargs. A hypothetical `host_create({password: ..., snmp_community: ..., tls_psk: ...})` cannot leak credentials into the audit row even when the call is denied early.
+- **Centralised redactor** is the **second** scrub - substring-match denylist at `write_audit` / `write_tool_audit`. Covers passwords, API keys, OAuth tokens, refresh tokens, code verifiers, PKCE verifiers, CSRF tokens, session cookies, MFA / TOTP secrets, HMAC signatures + nonces, Zabbix-specific credentials (TLS-PSK identity + secret, SNMP community strings, LDAP bind passwords, SMTP / webhook secrets, ODBC connection strings). Hash-bearing keys (`token_hash`, `password_hash`, `client_secret_hash`, ...) bypass the denylist with prefix-only retention for correlation.
+- **Long-string truncation** at 512 chars keeps the log readable when an LLM accidentally pastes a large blob into a tool argument.
+
+Self-service activity feed: the `audit_self_get` MCP tool exposes an in-memory ring buffer (max 100 entries per subject) of recent client-audit rows so a connected client can pull its own recent invocations without the operator having to share the log file. Cross-client isolation is enforced server-side - each subject sees only its own ring.
+
+OAuth Clients page surfaces a per-client `Last activity` column derived from a 512 KB tail-scan of the audit log on every page render; clients that registered but never invoked a tool show as "never" - prime revocation candidates. The full schema reference, including the bounded `target` / `filters` key sets and the redaction denylist, is documented in [`docs/AUDIT.md`](docs/AUDIT.md).
+
+Negative-test contract for the audit pipeline lives in [`tests/test_audit_negatives.py`](tests/test_audit_negatives.py): scope-deny rows carry the right `policy_decision`; severity-bypass attempts via raw `problem_get` land in `filters` so a reviewer sees what was actually requested; expired tokens fail closed; same-session calls correlate via `oauth_subject + mcp_session_id`; denied requests expose resource references but never raw kwargs.
+
+#### Conservative OAuth DCR profile (v1.31, [issue #49](https://github.com/initMAX/zabbix-mcp-server/issues/49) Track B)
+
+`POST /register` (RFC 7591 dynamic client registration) defaults to `[oauth].dcr_profile = "conservative"` in v1.31 (was implicit "permissive" before). The conservative profile rejects wildcard scope grants at registration time (`scope = "*"` returns `invalid_client_metadata`), enforces exact-string redirect URI matching at `/authorize` (no pattern / wildcard allowed), and short-circuits a few other footguns. Operators who need the v1.30 behaviour can opt back in with `dcr_profile = "permissive"`. The consent screen surfaces a danger-styled warning banner when the operator considers granting wildcard scope so the blast radius is unambiguous.
+
 ### Plugin Architecture (forthcoming, design-locked in v1.31)
 
 v1.31 introduces the user-facing surface for the upcoming plugin system (admin sidebar `MCP Modules` section, `/modules` page, `instructions=` MCP hint). The loader itself is not in v1.31 - it ships in a follow-up release tracked under [issue #47](https://github.com/initMAX/zabbix-mcp-server/issues/47). The trust model is locked now so external plugin authors and operators can read against a stable contract:
