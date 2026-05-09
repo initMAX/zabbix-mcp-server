@@ -328,12 +328,16 @@ a:hover {
     text-indent: -9999px;
     overflow: hidden;
 }
+/* SVG chevron - sits at fixed pixel size so vertical alignment is
+   identical whether the item is collapsed or expanded. Rotation is
+   also done in CSS-pixel space which avoids the typographic-baseline
+   wobble that the previous unicode triangle had. */
 .nav-module-chevron {
+    width: 14px;
+    height: 14px;
     color: #94a3b8;
-    font-size: 1.2rem;
-    line-height: 1;
-    transition: transform var(--transition-fast);
     flex-shrink: 0;
+    transition: transform var(--transition-fast);
 }
 .nav-module.is-open .nav-module-chevron {
     transform: rotate(90deg);

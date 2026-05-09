@@ -144,6 +144,12 @@ async def dashboard(request: Request) -> Response:
             "online_servers": sum(1 for s in servers if s["status"] == "online"),
             "admin_users": admin_user_count,
             "report_templates": report_template_count,
+            # Active MCP modules: today only the bundled Zabbix module ships,
+            # so the count is a constant 1. When the plugin loader lands
+            # soon this will count enabled [plugins.<id>] entries from
+            # config.toml and the Zabbix module itself.
+            "mcp_modules_active": 1,
+            "mcp_modules_total": 1,
         },
         "servers": servers,
         "audit_entries": recent_audit[:10],

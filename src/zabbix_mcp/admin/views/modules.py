@@ -18,7 +18,7 @@
 """Admin portal "MCP Modules" page - placeholder for the plugin loader.
 
 In v1.31 this is read-only: it lists the bundled Zabbix module and
-describes the v2.0 plan. When the plugin loader lands the same view
+describes what is coming soon. When the plugin loader lands the same view
 extends to enable / disable / install / update buttons backed by the
 ``install.sh add-plugin / remove-plugin`` CLI subcommands.
 
@@ -33,7 +33,7 @@ from starlette.responses import RedirectResponse, Response
 
 
 async def modules_list(request: Request) -> Response:
-    """GET /modules - list installed MCP modules + v2.0 roadmap."""
+    """GET /modules - list installed MCP modules + coming-soon roadmap."""
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)
     if not session:

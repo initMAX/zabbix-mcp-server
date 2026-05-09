@@ -55,10 +55,11 @@
             <li><a href="/wizard" class="nav-item {% if active == 'wizard' %}active{% endif %}">
                 <span class="nav-icon">&#x1FA84;</span> Client MCP Wizard</a></li>
 
-            {# Section 2 - MCP modules. Only Zabbix is shipped today; v2.0
-               adds the plugin loader and "All modules" lights up as a real
-               install/manage page. Sub-items per module group plugin-specific
-               configuration (Zabbix Servers, Report Templates, ...). #}
+            {# Section 2 - MCP modules. Only Zabbix is shipped today; the
+               plugin loader is in development and will turn "All modules"
+               into a real install / enable / disable / update page. Sub-items
+               per module group plugin-specific configuration (Zabbix Servers,
+               Report Templates, ...). #}
             <li class="nav-section-label">MCP Modules</li>
             <li><a href="/modules" class="nav-item {% if active == 'modules' %}active{% endif %}">
                 <span class="nav-icon">&#x1F4E6;</span> All modules</a></li>
@@ -74,7 +75,9 @@
                     <img src="/static/module-zabbix.svg" alt="" class="nav-module-icon">
                     <span class="nav-module-label">Zabbix</span>
                     <span class="nav-module-status" title="Module enabled">&bull;</span>
-                    <span class="nav-module-chevron">&#9656;</span>
+                    <svg class="nav-module-chevron" viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M5 3l6 5-6 5z" fill="currentColor"/>
+                    </svg>
                 </button>
                 <ul class="nav-module-children">
                     <li><a href="/servers" class="nav-item nav-sub-item {% if active == 'servers' %}active{% endif %}">

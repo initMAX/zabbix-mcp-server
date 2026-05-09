@@ -25,10 +25,12 @@
         </div>
     </a>
     <a href="/servers" class="stat-card" style="text-decoration:none; color:inherit;">
-        <div class="stat-icon">&#x1F5A5;</div>
+        <div class="stat-icon">
+            <img src="/static/module-zabbix.svg" alt="Zabbix" style="width:32px; height:32px; border-radius:6px;">
+        </div>
         <div class="stat-content">
             <div class="stat-value">{{ servers | length }}</div>
-            <div class="stat-label">Zabbix Servers</div>
+            <div class="stat-label">Zabbix Instances</div>
             <div id="server-status-list" style="margin-top:8px; min-width:0;">
                 {% for server in servers %}
                 <div style="display:flex; align-items:center; gap:6px; font-size:0.8rem; color:var(--text-muted); min-width:0;">
@@ -46,11 +48,19 @@
             <div class="stat-label">Admin Users</div>
         </div>
     </a>
-    <a href="/templates" class="stat-card" style="text-decoration:none; color:inherit;">
-        <div class="stat-icon">&#x1F4C4;</div>
+    <a href="/modules" class="stat-card" style="text-decoration:none; color:inherit;">
+        <div class="stat-icon">&#x1F4E6;</div>
         <div class="stat-content">
-            <div class="stat-value">{{ stats.report_templates | default(0) }}</div>
-            <div class="stat-label">Report Templates</div>
+            <div class="stat-value">
+                {{ stats.mcp_modules_active | default(0) }}
+                {% if stats.mcp_modules_total != stats.mcp_modules_active %}
+                <span class="text-sm text-muted">/ {{ stats.mcp_modules_total }}</span>
+                {% endif %}
+            </div>
+            <div class="stat-label">Active MCP modules</div>
+            <div style="margin-top:8px; font-size:0.8rem; color:var(--text-muted);">
+                Zabbix &middot; <span class="text-muted">+ more soon</span>
+            </div>
         </div>
     </a>
 </div>
@@ -58,7 +68,8 @@
 <!-- Quick Actions -->
 <div class="quick-actions">
     <a href="/tokens/create" class="btn btn-primary">&#x1F511; Create Token</a>
-    <a href="/servers" class="btn btn-ghost">&#x1F50C; Test Zabbix Servers</a>
+    <a href="/servers" class="btn btn-ghost">&#x1F50C; Test Zabbix Instances</a>
+    <a href="/modules" class="btn btn-ghost">&#x1F4E6; Browse MCP modules</a>
 </div>
 
 {% if tasks_panel %}
