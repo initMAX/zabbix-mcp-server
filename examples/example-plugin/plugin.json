@@ -1,0 +1,16 @@
+{
+    "$schema": "https://github.com/initMAX/zabbix-mcp-server/blob/main/docs/plugin-schema.json",
+    "id": "example",
+    "name": "Example Plugin",
+    "version": "0.1.0",
+    "description": "Minimal reference implementation of a plugin for the initMAX MCP host. Exposes a single tool example__echo that returns its input verbatim. Demonstrates the stdio MCP server contract that the upcoming plugin loader will use.",
+    "author": "initMAX s.r.o.",
+    "homepage": "https://github.com/initMAX/zabbix-mcp-server/tree/main/examples/example-plugin",
+    "license": "AGPL-3.0-only",
+    "transport": "stdio",
+    "exec": ["python", "-m", "example_plugin"],
+    "tool_prefix": "example",
+    "read_tools": ["example__echo"],
+    "write_tools": [],
+    "min_host_version": "1.31"
+}

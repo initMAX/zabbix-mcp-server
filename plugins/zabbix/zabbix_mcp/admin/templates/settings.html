@@ -108,6 +108,13 @@
                 <div class="form-hint">Max characters per tool response before truncation (default: 50000, min: 5000). Increase for template export workflows (e.g. 200000 for medium templates, 500000 for large built-in templates).</div>
             </div>
         </div>
+        <div class="settings-row">
+            <div class="settings-label">Tool prefix <span class="tooltip-icon" tabindex="0" data-tooltip="Optional namespace applied to bundled Zabbix tool names when running side-by-side with other MCP modules (forthcoming plugin loader, issue #47). Default empty = bundled tools surface as `host_get`, `problem_get`, ... unchanged. When set to e.g. `zabbix`, the same tools surface as `zabbix__host_get` etc. so they cannot collide with tools from other plugins (NetBox `netbox__device_get`, Jira `jira__issue_create`, ...). Single-module deployments should leave this empty.">&#x1F6C8;</span></div>
+            <div>
+                <input type="text" name="tool_prefix" class="form-input" value="{{ settings.tool_prefix | default('') }}" placeholder="(empty) = no prefix" pattern="[a-z][a-z0-9_]*" {% if current_user_role == 'viewer' %}disabled{% endif %}>
+                <div class="form-hint">Lowercase letter + letters/digits/underscores (e.g. <code>zabbix</code>). Empty for the default single-module deployment.</div>
+            </div>
+        </div>
         <div class="settings-row" id="public-url">
             <div class="settings-label">Public URL <span class="tooltip-icon" tabindex="0" data-tooltip="External URL clients use to reach this server. Required when bind host is 0.0.0.0 - OAuth discovery hands this out, so it must be reachable from the AI client's machine.">&#x1F6C8;</span></div>
             <div>

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "initmax-mcp-example"
+version = "0.1.0"
+description = "Reference implementation of a plugin for the initMAX MCP host."
+readme = "README.md"
+license = "AGPL-3.0-only"
+requires-python = ">=3.10"
+authors = [{ name = "initMAX s.r.o." }]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/example_plugin"]
+
+[project.scripts]
+initmax-mcp-example = "example_plugin.__main__:main"

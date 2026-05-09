@@ -1,0 +1,449 @@
+{#
+  Zabbix MCP Server
+  Copyright (C) 2026 initMAX s.r.o.
+  Licensed under the GNU Affero General Public License v3.
+  See LICENSE for details.
+#}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Authorize {{ client_name }} - initMAX MCP</title>
+    <link rel="stylesheet" href="/static/style.css?v={{ version }}">
+    <style>
+        .consent-card { max-width: 720px; }
+        .consent-greeting {
+            background: var(--color-success-light);
+            border: 1px solid var(--color-success);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            margin-bottom: 18px;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+        }
+        .consent-warning {
+            background: var(--color-warning-light);
+            border: 1px solid var(--color-warning);
+            border-radius: var(--radius-md);
+            padding: 10px 14px;
+            margin-bottom: 18px;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+        }
+        .consent-wildcard-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; border: 1px solid var(--color-warning);
+            background: var(--color-warning-light);
+            border-radius: var(--radius-md); margin-bottom: 18px;
+        }
+        .consent-wildcard-row input[type=checkbox] {
+            width: 20px; height: 20px; flex-shrink: 0;
+            accent-color: var(--color-warning);
+        }
+        .consent-wildcard-row .label-block { flex: 1; min-width: 0; }
+        .consent-wildcard-row .label-block strong { color: var(--text-primary); }
+        .consent-wildcard-row .label-block .desc { color: var(--text-muted); font-size: 0.78rem; margin-top: 2px; }
+
+        .plugin-section {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            margin-bottom: 14px;
+            background: var(--bg-input);
+            overflow: hidden;
+        }
+        .plugin-section.dimmed { opacity: 0.55; }
+        .plugin-header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+        .plugin-logo {
+            width: 36px; height: 36px; border-radius: 6px;
+            flex-shrink: 0; background: #fff; padding: 2px;
+        }
+        .plugin-meta { flex: 1; min-width: 0; }
+        .plugin-name {
+            font-weight: 600; font-size: 1rem; color: var(--text-primary);
+        }
+        .plugin-subtitle {
+            color: var(--text-muted); font-size: 0.78rem; margin-top: 2px;
+        }
+        .plugin-counts {
+            display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap;
+            font-size: 0.72rem;
+        }
+        .plugin-counts span {
+            padding: 3px 9px; border-radius: var(--radius-full);
+            background: var(--bg-input); color: var(--text-muted);
+            font-weight: 500;
+        }
+        .plugin-counts span.read { background: var(--color-primary-light); color: var(--color-primary); }
+        .plugin-counts span.write { background: var(--color-warning-light); color: var(--color-warning); }
+
+        .plugin-controls {
+            display: flex; align-items: center; gap: 18px;
+            padding: 10px 14px;
+            background: var(--bg-input);
+        }
+        .plugin-control-group { display: flex; align-items: center; gap: 8px; }
+        .plugin-control-group label { font-size: 0.85rem; color: var(--text-primary); cursor: pointer; }
+        .plugin-control-group input[type=radio] {
+            accent-color: var(--color-primary);
+            width: 16px; height: 16px;
+        }
+
+        .plugin-tools-toggle {
+            display: block; padding: 9px 14px;
+            background: transparent; border: none; border-top: 1px solid var(--border-color);
+            color: var(--color-primary); cursor: pointer;
+            font-size: 0.82rem; text-align: left; width: 100%;
+        }
+        .plugin-tools-toggle:hover { background: var(--bg-hover); }
+        .plugin-tools-toggle::before { content: "▶  "; font-size: 0.72rem; }
+        .plugin-tools-toggle.expanded::before { content: "▼  "; }
+
+        .plugin-tools-body {
+            display: none;
+            padding: 12px 14px;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-card);
+            max-height: 480px; overflow-y: auto;
+        }
+        .plugin-tools-body.expanded { display: block; }
+
+        .plugin-tools-search {
+            width: 100%;
+            padding: 7px 10px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .tool-group-header {
+            font-weight: 600; font-size: 0.78rem; text-transform: uppercase;
+            color: var(--text-muted); letter-spacing: 0.5px;
+            margin: 12px 0 6px; padding: 0 4px;
+        }
+        .tool-group-header:first-child { margin-top: 0; }
+
+        .tool-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 8px; border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+        .tool-row:hover { background: var(--bg-hover); }
+        .tool-row input[type=checkbox] {
+            width: 16px; height: 16px; flex-shrink: 0;
+            accent-color: var(--color-primary);
+        }
+        .tool-row.is-write input[type=checkbox] { accent-color: var(--color-warning); }
+        .tool-row .tool-meta { flex: 1; min-width: 0; }
+        .tool-row .tool-name {
+            font-family: var(--font-mono, monospace);
+            font-size: 0.82rem; color: var(--text-primary); font-weight: 500;
+        }
+        .tool-row .tool-desc {
+            color: var(--text-muted); font-size: 0.74rem;
+            margin-top: 1px; line-height: 1.3;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        .tool-row .write-badge {
+            background: var(--color-warning); color: #fff;
+            padding: 1px 6px; border-radius: var(--radius-full);
+            font-size: 0.65rem; font-weight: 500; flex-shrink: 0;
+        }
+
+        .tool-row.hidden { display: none; }
+        .tool-row.locked-by-level {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .tool-row.locked-by-level:hover { background: transparent; }
+        .tool-row.locked-by-level input[type=checkbox] { cursor: not-allowed; }
+
+        .consent-button-row {
+            display: flex; gap: 10px; margin-top: 24px;
+        }
+        .consent-button-row .btn { flex: 1; }
+        .consent-deny {
+            background: transparent !important;
+            color: var(--text-secondary) !important;
+            border: 1px solid var(--border-color) !important;
+        }
+        .consent-deny:hover {
+            background: var(--bg-hover) !important;
+            color: var(--color-danger) !important;
+        }
+        .consent-disclaimer {
+            color: var(--text-muted); font-size: 0.78rem; text-align: center; margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <div class="theme-switcher-login">
+            <button class="theme-btn" onclick="setTheme('light')" title="Light mode">&#x2600;&#xFE0F;</button>
+            <button class="theme-btn" onclick="setTheme('auto')" title="Auto (system)">&#x1F5A5;&#xFE0F;</button>
+            <button class="theme-btn" onclick="setTheme('dark')" title="Dark mode">&#x1F319;</button>
+        </div>
+        <div class="login-card consent-card">
+            <div class="login-logo">
+                <img src="/static/logo-horizontal-dark.svg" alt="initMAX" class="logo-light-theme" style="height: 40px;">
+                <img src="/static/logo-horizontal-light.svg" alt="initMAX" class="logo-dark-theme" style="height: 40px;">
+            </div>
+            <h1 class="login-title">Allow access?</h1>
+
+            <div class="consent-greeting">
+                Signed in as <strong>{{ subject }}</strong>{% if subject_role %} ({{ subject_role }} role){% endif %}. <strong>{{ client_name }}</strong> wants to call MCP tools on your behalf.
+            </div>
+
+            {% if wildcard_requested %}
+            <div class="consent-warning">
+                <strong>&#x26A0;&#xFE0F; This client is asking for unlimited access.</strong>
+                Either tick <em>Full access</em> below to grant everything in one click, or pick a per-plugin scope (<em>Read-only</em> or <em>Read + Write</em>) and optionally narrow it further to specific tools.
+            </div>
+            {% endif %}
+
+            <form method="post" action="/oauth/login" autocomplete="off">
+                <input type="hidden" name="request_id" value="{{ request_id }}">
+                <input type="hidden" name="step" value="consent">
+
+                {% if can_grant_wildcard %}
+                <label class="consent-wildcard-row">
+                    <input type="checkbox" name="scope" value="*" id="grant-wildcard" onchange="onWildcardToggle()">
+                    <div class="label-block">
+                        <strong>Grant full access</strong> (every tool on every module)
+                        <div class="desc">
+                            Equivalent to ticking <em>Read + Write</em> on every plugin below.
+                            Untick to choose plugins / tools individually.
+                        </div>
+                    </div>
+                </label>
+                {% endif %}
+
+                {% for plugin in plugins %}
+                <div class="plugin-section" data-plugin-id="{{ plugin.id }}">
+                    <div class="plugin-header">
+                        <img src="{{ plugin.logo_url }}" alt="{{ plugin.name }}" class="plugin-logo">
+                        <div class="plugin-meta">
+                            <div class="plugin-name">{{ plugin.name }}</div>
+                            <div class="plugin-subtitle">{{ plugin.subtitle }}</div>
+                        </div>
+                        <div class="plugin-counts">
+                            <span class="read" title="Read tools">{{ plugin.read_count }} read</span>
+                            <span class="write" title="Write tools">{{ plugin.write_count }} write</span>
+                            <span title="Total">{{ plugin.tool_count }} total</span>
+                        </div>
+                    </div>
+
+                    <div class="plugin-controls">
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">Access level:</span>
+                        <div class="plugin-control-group">
+                            <input type="radio" id="plugin-{{ plugin.id }}-none" name="plugin-{{ plugin.id }}-level" value="none" onchange="onPluginLevelChange('{{ plugin.id }}')">
+                            <label for="plugin-{{ plugin.id }}-none">None</label>
+                        </div>
+                        <div class="plugin-control-group">
+                            <input type="radio" id="plugin-{{ plugin.id }}-read" name="plugin-{{ plugin.id }}-level" value="read"
+                                   {% if plugin.default_choice == 'read' %}checked{% endif %}
+                                   onchange="onPluginLevelChange('{{ plugin.id }}')">
+                            <label for="plugin-{{ plugin.id }}-read">Read-only</label>
+                        </div>
+                        <div class="plugin-control-group">
+                            <input type="radio" id="plugin-{{ plugin.id }}-write" name="plugin-{{ plugin.id }}-level" value="write"
+                                   {% if plugin.default_choice == 'write' %}checked{% endif %}
+                                   onchange="onPluginLevelChange('{{ plugin.id }}')">
+                            <label for="plugin-{{ plugin.id }}-write">Read + Write</label>
+                        </div>
+                    </div>
+
+                    <button type="button" class="plugin-tools-toggle" onclick="toggleToolsPanel('{{ plugin.id }}', this)">
+                        Pick individual tools (overrides the access level above for the ticked tools only)
+                    </button>
+
+                    <div class="plugin-tools-body" id="plugin-{{ plugin.id }}-tools">
+                        <input type="text" class="plugin-tools-search"
+                               placeholder="Filter tools - e.g. host_get, problem, history"
+                               oninput="filterTools('{{ plugin.id }}', this.value)">
+
+                        {% for group in plugin.grouped_tools %}
+                        <div class="tool-group-header">{{ group.label }}</div>
+                        {% for tool in group.tools %}
+                        <label class="tool-row{% if tool.is_write %} is-write{% endif %}"
+                               data-tool-name="{{ tool.name }}"
+                               data-tool-desc="{{ tool.description }}"
+                               data-is-write="{{ '1' if tool.is_write else '0' }}">
+                            <input type="checkbox"
+                                   name="scope"
+                                   value="tool:{{ tool.name }}"
+                                   data-plugin-id="{{ plugin.id }}"
+                                   data-is-write="{{ '1' if tool.is_write else '0' }}">
+                            <div class="tool-meta">
+                                <div class="tool-name">{{ tool.name }}</div>
+                                <div class="tool-desc">{{ tool.description }}</div>
+                            </div>
+                            {% if tool.is_write %}<span class="write-badge">WRITE</span>{% endif %}
+                        </label>
+                        {% endfor %}
+                        {% endfor %}
+                    </div>
+
+                    {# Hidden inputs that emit plugin-level scopes (plugin:<id>.read /
+                       plugin:<id>.write) on form submit. Driven by the radio buttons
+                       above through the onPluginLevelChange handler. #}
+                    <input type="hidden" name="scope" value="" id="plugin-{{ plugin.id }}-scope" disabled>
+                </div>
+                {% endfor %}
+
+                <div class="consent-button-row">
+                    <button type="submit" name="action" value="deny" class="btn btn-lg consent-deny">Deny</button>
+                    <button type="submit" name="action" value="allow" class="btn btn-primary btn-lg">Allow</button>
+                </div>
+            </form>
+
+            <div class="consent-disclaimer">
+                Your choice is recorded in the audit log. To revoke this client later, sign in to the initMAX MCP admin portal and open the OAuth Clients page.
+            </div>
+        </div>
+        <div class="login-footer">
+            <a href="https://www.initmax.com" target="_blank" style="color:inherit; text-decoration:none;">&copy; {{ year }} initMAX s.r.o.</a>
+        </div>
+    </div>
+
+    <script>
+    // Plugin-level radio change -> emit the matching plugin:<id>.<level>
+    // scope via a single hidden input. ``none`` disables the input so
+    // the form does not post anything for that plugin. ``read`` also
+    // greys + un-ticks per-tool write checkboxes inside the plugin
+    // section so the operator gets a clear visual that write tools are
+    // not part of a read-only grant.
+    function onPluginLevelChange(pluginId) {
+        var section = document.querySelector('.plugin-section[data-plugin-id="' + pluginId + '"]');
+        if (!section) return;
+        var hidden = document.getElementById('plugin-' + pluginId + '-scope');
+        var checked = section.querySelector('input[name="plugin-' + pluginId + '-level"]:checked');
+        if (!hidden || !checked) return;
+        var level = checked.value;
+        if (level === 'none') {
+            hidden.value = '';
+            hidden.disabled = true;
+        } else if (level === 'read') {
+            hidden.value = 'plugin:' + pluginId + '.read';
+            hidden.disabled = false;
+        } else if (level === 'write') {
+            hidden.value = 'plugin:' + pluginId + '.write';
+            hidden.disabled = false;
+        }
+        section.classList.toggle('dimmed', level === 'none');
+
+        // Cascade to per-tool checkboxes. Under "Read-only" the write
+        // tools are locked + unticked (a write grant is incompatible
+        // with the read-only plugin level). Under "None" / "Read+Write"
+        // every tool stays interactive so the operator can hand-pick.
+        var lockWrites = (level === 'read');
+        section.querySelectorAll('.tool-row').forEach(function(row) {
+            var box = row.querySelector('input[type=checkbox]');
+            if (!box) return;
+            var rowIsWrite = row.dataset.isWrite === '1';
+            if (lockWrites && rowIsWrite) {
+                box.checked = false;
+                box.disabled = true;
+                row.classList.add('locked-by-level');
+            } else {
+                box.disabled = false;
+                row.classList.remove('locked-by-level');
+            }
+        });
+    }
+
+    // Wildcard: when ticked, dim all plugin sections (the per-plugin
+    // grants become redundant) and disable their hidden scope inputs to
+    // avoid posting both wildcard AND plugin scopes (audit log clarity).
+    function onWildcardToggle() {
+        var box = document.getElementById('grant-wildcard');
+        if (!box) return;
+        var on = box.checked;
+        document.querySelectorAll('.plugin-section').forEach(function(sec) {
+            sec.classList.toggle('dimmed', on);
+            sec.querySelectorAll('input[type=radio], input[type=checkbox], button.plugin-tools-toggle')
+                .forEach(function(el) {
+                    if (el.id === 'grant-wildcard') return;
+                    el.disabled = on;
+                });
+            var hidden = sec.querySelector('input[type=hidden][name=scope]');
+            if (hidden) hidden.disabled = on || hidden.value === '';
+        });
+    }
+
+    // Show / hide the per-tool body for a plugin section.
+    function toggleToolsPanel(pluginId, btn) {
+        var body = document.getElementById('plugin-' + pluginId + '-tools');
+        if (!body) return;
+        var showing = body.classList.toggle('expanded');
+        btn.classList.toggle('expanded', showing);
+        btn.firstChild.nodeValue = showing
+            ? 'Hide individual tools'
+            : 'Pick individual tools (overrides the access level above for the ticked tools only)';
+    }
+
+    // Filter the tool list by free-text query against name + description.
+    function filterTools(pluginId, query) {
+        var body = document.getElementById('plugin-' + pluginId + '-tools');
+        if (!body) return;
+        var q = (query || '').trim().toLowerCase();
+        var rows = body.querySelectorAll('.tool-row');
+        var groupHeaders = body.querySelectorAll('.tool-group-header');
+        if (!q) {
+            rows.forEach(function(r) { r.classList.remove('hidden'); });
+            groupHeaders.forEach(function(h) { h.classList.remove('hidden'); });
+            return;
+        }
+        // Hide rows whose name + desc do not match. Then hide group
+        // headers that no longer have any visible row underneath.
+        rows.forEach(function(r) {
+            var hay = (r.dataset.toolName + ' ' + (r.dataset.toolDesc || '')).toLowerCase();
+            r.classList.toggle('hidden', hay.indexOf(q) === -1);
+        });
+        groupHeaders.forEach(function(h) {
+            var sib = h.nextElementSibling;
+            var hasVisible = false;
+            while (sib && !sib.classList.contains('tool-group-header')) {
+                if (sib.classList.contains('tool-row') && !sib.classList.contains('hidden')) {
+                    hasVisible = true; break;
+                }
+                sib = sib.nextElementSibling;
+            }
+            h.classList.toggle('hidden', !hasVisible);
+        });
+    }
+
+    // Initialise: render hidden inputs for whatever radios are pre-checked.
+    document.querySelectorAll('.plugin-section').forEach(function(sec) {
+        onPluginLevelChange(sec.dataset.pluginId);
+    });
+
+    function setTheme(mode) {
+        localStorage.setItem('theme', mode);
+        applyTheme();
+    }
+    function applyTheme() {
+        var saved = localStorage.getItem('theme') || 'auto';
+        var resolved = saved === 'auto'
+            ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+            : saved;
+        document.documentElement.setAttribute('data-theme', resolved);
+        document.querySelectorAll('.theme-btn').forEach(function(btn) { btn.classList.remove('active'); });
+        var idx = {light: 0, auto: 1, dark: 2}[saved];
+        if (idx !== undefined) document.querySelectorAll('.theme-btn')[idx].classList.add('active');
+    }
+    applyTheme();
+    window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function() {
+        if (localStorage.getItem('theme') === 'auto') applyTheme();
+    });
+    </script>
+</body>
+</html>

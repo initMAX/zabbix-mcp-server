@@ -109,6 +109,50 @@
     <span class="text-muted">none specified.</span>
     {% endif %}
     {% endif %}
+
+    {# v1.31 grammar: per-plugin and per-tool grants. Read-only here -
+       these are minted at /authorize via the consent screen, not edited
+       from this page. #}
+    {% if plugin_grants or tool_grants %}
+    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+        <h4 style="margin: 0 0 8px; font-size: 0.92rem;">
+            Active per-plugin / per-tool grants
+            <span class="tooltip-icon" tabindex="0" data-tooltip="Fine-grained grants minted at the consent screen during the last successful /authorize. The checkboxes above govern which broad groups the client may request next time; these per-plugin / per-tool entries reflect what was actually granted and are re-issued when the operator next re-authenticates the client.">&#x1F6C8;</span>
+        </h4>
+        {% if plugin_grants %}
+        <div style="margin-bottom: 10px;">
+            <strong style="font-size: 0.82rem;">Plugins:</strong>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;">
+                {% for g in plugin_grants %}
+                <span class="badge {% if g.level == 'read' %}badge-info{% else %}badge-warning{% endif %}" style="font-family: var(--font-mono); font-size: 0.78rem;">
+                    {{ g.plugin_id }}{% if g.level == 'read' %} (read-only){% elif g.level == 'write' %} (read + write){% else %} (full){% endif %}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% if tool_grants %}
+        <div>
+            <strong style="font-size: 0.82rem;">Individual tools ({{ tool_grants | length }}):</strong>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;">
+                {% for t in tool_grants_visible %}
+                <code style="font-size: 0.74rem; padding: 2px 7px; background: var(--bg-input); border-radius: var(--radius-sm);">{{ t }}</code>
+                {% endfor %}
+                {% if tool_grants_overflow %}
+                <details style="display: inline;">
+                    <summary style="cursor: pointer; font-size: 0.74rem; color: var(--color-primary);">+ {{ tool_grants_overflow }} more</summary>
+                    <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;">
+                        {% for t in tool_grants[12:] %}
+                        <code style="font-size: 0.74rem; padding: 2px 7px; background: var(--bg-input); border-radius: var(--radius-sm);">{{ t }}</code>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 {% if can_edit %}

@@ -172,6 +172,10 @@ Commands:
   test-config         Validate config.toml syntax and report errors
   request-tls         Obtain a Let's Encrypt cert via certbot, wire it into config.toml,
                       install a renewal hook (usage: request-tls --hostname mcp.example.com [--email you@example.com])
+  add-plugin          (forthcoming) Install an MCP plugin from the initmax-mcp catalog
+  remove-plugin       (forthcoming) Uninstall an MCP plugin
+  update-plugin       (forthcoming) Update an installed MCP plugin
+  list-plugins        (forthcoming) List installed MCP plugins
 
 Options:
   --dry-run           Check prerequisites without installing anything
@@ -2125,6 +2129,63 @@ HOOK
     info "  sudo certbot renew --dry-run"
 }
 
+# ===========================================================================
+# do_plugin_loader_stub - placeholder for the forthcoming plugin loader.
+#
+# v1.31 ships the plugin contract (manifest schema, trust model,
+# tool_prefix plumbing, example plugin in examples/example-plugin/) but
+# not the runtime that actually installs / removes plugins from the
+# initmax-mcp catalog. Tracked under issue #47, lands in a follow-up
+# release. We register the subcommands now so operators who try
+# `./install.sh add-plugin nagios` get a clear "not yet shipped" message
+# pointing at the design + reference implementation, instead of
+# "Unknown argument".
+# ===========================================================================
+do_plugin_loader_stub() {
+    local subcmd="$1"
+    shift
+    echo
+    info "The MCP plugin loader is in development - it lands in a follow-up"
+    info "release. v1.31 ships the contract that the loader will use:"
+    info "  - manifest schema + trust model: SECURITY.md (\"Plugin Architecture\")"
+    info "  - operator-side config schema: config.example.toml ([plugins.<id>])"
+    info "  - reference implementation: examples/example-plugin/"
+    info "  - bundled module manifest: plugin.json (repo root)"
+    info "  - design discussion: https://github.com/initMAX/zabbix-mcp-server/issues/47"
+    echo
+    info "Subcommand requested: $subcmd $*"
+    echo
+    info "When the loader release ships, this command will:"
+    case "$subcmd" in
+        add-plugin)
+            info "  - install the named plugin into /opt/zabbix-mcp/plugins/<id>/"
+            info "  - create a venv and install the plugin's PyPI package"
+            info "  - add a [plugins.<id>] section to /etc/zabbix-mcp/config.toml"
+            info "  - reload the MCP server so the new plugin's tools/list entries register"
+            ;;
+        remove-plugin)
+            info "  - remove the [plugins.<id>] section from /etc/zabbix-mcp/config.toml"
+            info "  - delete the plugin's venv at /opt/zabbix-mcp/plugins/<id>/"
+            info "  - reload the MCP server so the plugin's tools/list entries un-register"
+            ;;
+        update-plugin)
+            info "  - re-resolve the plugin's pinned version constraint against PyPI"
+            info "  - upgrade the plugin's venv if a newer matching version is available"
+            info "  - reload the MCP server"
+            ;;
+        list-plugins)
+            info "  - print every [plugins.<id>] block from /etc/zabbix-mcp/config.toml"
+            info "  - show id / version / enabled / tool_prefix / source for each"
+            ;;
+    esac
+    echo
+    info "Today, only the bundled Zabbix module is registered. Run:"
+    info "  systemctl status zabbix-mcp-server"
+    info "to confirm the server is running, and visit /modules in the admin"
+    info "portal for the current module list."
+    exit 2
+}
+
 # --------------------------------------------------------------------------- #
 # Main — parse arguments
 # --------------------------------------------------------------------------- #
@@ -2151,6 +2212,9 @@ for arg in "$@"; do
             COMMAND="test-config"
             ;;
         install|update|upgrade|uninstall|set-admin-password|generate-token|request-tls)
+            COMMAND="$arg"
+            ;;
+        add-plugin|remove-plugin|update-plugin|list-plugins)
             COMMAND="$arg"
             ;;
         *)
@@ -2208,5 +2272,8 @@ case "$COMMAND" in
         ;;
     request-tls)
         do_request_tls "${ORIGINAL_ARGS[@]:1}"
+        ;;
+    add-plugin|remove-plugin|update-plugin|list-plugins)
+        do_plugin_loader_stub "$COMMAND" "${ORIGINAL_ARGS[@]:1}"
         ;;
 esac

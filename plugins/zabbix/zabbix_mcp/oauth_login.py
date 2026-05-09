@@ -68,7 +68,7 @@ _oauth_login_limiter = LoginRateLimiter()
 # Reuse the admin portal's Jinja env so the login + error pages look
 # identical to the portal's own login surface (logo, palette, theme
 # switcher, ``style.css``).  Templates referenced below MUST live in
-# ``src/zabbix_mcp/admin/templates/``.
+# ``plugins/zabbix/zabbix_mcp/admin/templates/``.
 _TEMPLATE_DIR = Path(__file__).parent / "admin" / "templates"
 _jinja_env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(str(_TEMPLATE_DIR)),
@@ -144,7 +144,176 @@ def _scope_cap_for_role(role: str) -> set[str]:
 
 
 # ---------------------------------------------------------------------------
-# Scope catalog for the consent screen
+# Per-plugin tool catalog for the v1.31 consent screen
+# ---------------------------------------------------------------------------
+# v1.30 / earlier consent rendered a flat list of six tool-group rows
+# (monitoring, alerts, ...) each with an opaque "X tools" badge. v1.31
+# breaks the catalog down per plugin (today: just the bundled Zabbix
+# module; future: NetBox / Nagios / Jira / FastSpring) AND down to
+# individual tools so the operator can grant exactly what the client
+# needs. The plugin section header has a Read-only / Read+Write toggle
+# (cascades to per-tool checkboxes) plus an expandable per-tool list
+# with search filter.
+
+# One-line descriptions for the extension tools that are NOT covered by
+# ALL_METHODS (those live as direct mcp.add_tool registrations in
+# server.py and have no MethodDef). Keep in sync with the extension
+# tool registrations.
+_EXTENSION_TOOL_DESCRIPTIONS: dict[str, str] = {
+    "graph_render": "Render a Zabbix graph as a PNG (returned as base64 data URL).",
+    "anomaly_detect": "Z-score anomaly check over a metric history window.",
+    "capacity_forecast": "Linear-regression forecast for items projecting to a threshold.",
+    "item_threshold_search": "List items whose lastvalue crosses operator-supplied numeric thresholds.",
+    "problem_active_get": "Active-only problems pre-filtered for disabled triggers / hosts and Information / Not classified noise.",
+    "host_status_get": "Host + interfaces + active problems + last-value of top items in one call.",
+    "hostgroup_overview_get": "Host group health roll-up with the top-N noisiest hosts.",
+    "infrastructure_summary_get": "Whole-deployment dashboard summary (problem counts by severity, top groups, biggest hostgroups).",
+    "item_history_summary_get": "Item metadata + history window + min/max/avg over the period.",
+    "report_generate": "Generate a PDF report from a registered template (long-running, supports Tasks API).",
+    "action_prepare": "Stage 1 of two-step write approval: stash the action and return a confirmation token.",
+    "action_confirm": "Stage 2 of two-step write approval: execute the previously prepared action.",
+    "zabbix_raw_api_call": "Admin escape hatch - call any Zabbix API method by name. Required for methods this server does not wrap.",
+    "health_check": "Verify MCP server status and connectivity to all configured Zabbix servers.",
+}
+
+
+def _build_tool_catalog() -> list[dict[str, Any]]:
+    """Return one row per registered tool, with metadata for the consent UI.
+
+    Iterates ALL_METHODS (the wrapped Zabbix API methods) plus the
+    standalone extension tools registered in server.py. Each row carries
+    the canonical tool name (no plugin prefix), a one-line description,
+    a write classification (drives the Read-only / Read+Write toggle),
+    and the tool group it belongs to (drives the in-page sub-section
+    headers).
+    """
+    from zabbix_mcp.api import ALL_METHODS
+    from zabbix_mcp.config import TOOL_GROUPS
+
+    # Map prefix -> first group it appears in (consistent with how
+    # _expand_tool_groups treats overlapping groups; e.g. "host" appears
+    # in monitoring -> use that as the canonical group label).
+    prefix_to_group: dict[str, str] = {}
+    for group, prefixes in TOOL_GROUPS.items():
+        for p in prefixes:
+            prefix_to_group.setdefault(p, group)
+
+    catalog: list[dict[str, Any]] = []
+    for m in ALL_METHODS:
+        prefix = m.tool_name.rsplit("_", 1)[0] if "_" in m.tool_name else m.tool_name
+        # Pre-correlated views (host_status_get etc.) have full names in
+        # TOOL_GROUPS["extensions"] so check that first.
+        if m.tool_name in prefix_to_group:
+            group = prefix_to_group[m.tool_name]
+        else:
+            group = prefix_to_group.get(prefix, "other")
+        first_line = (m.description or "").splitlines()[0].strip()
+        catalog.append({
+            "name": m.tool_name,
+            "description": first_line[:160],
+            "is_write": not m.read_only,
+            "group": group,
+        })
+
+    # Add extension tools that are not wrapped via MethodDef. These are
+    # direct registrations in server.py and need explicit descriptions.
+    seen = {row["name"] for row in catalog}
+    for name in TOOL_GROUPS.get("extensions", []):
+        if name in seen:
+            continue
+        desc = _EXTENSION_TOOL_DESCRIPTIONS.get(name, name.replace("_", " ").title() + " (extension tool).")
+        # Classify: the few writeful extensions (action_confirm,
+        # zabbix_raw_api_call, history_push). Reuse the same rule the
+        # runtime uses (_WRITE_EXTENSION_TOOLS) by importing it here.
+        try:
+            from zabbix_mcp.server import _WRITE_EXTENSION_TOOLS
+            is_write = name in _WRITE_EXTENSION_TOOLS
+        except Exception:  # pragma: no cover - defensive
+            is_write = name in {"action_confirm", "zabbix_raw_api_call", "history_push"}
+        catalog.append({
+            "name": name,
+            "description": desc[:160],
+            "is_write": is_write,
+            "group": "extensions",
+        })
+
+    catalog.sort(key=lambda r: (r["group"], r["name"]))
+    return catalog
+
+
+def _consent_plugin_catalog(
+    requested_scopes: list[str],
+    role_cap: set[str],
+) -> dict[str, Any]:
+    """Build the per-plugin consent UI structure consumed by oauth_consent.html.
+
+    Today only the bundled Zabbix module is registered with the host;
+    when the loader release lands, this function iterates the installed
+    plugin registry and returns one section per active plugin. The
+    template is already plugin-agnostic - it renders the list it gets.
+    """
+    requested = list(requested_scopes or [])
+    has_wildcard_request = (not requested) or ("*" in requested)
+    can_grant_wildcard = "*" in role_cap
+
+    tool_catalog = _build_tool_catalog()
+    write_count = sum(1 for t in tool_catalog if t["is_write"])
+    read_count = len(tool_catalog) - write_count
+
+    # Default plugin-level choice: pick the LEAST privilege that still
+    # satisfies the client's request. Wildcard request -> read-only by
+    # default (operator must explicitly upgrade to write). Specific
+    # write-heavy groups (users / administration) -> write. Anything else
+    # -> read-only.
+    default_choice = "read"
+    if any(s in {"users", "administration"} for s in requested):
+        default_choice = "write"
+    elif any(s.startswith("plugin:") and (s.endswith(".write") or "." not in s[7:]) for s in requested):
+        default_choice = "write"
+
+    # Group sub-sections inside the per-tool list (for template grouping).
+    by_group: dict[str, list[dict[str, Any]]] = {}
+    for row in tool_catalog:
+        by_group.setdefault(row["group"], []).append(row)
+    grouped_tools = [
+        {"group": g, "label": _TOOL_GROUP_LABELS.get(g, g.replace("_", " ").title()),
+         "tools": tools}
+        for g, tools in sorted(by_group.items())
+    ]
+
+    return {
+        "wildcard_requested": has_wildcard_request,
+        "can_grant_wildcard": can_grant_wildcard,
+        "plugins": [
+            {
+                "id": "zabbix",
+                "name": "Zabbix",
+                "subtitle": "Bundled - default-installed",
+                "logo_url": "/static/module-zabbix.svg",
+                "tool_count": len(tool_catalog),
+                "read_count": read_count,
+                "write_count": write_count,
+                "default_choice": default_choice,
+                "grouped_tools": grouped_tools,
+            }
+        ],
+    }
+
+
+_TOOL_GROUP_LABELS: dict[str, str] = {
+    "monitoring": "Monitoring",
+    "data_collection": "Data collection / templates",
+    "alerts": "Alerts & actions",
+    "users": "Users, roles & access",
+    "administration": "Administration",
+    "extensions": "Extensions",
+    "other": "Other",
+}
+
+
+# ---------------------------------------------------------------------------
+# Legacy scope catalog (v1.30 group-based consent UI) - retained as a fallback
+# in case _build_tool_catalog cannot be invoked (early boot, missing imports).
 # ---------------------------------------------------------------------------
 
 
@@ -358,33 +527,18 @@ def _handle_login_step(
     )
 
     requested_scopes = list(pending.params.scopes or [])
-    has_wildcard = (not requested_scopes) or ("*" in requested_scopes)
     cap = _scope_cap_for_role(role)
-    rows = _scopes_for_consent_ui(requested_scopes)
-    # Apply role cap: scopes outside the operator's cap render disabled
-    # with a "needs admin role" hint, so a viewer cannot accidentally
-    # grant administration / users to a third-party client.
-    can_grant_wildcard = "*" in cap
-    for row in rows:
-        if can_grant_wildcard:
-            row["disabled"] = False
-        else:
-            allowed_for_this_role = row["id"] in cap
-            row["disabled"] = not allowed_for_this_role
-            if row["disabled"]:
-                row["checked"] = False
-                row["description"] = (
-                    row["description"]
-                    + f"  -- not available to your role ({role}); ask an admin."
-                )
+    catalog = _consent_plugin_catalog(requested_scopes, cap)
     return HTMLResponse(_render_template(
         "oauth_consent.html",
         request_id=request_id,
         client_name=(pending.client.client_name or "").strip() or str(pending.client.client_id or ""),
         subject=username,
         subject_role=role,
-        scopes=rows,
-        has_wildcard_request=has_wildcard,
+        catalog=catalog,
+        wildcard_requested=catalog["wildcard_requested"],
+        can_grant_wildcard=catalog["can_grant_wildcard"],
+        plugins=catalog["plugins"],
     ))
 
 
@@ -436,29 +590,44 @@ def _handle_consent_step(
     if action != "allow":
         return _render_error_page("Unrecognised consent action.")
 
-    granted = [str(s) for s in form.getlist("scope")] if hasattr(form, "getlist") else []
-    # Wildcard subsumes the concrete groups - if both are posted, drop
-    # the redundant rows so the audit log shows the actual grant
-    # ("scopes=['*']") instead of a confusing super-set.
+    raw_granted = [str(s) for s in form.getlist("scope")] if hasattr(form, "getlist") else []
+    # Drop empty strings that disabled hidden inputs can post when the
+    # browser ignores ``disabled`` (defensive belt-and-braces for
+    # unusual UAs - the consent screen disables the radio-driven hidden
+    # input when "None" is selected).
+    granted = [s for s in (s.strip() for s in raw_granted) if s]
+    # Wildcard subsumes everything else - if both posted, simplify so
+    # the audit log shows the actual grant rather than a super-set.
     if "*" in granted:
         granted = ["*"]
+
     if not granted:
-        # The operator unticked everything -- treat as a deny since an
-        # empty grant is functionally useless and likely an accident.
         return _render_error_page(
-            "You did not grant any scope. Either pick at least one scope "
-            "or click Deny to cancel.",
+            "You did not grant any scope. Either pick at least one access "
+            "level / tool or click Deny to cancel.",
             status_code=400,
         )
 
+    # Reject any scope the client did not originally request, BUT the
+    # v1.31 grammar allows the operator to substitute equivalent or
+    # narrower forms - e.g. a client that asked for "monitoring" should
+    # accept "plugin:zabbix.read" or a hand-picked "tool:host_get" list,
+    # because those are subsets of what was requested. We only enforce
+    # the rejection when the client locked down its request to a
+    # specific group set AND the operator answered with something
+    # *broader* (e.g. wildcard *).
     requested_scopes = set(pending.params.scopes or [])
     if "*" in requested_scopes or not requested_scopes:
-        requested_scopes |= {"*"}
-        # When client requested wildcard, any scope set is allowed
         candidate_grant = list(granted)
     else:
-        # Reject any scope the client did not originally request
-        candidate_grant = [s for s in granted if s in requested_scopes]
+        # Client asked for a specific set - filter out any wildcard
+        # broadening the operator might have ticked. Per-plugin and
+        # per-tool grants are accepted because they are subsets of any
+        # group the client could have asked for.
+        candidate_grant = [
+            s for s in granted
+            if s != "*" or "*" in requested_scopes
+        ]
         if not candidate_grant:
             return _render_error_page(
                 "Granted scopes do not match what the client requested.",
@@ -467,15 +636,52 @@ def _handle_consent_step(
 
     # Cap by operator role -- a viewer cannot grant administration /
     # users no matter what the form posted.  Server-side check; the
-    # disabled checkboxes in the consent UI are only a hint.
+    # disabled UI controls are only a hint. v1.31 grammar additions
+    # (``plugin:zabbix.write``, ``tool:host_create``, ...) are gated on
+    # the WRITE side so a non-admin cannot grant a write scope (or the
+    # wildcard) regardless of what the form posted.
     cap = _scope_cap_for_role(pending.authenticated_role or "viewer")
-    if "*" in cap:
-        allowed_grant = candidate_grant
-    else:
-        allowed_grant = [s for s in candidate_grant if s in cap]
-        # Reject the wildcard request from a non-admin operator entirely.
-        if "*" in candidate_grant and "*" not in cap:
-            allowed_grant = [s for s in allowed_grant if s != "*"]
+    can_grant_writes = "*" in cap or any(
+        s in {"users", "administration"} for s in cap
+    )
+    allowed_grant: list[str] = []
+    rejected: list[str] = []
+    for s in candidate_grant:
+        if s == "*":
+            if "*" in cap:
+                allowed_grant.append(s)
+            else:
+                rejected.append(s)
+        elif s.startswith("plugin:") and (s.endswith(".write") or "." not in s.split(":", 1)[1]):
+            # plugin:<id> or plugin:<id>.write -> implies write access
+            if can_grant_writes:
+                allowed_grant.append(s)
+            else:
+                rejected.append(s)
+        elif s.startswith("plugin:") and s.endswith(".read"):
+            # Read-only plugin grant - any role can grant.
+            allowed_grant.append(s)
+        elif s.startswith("tool:"):
+            # Per-tool grant. Allow only if the tool is a read tool OR
+            # the operator can grant writes.
+            tool_name = s[len("tool:"):]
+            try:
+                from zabbix_mcp.server import _ensure_write_tools_set, _WRITE_TOOLS
+                _ensure_write_tools_set()
+                is_write = tool_name in _WRITE_TOOLS
+            except Exception:
+                is_write = False
+            if is_write and not can_grant_writes:
+                rejected.append(s)
+            else:
+                allowed_grant.append(s)
+        else:
+            # Legacy group / prefix scope - apply the v1.30 cap check.
+            if "*" in cap or s in cap:
+                allowed_grant.append(s)
+            else:
+                rejected.append(s)
+
     if not allowed_grant:
         return _render_error_page(
             "None of the scopes you ticked are within your role's grant "
@@ -493,6 +699,20 @@ def _handle_consent_step(
             "and completion. Reconnect from your MCP client to begin a "
             "new login.",
         )
+    # Audit-log details: keep the per-tool list capped so a 200-tool
+    # grant does not blow the audit row size. Summary form: the first 8
+    # tool names + a count.
+    tool_grants = [s for s in allowed_grant if s.startswith("tool:")]
+    plugin_grants = [s for s in allowed_grant if s.startswith("plugin:")]
+    summary = {
+        "wildcard": "*" in allowed_grant,
+        "plugins": plugin_grants,
+        "tools_count": len(tool_grants),
+        "tools_sample": tool_grants[:8],
+        "legacy": [s for s in allowed_grant if not s.startswith(("plugin:", "tool:")) and s != "*"],
+    }
+    if rejected:
+        summary["rejected_by_role"] = rejected
     write_audit(
         action="oauth.consent_granted",
         user=subject,
@@ -501,13 +721,16 @@ def _handle_consent_step(
         details={
             "client_name": pending.client.client_name or "",
             "requested_scopes": list(pending.params.scopes or []),
-            "granted_scopes": allowed_grant,
+            "granted_scopes_summary": summary,
         },
         ip=client_ip or "",
     )
     logger.info(
-        "OAuth consent granted: user=%s client=%s requested=%s granted=%s",
+        "OAuth consent granted: user=%s client=%s requested=%s "
+        "granted=%d scopes (wildcard=%s, plugins=%s, tools=%d, legacy=%s)",
         subject, pending.client.client_id,
-        list(pending.params.scopes or []), allowed_grant,
+        list(pending.params.scopes or []),
+        len(allowed_grant), summary["wildcard"], summary["plugins"],
+        summary["tools_count"], summary["legacy"],
     )
     return RedirectResponse(redirect_url, status_code=302)

@@ -121,6 +121,19 @@ compact_output = true
 # setting and uses the per-token `allow_raw_json` field instead.
 # stdio_allow_raw_json = false
 
+# Tool-name prefix applied to bundled Zabbix tools when running
+# side-by-side with other MCP modules (plugin loader is forthcoming -
+# tracked under issue #47, ships in a follow-up release; design-locked
+# in v1.31). Default empty - bundled tools surface as `host_get`,
+# `problem_get`, ... (unchanged from earlier versions).
+# When set to "zabbix", the same tools surface as `zabbix__host_get`,
+# `zabbix__problem_get`, ... so they cannot collide with tools from
+# other plugins (e.g. NetBox `netbox__device_get`, Jira
+# `jira__issue_create`). Operators running a single-module host
+# (Zabbix only) should leave this empty - that's the supported
+# deployment for v1.31.
+# tool_prefix = ""
+
 # ---------------------------------------------------------------------------
 # PDF Reporting (optional - requires: pip install zabbix-mcp-server[reporting])
 # ---------------------------------------------------------------------------
@@ -554,6 +567,35 @@ verify_ssl = true
 # frontend_password = "${ZABBIX_PROD_FRONTEND_PASSWORD}"
 
 # ---------------------------------------------------------------------------
+# MCP Modules (bundled) - forthcoming, design-locked in v1.31
+# ---------------------------------------------------------------------------
+# v1.31 lays out the source tree under plugins/<id>/ to make every MCP
+# module symmetrical: the bundled Zabbix integration lives at
+# plugins/zabbix/zabbix_mcp/, future bundled modules (if any) get their own
+# plugins/<id>/ subdirectory next to it, and externally-installed plugins
+# land under /opt/zabbix-mcp/plugins/<id>/ at runtime once the loader ships
+# (issue #47).
+#
+# A bundled module is registered with the host even when no [modules.<id>]
+# block is set - so existing operator configs do not need updating. The
+# [modules.<id>] block exists so an operator can DISABLE a bundled module
+# at boot (e.g. to run the host as a pure plugin loader without the
+# bundled Zabbix integration). v1.31 PARSES this block but does not yet
+# enforce the `enabled = false` toggle - the disable / re-enable runtime
+# lands with the loader release. Setting enabled = false in v1.31 is
+# tolerated (logged) but the Zabbix tools still register, matching the
+# "no breaking change for end users" v1.31 contract.
+#
+# [modules.zabbix]
+# enabled = true
+#                         # Default: bundled Zabbix module is registered.
+#                         # When the loader ships, set to false to suppress
+#                         # the bundled tool registration without touching
+#                         # the [zabbix.<server>] blocks (the connection
+#                         # config stays in place; the host just stops
+#                         # exposing Zabbix tools to MCP clients).
+
+# ---------------------------------------------------------------------------
 # Example: additional server
 # ---------------------------------------------------------------------------
 # Uncomment and configure to add a second Zabbix instance.
@@ -565,3 +607,87 @@ verify_ssl = true
 # read_only = false
 # verify_ssl = false
 # skip_version_check = false
+
+# ---------------------------------------------------------------------------
+# MCP Modules (plugins) - forthcoming in a follow-up release, design-locked in v1.31
+# ---------------------------------------------------------------------------
+# v1.31 ships the user-facing surface for the upcoming plugin loader
+# (admin sidebar "MCP Modules" section, /modules page, MCP `instructions=`
+# hint). The loader itself is tracked under issue #47 and lands in the next
+# release. The schema below is the contract that the loader will use when it
+# ships - documented here so plugin authors and operators can read against
+# something stable.
+#
+# v1.31 IGNORES every [plugins.X] block. Today only the bundled Zabbix module
+# is registered with the server (always present, always enabled, no entry
+# required here). Adding a [plugins.X] block in v1.31 has no effect.
+#
+# Once the loader ships:
+#   - The `install.sh add-plugin <id>` subcommand creates the [plugins.<id>]
+#     entry, the venv at /opt/zabbix-mcp/plugins/<id>/, and per-plugin config
+#     at /etc/zabbix-mcp/plugins/<id>.toml.
+#   - The admin portal /modules page surfaces install / enable / disable /
+#     update / remove buttons mapped to the same install.sh subcommands.
+#   - Each plugin runs as its own subprocess (stdio MCP server), inheriting
+#     the host's service user. See SECURITY.md "Plugin Architecture" for the
+#     full trust model.
+#
+# Schema (commented - paste-and-edit when the loader ships):
+#
+# [plugins.netbox]
+# enabled = true
+#                         # Operator-side enable/disable. Disabled plugins
+#                         # do not register tools but stay installed
+#                         # (config + venv preserved for re-enable).
+# package = "initmax-mcp-netbox"
+#                         # Source: PyPI distribution name (default).
+#                         # For local development point at a path or a
+#                         # git URL: package = "/opt/local-plugins/netbox"
+#                         # or "git+https://github.com/example/mcp-netbox".
+#                         # Non-PyPI sources flagged with an "untrusted
+#                         # source" badge in the admin portal until the
+#                         # operator acknowledges.
+# version = ">=0.1,<1.0"
+#                         # Pip-style version constraint. Re-checked on
+#                         # every `install.sh add-plugin` / update; the
+#                         # loader refuses to start a plugin whose
+#                         # installed version does not match.
+# tool_prefix = "netbox"
+#                         # Defaults to the plugin id ("netbox" here).
+#                         # Tools surface as netbox__device_get,
+#                         # netbox__ip_get, ... so they cannot collide
+#                         # with bundled Zabbix tools or with other
+#                         # plugins. Collision-checked at boot - the host
+#                         # refuses to start on duplicates.
+# config_file = "/etc/zabbix-mcp/plugins/netbox.toml"
+#                         # Plugin-specific runtime config (API URLs,
+#                         # credentials, plugin-defined options). Per-
+#                         # plugin schema, owned by the plugin. Kept out
+#                         # of this file so plugin churn does not rewrite
+#                         # the operator's main config. Default:
+#                         # /etc/zabbix-mcp/plugins/<id>.toml. Permissions:
+#                         # 0640 root:zabbix-mcp (same as this file).
+# # exec_path = ""
+#                         # OPTIONAL escape hatch. Default empty = use the
+#                         # convention `<venv>/bin/<entry-point>` derived
+#                         # from the plugin's pyproject.toml. Override only
+#                         # for plugins that do not follow the convention
+#                         # (e.g. a plugin shipping a Go binary, or a
+#                         # plugin running under a different interpreter).
+#
+# Token scope grammar (extends today's [tokens.X].scopes):
+#
+# [tokens.netbox-readonly]
+# secret_hash = "..."
+# scopes = ["plugin:netbox.read"]
+#                         # plugin:<id>           = all tools from that plugin
+#                         # plugin:<id>.<group>   = a plugin-defined subset
+#                         # monitoring / alerts /  = bundled Zabbix tool
+#                         #   users / extensions    groups (unchanged)
+#                         # Tokens issued before the loader ships keep
+#                         # working unchanged - they simply cannot reach
+#                         # plugin tools because they list no plugin: scope.
+# allowed_servers = ["production"]
+#                         # Zabbix-specific (unchanged). Does not apply to
+#                         # non-Zabbix plugins - each plugin owns its own
+#                         # targeting model in /etc/zabbix-mcp/plugins/<id>.toml.

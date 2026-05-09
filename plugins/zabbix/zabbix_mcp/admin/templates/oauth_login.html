@@ -22,7 +22,8 @@
             color: var(--text-primary);
         }
         .oauth-consent strong { color: var(--text-primary); }
-        .oauth-scopes { margin: 8px 0 0; padding: 0; list-style: none; }
+        .oauth-scope-line { margin: 8px 0 0; font-size: 0.85rem; line-height: 1.5; color: var(--text-primary); }
+        .oauth-scopes { margin: 6px 0 0; padding: 0; list-style: none; }
         .oauth-scopes li {
             display: inline-block;
             margin: 3px 4px 0 0;
@@ -64,13 +65,19 @@
 
             <div class="oauth-consent">
                 <strong>{{ client_name }}</strong> is asking to use your operator account.
-                <ul class="oauth-scopes">
-                    {% if scopes %}
-                        {% for s in scopes %}<li>{{ s }}</li>{% endfor %}
-                    {% else %}
-                        <li class="muted">no specific scope</li>
-                    {% endif %}
-                </ul>
+                {% set narrow_scopes = scopes | reject('equalto', '*') | list if scopes else [] %}
+                {% if scopes and '*' in scopes and not narrow_scopes %}
+                    <div class="oauth-scope-line">
+                        Requested access: <strong>all available MCP tools</strong>. You will choose which tool groups to actually grant on the next screen.
+                    </div>
+                {% elif narrow_scopes %}
+                    <div class="oauth-scope-line">Requested access:</div>
+                    <ul class="oauth-scopes">
+                        {% for s in narrow_scopes %}<li>{{ s }}</li>{% endfor %}
+                    </ul>
+                {% else %}
+                    <div class="oauth-scope-line">No specific scope requested - default access policy applies.</div>
+                {% endif %}
             </div>
 
             <form method="post" autocomplete="on">
@@ -88,7 +95,7 @@
                 </div>
             </form>
 
-            <div class="oauth-disclaimer">By signing in you grant the scopes listed above for one session.</div>
+            <div class="oauth-disclaimer">After signing in, the next screen lets you choose which specific tools and modules this client may use.</div>
         </div>
         <div class="login-footer">
             <a href="https://www.initmax.com" target="_blank" style="color:inherit; text-decoration:none;">&copy; {{ year }} initMAX s.r.o.</a>

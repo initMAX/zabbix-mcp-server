@@ -52,7 +52,7 @@ from mcp.types import (
 )
 
 from zabbix_mcp.api import ALL_METHODS
-from zabbix_mcp.api.types import MethodDef, ParamDef
+from zabbix_mcp.api.types import MethodDef
 from zabbix_mcp.client import ClientManager, RateLimitError, ReadOnlyError
 from zabbix_mcp.config import AppConfig
 
@@ -1023,6 +1023,25 @@ _TASK_AUGMENTED_TOOLS = frozenset({"report_generate"})
 
 
 # ---------------------------------------------------------------------------
+# [server].tool_prefix - module-level state set by run_server() before
+# _register_tools(). Empty (default) preserves v1.30 byte-identical tool
+# naming. When non-empty, every bundled tool surfaces as ``<prefix>__<name>``
+# at FastMCP registration; internal logic that keys off the canonical bare
+# name (write-tool detection, scope filter, Tasks API augmentation) strips
+# the prefix via ``_canonical_tool_name`` before pattern matching.
+# ---------------------------------------------------------------------------
+_CONFIGURED_TOOL_PREFIX: str = ""
+
+
+def _canonical_tool_name(name: str) -> str:
+    """Return the bare tool name with any configured prefix stripped."""
+    p = _CONFIGURED_TOOL_PREFIX
+    if p and name.startswith(p + "__"):
+        return name[len(p) + 2:]
+    return name
+
+
+# ---------------------------------------------------------------------------
 # Tools/list filtering by calling token scopes
 # ---------------------------------------------------------------------------
 
@@ -1047,24 +1066,38 @@ def _build_write_tools_set() -> frozenset[str]:
     return frozenset(auto | _WRITE_EXTENSION_TOOLS)
 
 
+# v1.31 scope grammar lives in scope_grammar.py to avoid duplicating the
+# parser between server.py (tools/list filter) and token_store.py
+# (runtime authorization check). Re-exported under the legacy names
+# ``_BUNDLED_PLUGIN_ID`` / ``_parse_token_scopes`` so existing call
+# sites in this module keep working unchanged.
+from zabbix_mcp.scope_grammar import (
+    BUNDLED_PLUGIN_ID as _BUNDLED_PLUGIN_ID,
+    parse_token_scopes as _parse_token_scopes,
+)
+
+
 def _filter_tools_by_token(tools: list) -> list:
     """Trim a tools/list response to what the current token may actually call.
 
     Reads the calling token from ``current_token_info`` (set by the auth
-    middleware) and applies two filters:
+    middleware) and applies the v1.31 scope grammar:
 
-    1. **Scope filter.** Tokens with ``scopes = ["*"]`` (or unset) keep
-       the full catalog. Otherwise the scope list is expanded via
-       ``_expand_tool_groups`` (groups -> prefixes), and only tools
-       whose ``tool_name.rsplit("_", 1)[0]`` matches an allowed prefix
-       survive. Extension tools (which carry no underscore-separable
-       prefix) are matched by exact tool name plus an "extensions"
-       group shortcut.
+    1. **Wildcard.** ``scopes = ["*"]`` (or no scopes set at all) keeps
+       the full catalog, capped by the per-token ``read_only`` flag.
 
-    2. **Read-only filter.** Tokens with ``read_only = true`` never
-       see write tools (``*_create / *_update / *_delete``, the mass*
-       methods, ``action_prepare/confirm``, ``zabbix_raw_api_call``,
-       etc.). The set is precomputed in ``_WRITE_TOOLS``.
+    2. **Explicit per-tool grants** (``tool:host_get``). The exact
+       canonical tool name is allowed regardless of plugin / group.
+
+    3. **Per-plugin grants** (``plugin:zabbix.read`` /
+       ``plugin:zabbix.write`` / ``plugin:zabbix``). The ``.read`` form
+       grants only read tools; ``.write`` and the bare ``plugin:<id>``
+       form grant the full read + write surface of that plugin.
+
+    4. **Legacy group / prefix scopes** (``monitoring``, ``alerts``,
+       ``host``, ...). v1.30 tokens still work unchanged; the per-token
+       ``read_only`` flag still blocks write tools the same way as
+       before.
 
     When no token is in context (stdio transport, or pre-auth handshake
     where the contextvar is still None), returns the input unchanged
@@ -1075,31 +1108,66 @@ def _filter_tools_by_token(tools: list) -> list:
     if token is None:
         return tools
 
-    read_only = bool(getattr(token, "read_only", False))
+    read_only_token = bool(getattr(token, "read_only", False))
     scopes = list(getattr(token, "scopes", None) or [])
-    has_wildcard = (not scopes) or "*" in scopes
+    parsed = _parse_token_scopes(scopes)
 
-    if has_wildcard:
-        if read_only:
-            return [t for t in tools if t.name not in _WRITE_TOOLS]
+    has_wildcard = parsed["wildcard"] or not scopes
+
+    if has_wildcard and not (parsed["tools"] or parsed["plugins_full"]
+                              or parsed["plugins_read"] or parsed["plugins_write"]
+                              or parsed["legacy"]):
+        # Pure wildcard (or empty) token - same behaviour as v1.30.
+        if read_only_token:
+            return [t for t in tools if _canonical_tool_name(t.name) not in _WRITE_TOOLS]
         return tools
 
     from zabbix_mcp.config import _expand_tool_groups, TOOL_GROUPS
-    allowed_prefixes = set(_expand_tool_groups(scopes))
+    allowed_prefixes = set(_expand_tool_groups(parsed["legacy"])) if parsed["legacy"] else set()
     extension_names = set(TOOL_GROUPS.get("extensions", []))
-    has_extensions_scope = "extensions" in scopes
+    has_extensions_scope = "extensions" in parsed["legacy"]
+
+    bundled = _BUNDLED_PLUGIN_ID
+    plugin_full = bundled in parsed["plugins_full"]
+    plugin_write = plugin_full or bundled in parsed["plugins_write"]
+    plugin_read = plugin_write or bundled in parsed["plugins_read"]
 
     out = []
     for t in tools:
-        if read_only and t.name in _WRITE_TOOLS:
+        canonical = _canonical_tool_name(t.name)
+        is_write = canonical in _WRITE_TOOLS
+
+        # Wildcard cap: token's read_only flag still applies so an
+        # operator can hold a "*" token but be narrowed to read-only via
+        # the token settings.
+        if parsed["wildcard"]:
+            if read_only_token and is_write:
+                continue
+            out.append(t)
             continue
-        # Extension tools: identified by the exact-name list in TOOL_GROUPS
-        if t.name in extension_names:
-            if has_extensions_scope or t.name in allowed_prefixes:
+
+        # Explicit per-tool grant - bypasses everything else (the
+        # operator chose this specific tool, including write tools).
+        if canonical in parsed["tools"]:
+            out.append(t)
+            continue
+
+        # Per-plugin grants.
+        if is_write and plugin_write:
+            out.append(t); continue
+        if not is_write and plugin_read:
+            out.append(t); continue
+
+        # Legacy: respect the per-token read_only flag (v1.30 semantics).
+        if read_only_token and is_write:
+            continue
+        # Legacy extension tools: identified by exact-name list in TOOL_GROUPS
+        if canonical in extension_names:
+            if has_extensions_scope or canonical in allowed_prefixes:
                 out.append(t)
             continue
-        # Regular tools: prefix match (e.g. "host_create" -> "host")
-        prefix = t.name.rsplit("_", 1)[0] if "_" in t.name else t.name
+        # Legacy regular tools: prefix match (e.g. "host_create" -> "host")
+        prefix = canonical.rsplit("_", 1)[0] if "_" in canonical else canonical
         if prefix in allowed_prefixes:
             out.append(t)
     return out
@@ -1139,6 +1207,41 @@ def _patch_fastmcp_convert_result_for_tasks() -> None:
 
     _convert_with_tasks._zmcp_patched = True  # type: ignore[attr-defined]
     _fm_module.FuncMetadata.convert_result = _convert_with_tasks
+
+
+def _patch_fastmcp_revocation_request_optional_secret() -> None:
+    """Make ``client_secret`` truly optional on the /revoke endpoint.
+
+    Upstream ``mcp.server.auth.handlers.revoke.RevocationRequest`` declares
+    ``client_secret: str | None`` without a default value. Pydantic v2
+    treats that as a REQUIRED field that happens to accept ``None`` -
+    callers must POST ``client_secret=`` (empty) explicitly. Public
+    PKCE-only clients (Claude Desktop, mcp-inspector, mcp-remote) do not
+    have a client secret to send and so cannot revoke their own tokens
+    via the spec-defined RFC 7009 endpoint - they hit a 400
+    ``client_secret: Field required`` error.
+
+    Per RFC 7009 §2.1 + OAuth 2.1: revocation must work for the client
+    that owns the token, regardless of whether it has a secret. This
+    patch sets the field default to ``None`` so public clients can call
+    ``/revoke`` with just ``client_id`` + ``token``. Confidential
+    clients still have to send their secret; the existing
+    ``client_authenticator`` (called before this schema) enforces that.
+
+    Idempotent - safe to call multiple times.
+    """
+    try:
+        from mcp.server.auth.handlers.revoke import RevocationRequest
+    except Exception:  # pragma: no cover - older mcp versions
+        return
+    if getattr(RevocationRequest, "_zmcp_revoke_patched", False):
+        return
+    fields = RevocationRequest.model_fields
+    if "client_secret" in fields and fields["client_secret"].is_required():
+        fields["client_secret"].default = None
+        # Force model rebuild so the change takes effect.
+        RevocationRequest.model_rebuild(force=True)
+    RevocationRequest._zmcp_revoke_patched = True  # type: ignore[attr-defined]
 
 
 def _load_server_icons() -> list[Icon] | None:
@@ -1445,7 +1548,7 @@ def _make_tool_handler(
             # Check token authorization (servers, scopes, read_only)
             from zabbix_mcp.token_store import check_token_authorization
             _tool_prefix = method_def.tool_name.rsplit("_", 1)[0] if "_" in method_def.tool_name else method_def.tool_name
-            _auth_err = check_token_authorization(server_name, tool_prefix=_tool_prefix, is_write=not method_def.read_only)
+            _auth_err = check_token_authorization(server_name, tool_prefix=_tool_prefix, tool_name=method_def.tool_name, is_write=not method_def.read_only)
             if _auth_err:
                 raise ToolError(_auth_err)
 
@@ -1558,6 +1661,7 @@ def _register_tools(
     compact_output: bool = True,
     response_max_chars: int = _RESPONSE_MAX_CHARS,
     config: AppConfig | None = None,
+    tool_prefix: str = "",
 ) -> int:
     """Register Zabbix API methods as MCP tools. Returns tool count.
 
@@ -1568,11 +1672,36 @@ def _register_tools(
 
     When *disabled_tools* is set, tools whose prefix matches an entry
     are excluded. This is applied after the allowlist filter.
+
+    When *tool_prefix* is non-empty, every registered tool name is
+    rewritten to ``<tool_prefix>__<name>`` (e.g. ``zabbix__host_get``).
+    Default empty preserves v1.30 byte-identical naming.
     """
     from zabbix_mcp.token_store import check_token_authorization
 
     server_names = client_manager.server_names
     count = 0
+
+    def _add_tool(handler, *, name: str | None = None,
+                  description: str | None = None,
+                  annotations: ToolAnnotations | None = None) -> None:
+        """Wrap mcp.add_tool with the [server].tool_prefix applied.
+
+        ``name`` defaults to ``handler.__name__`` to mirror FastMCP's own
+        ``add_tool`` behaviour - some bundled tools (zabbix_raw_api_call,
+        health_check) rely on auto-derivation rather than passing
+        ``name=`` explicitly.
+        """
+        canonical = name or getattr(handler, "__name__", None)
+        if not canonical:
+            raise ValueError("_add_tool: cannot derive tool name from handler")
+        full_name = f"{tool_prefix}__{canonical}" if tool_prefix else canonical
+        kwargs: dict[str, Any] = {"name": full_name}
+        if description is not None:
+            kwargs["description"] = description
+        if annotations is not None:
+            kwargs["annotations"] = annotations
+        mcp.add_tool(handler, **kwargs)
 
     for method_def in ALL_METHODS:
         prefix = method_def.tool_name.rsplit("_", 1)[0]
@@ -1600,7 +1729,7 @@ def _register_tools(
                 tool_annotations["idempotentHint"] = True
         tool_annotations["openWorldHint"] = True
 
-        mcp.add_tool(
+        _add_tool(
             handler,
             name=method_def.tool_name,
             description=method_def.description,
@@ -1663,7 +1792,7 @@ def _register_tools(
 
             # Token authorization: server + scope + read_only
             _prefix = method.split(".")[0].lower() if "." in method else ""
-            _auth_err = check_token_authorization(server_name, tool_prefix=_prefix, is_write=not is_read_only)
+            _auth_err = check_token_authorization(server_name, tool_prefix=_prefix, tool_name="zabbix_raw_api_call", is_write=not is_read_only)
             if _auth_err:
                 raise ToolError(_auth_err)
 
@@ -1685,7 +1814,7 @@ def _register_tools(
             )
 
     if _ext_allowed("zabbix_raw_api_call"):
-        mcp.add_tool(
+        _add_tool(
             zabbix_raw_api_call,
             annotations=ToolAnnotations(openWorldHint=True),
         )
@@ -1710,7 +1839,7 @@ def _register_tools(
         return json.dumps(results, indent=2)
 
     if _ext_allowed("health_check"):
-        mcp.add_tool(
+        _add_tool(
             health_check,
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
         )
@@ -1741,7 +1870,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
-        _auth_err = check_token_authorization(srv, tool_prefix="graph")
+        _auth_err = check_token_authorization(srv, tool_prefix="graph", tool_name="graph_render")
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -1750,7 +1879,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("graph_render"):
-        mcp.add_tool(
+        _add_tool(
             _graph_render, name="graph_render",
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
         )
@@ -1773,7 +1902,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
-        _auth_err = check_token_authorization(srv, tool_prefix="host")
+        _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="anomaly_detect")
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -1783,7 +1912,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("anomaly_detect"):
-        mcp.add_tool(
+        _add_tool(
             _anomaly_detect, name="anomaly_detect",
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
         )
@@ -1805,7 +1934,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
-        _auth_err = check_token_authorization(srv, tool_prefix="host")
+        _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="capacity_forecast")
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -1814,7 +1943,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("capacity_forecast"):
-        mcp.add_tool(
+        _add_tool(
             _capacity_forecast, name="capacity_forecast",
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
         )
@@ -1854,7 +1983,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
-        _auth_err = check_token_authorization(srv, tool_prefix="item")
+        _auth_err = check_token_authorization(srv, tool_prefix="item", tool_name="item_threshold_search")
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -1867,7 +1996,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("item_threshold_search"):
-        mcp.add_tool(
+        _add_tool(
             _item_threshold_search, name="item_threshold_search",
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
         )
@@ -1909,7 +2038,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
-        _auth_err = check_token_authorization(srv, tool_prefix="problem")
+        _auth_err = check_token_authorization(srv, tool_prefix="problem", tool_name="problem_active_get")
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -1919,7 +2048,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("problem_active_get"):
-        mcp.add_tool(
+        _add_tool(
             _problem_active_get, name="problem_active_get",
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
         )
@@ -1945,7 +2074,7 @@ def _register_tools(
         # Composite read - require scope for every Zabbix endpoint we
         # internally call so a narrow-scoped token can't read problems
         # / items here that it could not pull via problem_get / item_get.
-        _auth_err = check_token_authorization(srv, tool_prefixes=[
+        _auth_err = check_token_authorization(srv, tool_name="host_status_get", tool_prefixes=[
             "host", "hostinterface", "problem", "trigger", "item",
         ])
         if _auth_err:
@@ -1956,7 +2085,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("host_status_get"):
-        mcp.add_tool(_host_status_get, name="host_status_get",
+        _add_tool(_host_status_get, name="host_status_get",
                      annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True))
         count += 1
 
@@ -1976,7 +2105,7 @@ def _register_tools(
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         # Composite read - covers hostgroup + member host + active problems.
-        _auth_err = check_token_authorization(srv, tool_prefixes=[
+        _auth_err = check_token_authorization(srv, tool_name="hostgroup_overview_get", tool_prefixes=[
             "hostgroup", "host", "problem", "trigger",
         ])
         if _auth_err:
@@ -1987,7 +2116,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("hostgroup_overview_get"):
-        mcp.add_tool(_hostgroup_overview_get, name="hostgroup_overview_get",
+        _add_tool(_hostgroup_overview_get, name="hostgroup_overview_get",
                      annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True))
         count += 1
 
@@ -2007,7 +2136,7 @@ def _register_tools(
         # Composite read - aggregates host / item / trigger / template /
         # problem counts plus per-group breakdown. Requires scope for
         # every endpoint we sum over.
-        _auth_err = check_token_authorization(srv, tool_prefixes=[
+        _auth_err = check_token_authorization(srv, tool_name="infrastructure_summary_get", tool_prefixes=[
             "host", "hostgroup", "item", "trigger", "template", "problem",
         ])
         if _auth_err:
@@ -2017,7 +2146,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("infrastructure_summary_get"):
-        mcp.add_tool(_infrastructure_summary_get, name="infrastructure_summary_get",
+        _add_tool(_infrastructure_summary_get, name="infrastructure_summary_get",
                      annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True))
         count += 1
 
@@ -2039,7 +2168,7 @@ def _register_tools(
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         # Composite read - item metadata + history + parent host name.
-        _auth_err = check_token_authorization(srv, tool_prefixes=[
+        _auth_err = check_token_authorization(srv, tool_name="item_history_summary_get", tool_prefixes=[
             "item", "history", "host",
         ])
         if _auth_err:
@@ -2050,7 +2179,7 @@ def _register_tools(
         ), raw_json=bool(raw_json))
 
     if _ext_allowed("item_history_summary_get"):
-        mcp.add_tool(_item_history_summary_get, name="item_history_summary_get",
+        _add_tool(_item_history_summary_get, name="item_history_summary_get",
                      annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True))
         count += 1
 
@@ -2087,7 +2216,7 @@ def _register_tools(
                 """Synchronous PDF generation - shared between sync and task-augmented paths."""
                 from zabbix_mcp.reporting import data_fetcher
                 srv = client_manager.resolve_server(server or client_manager.default_server)
-                _auth_err = check_token_authorization(srv, tool_prefix="host")
+                _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="report_generate")
                 if _auth_err:
                     raise ToolError(_auth_err)
 
@@ -2174,7 +2303,7 @@ def _register_tools(
                 )
 
             if _ext_allowed("report_generate"):
-                mcp.add_tool(
+                _add_tool(
                     _report_generate, name="report_generate",
                     annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
                 )
@@ -2210,7 +2339,7 @@ def _register_tools(
 
         # Token authorization: server + write permission
         _prefix = action.split(".")[0].lower() if "." in action else ""
-        _auth_err = check_token_authorization(srv, tool_prefix=_prefix, is_write=True)
+        _auth_err = check_token_authorization(srv, tool_prefix=_prefix, tool_name="action_confirm", is_write=True)
         if _auth_err:
             raise ToolError(_auth_err)
 
@@ -2271,7 +2400,7 @@ def _register_tools(
         }, indent=2)
 
     if _ext_allowed("action_prepare"):
-        mcp.add_tool(
+        _add_tool(
             action_prepare, name="action_prepare",
             annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False),
         )
@@ -2319,7 +2448,7 @@ def _register_tools(
             raise ToolError(f"Execution failed: {exc} (action: {action_data['action']})")
 
     if _ext_allowed("action_confirm"):
-        mcp.add_tool(
+        _add_tool(
             action_confirm, name="action_confirm",
             annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, openWorldHint=True),
         )
@@ -2747,6 +2876,7 @@ def run_server(
     # so the task-augmented path on report_generate actually reaches the
     # low-level Server which knows how to ship it to the client. Idempotent.
     _patch_fastmcp_convert_result_for_tasks()
+    _patch_fastmcp_revocation_request_optional_secret()
 
     mcp = FastMCP(
         name="zabbix-mcp-server",
@@ -2804,12 +2934,25 @@ def run_server(
         result = await _orig_list_tools_handler(req)
         tools_list = result.root.tools
         for tool in tools_list:
-            if tool.name in _TASK_AUGMENTED_TOOLS:
+            if _canonical_tool_name(tool.name) in _TASK_AUGMENTED_TOOLS:
                 tool.execution = ToolExecution(taskSupport="optional")
         tools_list = _filter_tools_by_token(tools_list)
         return ServerResult(ListToolsResult(tools=tools_list))
 
     mcp._mcp_server.request_handlers[ListToolsRequest] = _list_tools_with_execution
+
+    # Make [server].tool_prefix visible to module-level helpers
+    # (_canonical_tool_name) before _register_tools registers the
+    # bundled tools with the prefix applied.
+    global _CONFIGURED_TOOL_PREFIX
+    _CONFIGURED_TOOL_PREFIX = config.server.tool_prefix or ""
+    if _CONFIGURED_TOOL_PREFIX:
+        logger.info(
+            "Bundled Zabbix tools will be registered with prefix '%s__' "
+            "(e.g. %s__host_get). Internal scope / write-tool / Tasks API "
+            "logic strips the prefix before pattern matching.",
+            _CONFIGURED_TOOL_PREFIX, _CONFIGURED_TOOL_PREFIX,
+        )
 
     tool_count = _register_tools(
         mcp, client_manager, config.server.tools, config.server.disabled_tools,
@@ -2817,6 +2960,7 @@ def run_server(
         compact_output=config.server.compact_output,
         response_max_chars=config.server.response_max_chars,
         config=config,
+        tool_prefix=_CONFIGURED_TOOL_PREFIX,
     )
     # Build the write-tools set for the tools/list scope filter once we
     # know everything that will ever be registered.
@@ -2893,7 +3037,7 @@ def run_server(
         # static directory at ``/static/`` on the MCP port for that.
         if oauth_provider is not None:
             from pathlib import Path
-            from starlette.responses import HTMLResponse, RedirectResponse, FileResponse
+            from starlette.responses import FileResponse
             from zabbix_mcp.oauth_login import handle_oauth_login
 
             login_path = config.oauth.login_path

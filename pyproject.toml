@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zabbix-mcp-server"
-version = "1.30"
+version = "1.31"
 description = "Production-quality MCP server for the complete Zabbix API"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -43,4 +43,10 @@ Repository = "https://github.com/initMAX/zabbix-mcp-server"
 Issues = "https://github.com/initMAX/zabbix-mcp-server/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/zabbix_mcp"]
+# Bundled Zabbix module lives under plugins/zabbix/ alongside its plugin.json
+# manifest. Future bundled modules (if any) sit in their own plugins/<id>/
+# subdirectory next to it; externally-installed plugins land under
+# /opt/zabbix-mcp/plugins/<id>/ at runtime, managed by the loader (issue #47).
+# The on-disk path moved in v1.31 but the import path stays `zabbix_mcp` for
+# backwards-compatibility with existing pip / Docker deployments.
+packages = ["plugins/zabbix/zabbix_mcp"]

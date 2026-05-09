@@ -35,7 +35,7 @@ LLM call -> report_generate tool
        ReportEngine.generate_report()      <- merges with branding context
               |
               v
-       Jinja2 template (HTML)              <- /src/zabbix_mcp/reporting/templates/
+       Jinja2 template (HTML)              <- /plugins/zabbix/zabbix_mcp/reporting/templates/
               |                                or /etc/zabbix-mcp/templates/ (custom)
               v
        WeasyPrint -> PDF bytes
@@ -48,11 +48,11 @@ Key files in the source tree:
 
 | File | Purpose |
 |---|---|
-| `src/zabbix_mcp/reporting/engine.py` | `ReportEngine` class, template registry, branding logic |
-| `src/zabbix_mcp/reporting/data_fetcher.py` | One `fetch_<type>_data()` per report type |
-| `src/zabbix_mcp/reporting/templates/base.html` | Common layout, CSS, header/footer, page numbering |
-| `src/zabbix_mcp/reporting/templates/*.html` | One Jinja2 template per built-in report type |
-| `src/zabbix_mcp/admin/views/templates.py` | Admin portal CRUD + Jinja2 preview with sample data |
+| `plugins/zabbix/zabbix_mcp/reporting/engine.py` | `ReportEngine` class, template registry, branding logic |
+| `plugins/zabbix/zabbix_mcp/reporting/data_fetcher.py` | One `fetch_<type>_data()` per report type |
+| `plugins/zabbix/zabbix_mcp/reporting/templates/base.html` | Common layout, CSS, header/footer, page numbering |
+| `plugins/zabbix/zabbix_mcp/reporting/templates/*.html` | One Jinja2 template per built-in report type |
+| `plugins/zabbix/zabbix_mcp/admin/views/templates.py` | Admin portal CRUD + Jinja2 preview with sample data |
 
 Required Python packages: `jinja2`, `weasyprint`. Install with the optional extra:
 

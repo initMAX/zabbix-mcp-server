@@ -42,11 +42,22 @@ current_token_info: contextvars.ContextVar[Any] = contextvars.ContextVar("curren
 current_client_ip: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_client_ip", default=None)
 
 
+# Single source of truth for the v1.31 scope parser - shared with
+# zabbix_mcp.server (tools/list filter). Re-exported under the
+# leading-underscore module-private names so the rest of this file
+# keeps using the same identifiers it had pre-extraction.
+from zabbix_mcp.scope_grammar import (
+    BUNDLED_PLUGIN_ID as _BUNDLED_PLUGIN_ID,
+    parse_token_scopes as _parse_token_scopes,
+)
+
+
 def check_token_authorization(
     server_name: str,
     *,
     tool_prefix: str = "",
     tool_prefixes: list[str] | tuple[str, ...] | None = None,
+    tool_name: str | None = None,
     is_write: bool = False,
 ) -> str | None:
     """Check current token's authorization for a server + tool + write operation.
@@ -59,6 +70,10 @@ def check_token_authorization(
     pull problems and items via the composite tool that it could not
     pull via problem_get / item_get directly.
 
+    *tool_name* is the canonical tool name (e.g. "host_get") and lets the
+    new v1.31 scope grammar match per-tool grants of the form
+    ``"tool:host_get"``. When omitted the per-tool path is skipped.
+
     Returns an error message string if denied, or None if allowed.
     """
     token = current_token_info.get()
@@ -70,28 +85,80 @@ def check_token_authorization(
         if server_name not in token.allowed_servers:
             return f"Token '{token.name}' is not authorized for server '{server_name}'. Allowed: {', '.join(token.allowed_servers)}"
 
-    # Check token-level read_only
+    # Check scopes (if not wildcard)
+    scopes = list(token.scopes or [])
+    if scopes and "*" in scopes:
+        # Pure wildcard - read_only token still blocks writes (v1.30 semantics).
+        if is_write and token.read_only:
+            return f"Token '{token.name}' is read-only. Write operations are not allowed."
+        return None
+
+    if not scopes:
+        # No scopes at all -> v1.30 behaviour: full access capped by read_only flag.
+        if is_write and token.read_only:
+            return f"Token '{token.name}' is read-only. Write operations are not allowed."
+        return None
+
+    # Parse v1.31 grammar.
+    parsed = _parse_token_scopes(scopes)
+    bundled = _BUNDLED_PLUGIN_ID
+
+    # Per-tool explicit grant (v1.31): bypass everything else.
+    if tool_name and tool_name in parsed["tools"]:
+        return None
+
+    # Per-plugin grants (v1.31). Bundled tools live under plugin id "zabbix";
+    # external plugins land under their own id once the loader ships.
+    if bundled in parsed["plugins_full"]:
+        return None
+    if is_write and bundled in parsed["plugins_write"]:
+        return None
+    if not is_write and bundled in parsed["plugins_read"]:
+        return None
+    if not is_write and bundled in parsed["plugins_write"]:
+        # write grant subsumes read access
+        return None
+
+    # Legacy (v1.30) prefix / group scope. Per-token read_only still applies
+    # to legacy tokens for backwards compat.
     if is_write and token.read_only:
         return f"Token '{token.name}' is read-only. Write operations are not allowed."
 
-    # Check scopes (if not wildcard)
-    if token.scopes and "*" not in token.scopes:
-        from zabbix_mcp.config import TOOL_GROUPS, _expand_tool_groups
-        allowed_prefixes = set(_expand_tool_groups(token.scopes))
+    if not parsed["legacy"]:
+        # All scopes were v1.31 forms and none matched - block.
+        return _scope_denied_message(token, parsed, tool_prefix, tool_prefixes, tool_name)
 
-        # Multi-prefix form: every prefix the tool touches must be allowed.
-        if tool_prefixes:
-            missing = [p for p in tool_prefixes if p not in allowed_prefixes]
-            if missing:
-                return (
-                    f"Token '{token.name}' scope does not include {missing!r} "
-                    f"(this tool combines data from {sorted(set(tool_prefixes))!r}). "
-                    f"Allowed scopes: {', '.join(token.scopes)}"
-                )
-        elif tool_prefix and tool_prefix not in allowed_prefixes:
-            return f"Token '{token.name}' scope does not include '{tool_prefix}'. Allowed scopes: {', '.join(token.scopes)}"
+    from zabbix_mcp.config import _expand_tool_groups
+    allowed_prefixes = set(_expand_tool_groups(parsed["legacy"]))
+
+    if tool_prefixes:
+        missing = [p for p in tool_prefixes if p not in allowed_prefixes]
+        if missing:
+            return (
+                f"Token '{token.name}' scope does not include {missing!r} "
+                f"(this tool combines data from {sorted(set(tool_prefixes))!r}). "
+                f"Allowed scopes: {', '.join(scopes)}"
+            )
+    elif tool_prefix and tool_prefix not in allowed_prefixes:
+        return _scope_denied_message(token, parsed, tool_prefix, tool_prefixes, tool_name)
 
     return None
+
+
+def _scope_denied_message(token, parsed, tool_prefix, tool_prefixes, tool_name) -> str:
+    """Build a single denial message that mentions whichever scope shape applies."""
+    bits = []
+    if tool_name:
+        bits.append(f"tool '{tool_name}'")
+    if tool_prefix:
+        bits.append(f"prefix '{tool_prefix}'")
+    if tool_prefixes:
+        bits.append(f"prefixes {sorted(set(tool_prefixes))!r}")
+    needed = " / ".join(bits) or "this tool"
+    return (
+        f"Token '{token.name}' scope does not allow {needed}. "
+        f"Granted scopes: {', '.join(token.scopes or []) or '(none)'}."
+    )
 
 
 @dataclass

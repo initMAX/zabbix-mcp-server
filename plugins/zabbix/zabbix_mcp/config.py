@@ -116,6 +116,16 @@ class ServerConfig:
     # opt in here. HTTP transport uses the per-token ``allow_raw_json``
     # flag instead and ignores this setting.
     stdio_allow_raw_json: bool = False
+    # Tool-name prefix applied to every bundled Zabbix tool when this host
+    # runs side-by-side with other MCP modules under a multi-plugin setup.
+    # Default empty = bundled tools surface unprefixed (host_get,
+    # problem_get, ...) - byte-identical to v1.30 behaviour. When set to
+    # e.g. "zabbix", the same tools surface as zabbix__host_get etc. so
+    # they cannot collide with tools from other plugins (netbox__device_get,
+    # jira__issue_create, ...). Internal logic (token scope filter,
+    # read-only write-tool detection, Tasks API augmentation) keys off the
+    # canonical bare name regardless of the prefix.
+    tool_prefix: str = ""
 
 
 @dataclass(frozen=True)
@@ -332,6 +342,39 @@ def _parse_zabbix_server(name: str, srv: object) -> "ZabbixServerConfig":
         frontend_password=_resolve_env_vars(str(srv.get("frontend_password", ""))),
         request_timeout=int(srv.get("request_timeout", 300)),
     )
+
+
+_TOOL_PREFIX_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _validate_tool_prefix(value: object) -> str:
+    """Validate [server].tool_prefix.
+
+    Empty string (default) keeps the bundled module's tools unprefixed -
+    backwards compatible with v1.30. Non-empty values must be lowercase,
+    start with a letter, and contain only lowercase letters / digits /
+    underscores so they form valid MCP tool name segments when joined
+    with the double-underscore separator (e.g. ``zabbix`` ->
+    ``zabbix__host_get``). Invalid values raise ConfigError so an
+    operator typo surfaces at boot instead of producing un-callable
+    tool names downstream.
+    """
+    if value is None or value == "":
+        return ""
+    if not isinstance(value, str):
+        raise ConfigError(
+            f"[server].tool_prefix must be a string, got {type(value).__name__}"
+        )
+    s = value.strip()
+    if not s:
+        return ""
+    if not _TOOL_PREFIX_RE.match(s):
+        raise ConfigError(
+            f"[server].tool_prefix '{s}' is invalid. Must match {_TOOL_PREFIX_RE.pattern} "
+            f"(lowercase letter first, then letters / digits / underscores). "
+            f"Example: tool_prefix = \"zabbix\""
+        )
+    return s
 
 
 def _validate_public_url(value: str, tls_cert_file: object) -> str:
@@ -553,6 +596,7 @@ def load_config(path: str | Path) -> AppConfig:
         report_company=server_raw.get("report_company", ""),
         report_subtitle=server_raw.get("report_subtitle", "IT Monitoring Service"),
         stdio_allow_raw_json=bool(server_raw.get("stdio_allow_raw_json", False)),
+        tool_prefix=_validate_tool_prefix(server_raw.get("tool_prefix", "")),
     )
 
     zabbix_raw = raw.get("zabbix", {})
@@ -623,6 +667,60 @@ def load_config(path: str | Path) -> AppConfig:
         access_token_ttl_seconds=int(oauth_raw.get("access_token_ttl_seconds", 3600) or 3600),
         refresh_token_ttl_seconds=int(oauth_raw.get("refresh_token_ttl_seconds", 30 * 24 * 3600) or 30 * 24 * 3600),
     )
+
+    # Optional [plugins.<id>] blocks - the contract is locked in v1.31
+    # but the plugin loader itself ships in a follow-up release (issue
+    # #47). Eager operators may have already added plugin entries to
+    # config.toml against the documented schema; we accept and ignore
+    # them so they do not crash startup. A single info-level log line
+    # records that the entries were seen but not activated.
+    plugins_raw = raw.get("plugins", {}) or {}
+    if plugins_raw:
+        if isinstance(plugins_raw, dict):
+            ids = ", ".join(sorted(plugins_raw.keys()))
+            logger.info(
+                "Found %d [plugins.X] section(s) in config (%s); plugin loader is "
+                "not yet shipped (tracked under issue #47), entries are ignored. "
+                "See SECURITY.md plugin section for the contract design.",
+                len(plugins_raw), ids,
+            )
+        else:
+            logger.warning(
+                "Ignoring [plugins] config entry - expected a table of "
+                "[plugins.<id>] sections, got %s.",
+                type(plugins_raw).__name__,
+            )
+
+    # Optional [modules.<id>] blocks - operator-side toggle for bundled
+    # modules. v1.31 parses but does not enforce the `enabled = false`
+    # toggle (the disable / re-enable runtime lands with the loader
+    # release per issue #47). We log when an operator has set
+    # enabled=false on a bundled module so the next-release upgrade can
+    # be predicted ("when v1.32 lands, this Zabbix module will stop
+    # registering tools"). The bundled module always registers in v1.31
+    # regardless of this block - the v1.31 contract is no behavioural
+    # change for end users.
+    modules_raw = raw.get("modules", {}) or {}
+    if modules_raw:
+        if isinstance(modules_raw, dict):
+            disabled_in_config = [
+                mid for mid, mcfg in modules_raw.items()
+                if isinstance(mcfg, dict) and mcfg.get("enabled") is False
+            ]
+            if disabled_in_config:
+                logger.info(
+                    "Found [modules.X] section(s) with enabled=false (%s); "
+                    "the bundled-module disable runtime ships with the plugin "
+                    "loader (issue #47), so v1.31 still registers these "
+                    "modules. The toggle takes effect on the loader release.",
+                    ", ".join(sorted(disabled_in_config)),
+                )
+        else:
+            logger.warning(
+                "Ignoring [modules] config entry - expected a table of "
+                "[modules.<id>] sections, got %s.",
+                type(modules_raw).__name__,
+            )
 
     return AppConfig(
         server=server_config, zabbix_servers=zabbix_servers,

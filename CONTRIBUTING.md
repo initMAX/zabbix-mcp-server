@@ -21,7 +21,7 @@ python -m pytest tests/test_smoke.py -v
 ## Project Structure
 
 ```
-src/zabbix_mcp/
+plugins/zabbix/zabbix_mcp/
 ├── cli.py              # CLI entry point
 ├── config.py           # TOML config loading
 ├── client.py           # Multi-server Zabbix client + rate limiter
@@ -38,7 +38,7 @@ src/zabbix_mcp/
 
 ## Adding a New Zabbix API Method
 
-1. Find the right file in `src/zabbix_mcp/api/` for the API group
+1. Find the right file in `plugins/zabbix/zabbix_mcp/api/` for the API group (the bundled Zabbix module's source tree moved under `plugins/<id>/` in v1.31 - import path stays `zabbix_mcp` for backwards compatibility)
 2. Add a `MethodDef` entry with the API method name, tool name, description, and parameters
 3. The tool is auto-registered — no other changes needed
 4. Run the tests to verify

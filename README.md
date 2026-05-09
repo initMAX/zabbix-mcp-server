@@ -32,7 +32,7 @@
   <b>Overview:</b> <a href="#what-is-this">What is this?</a> · <a href="#features">Features</a><br>
   <b>Install:</b> <a href="#quick-start">Quick Start</a> · <a href="#installation">Installation</a> · <a href="#upgrade">Upgrade</a> · <a href="#first-time-admin-portal-access">First-time admin access</a><br>
   <b>Configure:</b> <a href="#configuration-reference">Reference</a> · <a href="#oauth-21-authorization-server">OAuth 2.1</a> · <a href="#public-url-and-reverse-proxy-deployments">Public URL</a> · <a href="#tls--https">TLS / HTTPS</a> · <a href="#token-budget">Token Budget</a><br>
-  <b>Use:</b> <a href="#client-mcp-wizard-beta">Client Wizard</a> · <a href="#connecting-ai-clients">AI Clients</a> · <a href="#example-prompts">Prompts</a> · <a href="#available-tools">Tools</a> · <a href="#common-parameters-get-methods">Parameters</a> · <a href="#pdf-reports-beta">PDF Reports</a><br>
+  <b>Use:</b> <a href="#client-mcp-wizard-beta">Client Wizard</a> · <a href="#connecting-ai-clients">AI Clients</a> · <a href="#example-prompts">Prompts</a> · <a href="#available-tools">Tools</a> · <a href="#plugins">Plugins</a> · <a href="#common-parameters-get-methods">Parameters</a> · <a href="#pdf-reports-beta">PDF Reports</a><br>
   <b>Operate:</b> <a href="#installer-cli">Installer CLI</a> · <a href="#update-notifications">Update notifications</a> · <a href="#zabbix-compatibility">Compatibility</a> · <a href="#development">Development</a> · <a href="#related-projects">Related Projects</a> · <a href="#license">License</a>
 </p>
 
@@ -416,7 +416,7 @@ A standalone page at `/wizard` (sidebar entry **Client MCP Wizard**) that replac
 3. **Pick your AI client** - grid of 14 cards: Claude Desktop, Claude Code (CLI), OpenAI Codex, ChatGPT, VS Code + GitHub Copilot, Cursor, Cline, JetBrains AI, Goose, Open WebUI, 5ire, Gemini CLI, n8n, Generic MCP Client.
 4. **Copy the config** - host override picker when `[server].host = 0.0.0.0` (Docker container IPs are de-emphasized with a manual-entry input on top), transport picker with a "detected" badge on the running transport, per-client install instructions on the left, syntax-highlighted snippet on the right with a copy-on-hover overlay icon, download-as-file button, and a matching curl quick-test block. Both code blocks substitute a pasted Bearer token live so the operator can verify before copying.
 
-Every snippet and instruction set comes from a single-source-of-truth catalog (`src/zabbix_mcp/admin/wizard_clients.py`) cross-checked against each client's current official documentation (Claude Desktop via `mcp-remote` wrapper for Bearer tokens, Claude Code with the `--transport` / `--header` flag rename from 2025, ChatGPT Developer-mode Apps & Connectors path, Gemini CLI `httpUrl` vs `url` key split, Goose Streamable HTTP YAML schema, Open WebUI native MCP since v0.6.31, etc.).
+Every snippet and instruction set comes from a single-source-of-truth catalog (`plugins/zabbix/zabbix_mcp/admin/wizard_clients.py`) cross-checked against each client's current official documentation (Claude Desktop via `mcp-remote` wrapper for Bearer tokens, Claude Code with the `--transport` / `--header` flag rename from 2025, ChatGPT Developer-mode Apps & Connectors path, Gemini CLI `httpUrl` vs `url` key split, Goose Streamable HTTP YAML schema, Open WebUI native MCP since v0.6.31, etc.).
 
 <table>
 <tr>
@@ -829,6 +829,71 @@ All tools accept an optional `server` parameter to target a specific Zabbix inst
 <tr><td rowspan="2"><strong>Generic</strong></td><td><code>zabbix_raw_api_call</code></td><td>Call any Zabbix API method directly by name — use for methods not covered above</td></tr>
 <tr><td><code>health_check</code></td><td>Verify MCP server status and connectivity to all configured Zabbix servers</td></tr>
 </table>
+
+## Plugins
+
+This server is the host for a multi-plugin MCP architecture. The bundled Zabbix integration is the first (always-present) module; additional integrations install as plugins from the upcoming `initmax-mcp` catalog (Nagios / PRTG, NetBox, Atlassian Jira / Confluence, FastSpring, ...). Plugins surface their tools alongside the Zabbix ones with a per-plugin prefix (`netbox__device_get`, `jira__issue_create`, `fastspring__order_get`).
+
+> **Status**: the plugin **loader** (install / enable / disable / update / remove) is in development and lands in a follow-up release. The schema and trust model are locked - documented here, in [`SECURITY.md`](SECURITY.md#plugin-architecture-forthcoming-design-locked-in-v131), and in [`config.example.toml`](config.example.toml) - so plugin authors and operators can read against a stable contract. Tracked under [issue #47](https://github.com/initMAX/zabbix-mcp-server/issues/47). The admin portal `/modules` page lists every module currently registered with the server; today that is just the bundled Zabbix integration.
+
+### How plugins work
+
+- **Subprocess MCP servers, not Python imports.** Each plugin runs in its own venv (`/opt/zabbix-mcp/plugins/<id>/venv`), talks JSON-RPC over stdio, inherits the host's service user, and is fully isolated from the host's address space, OAuth state, and admin portal session table. A misbehaving or malicious plugin cannot reach into the host or other plugins.
+- **Trust anchor stays at the host.** The MCP / OAuth token presented by the AI client is validated by the host before any `tools/list` / `tools/call` is forwarded to a plugin. Plugins do not see the caller token.
+- **Tool naming is namespaced.** Each plugin declares a `tool_prefix` in its `plugin.json`; tools surface as `<prefix>__<tool>`. The bundled Zabbix module's prefix is empty by default for backwards compatibility (`host_get` stays `host_get`); set `[server].tool_prefix = "zabbix"` to opt into namespacing for multi-plugin deployments. Prefix collisions are checked at boot - the host refuses to start on duplicates.
+- **Token scopes extend.** New scope syntax `plugin:<id>` / `plugin:<id>.<group>` grants plugin tools to a token. Bundled Zabbix tool groups (`monitoring`, `alerts`, ...) keep their existing semantics. Tokens issued before plugin support keep working unchanged.
+- **Plugin config is separate.** Each plugin's runtime config goes into `/etc/zabbix-mcp/plugins/<id>.toml` so plugin install / update / remove never rewrites the operator's main `config.toml`.
+- **Audit log records every lifecycle event** (`plugin.install`, `plugin.enable`, `plugin.disable`, `plugin.update`, `plugin.remove`) plus per-call `plugin.tool_invoke` with the plugin id, tool name, and an argument hash.
+
+### Plugin schema
+
+```toml
+[plugins.netbox]
+enabled = true
+package = "initmax-mcp-netbox"          # PyPI distribution, local path, or git URL
+version = ">=0.1,<1.0"                   # pip-style version constraint
+tool_prefix = "netbox"                   # tools surface as netbox__device_get, ...
+config_file = "/etc/zabbix-mcp/plugins/netbox.toml"
+
+[tokens.netbox-readonly]
+secret_hash = "..."
+scopes = ["plugin:netbox.read"]          # plugin:<id> | plugin:<id>.<group> | bundled groups
+```
+
+The bundled Zabbix integration stays at the existing top-level `[zabbix.<server>]` blocks - it is not a `[plugins.zabbix]` entry. Existing operator configs are unaffected by plugin support.
+
+### Source-tree layout (v1.31)
+
+The bundled Zabbix module's source tree lives under `plugins/zabbix/` so every MCP module - bundled today or installed by the loader tomorrow - sits at the same canonical path:
+
+```
+zabbix-mcp-server/
+├── plugins/
+│   ├── README.md
+│   └── zabbix/
+│       ├── plugin.json          Bundled module manifest
+│       └── zabbix_mcp/          Bundled module source code
+├── examples/
+│   └── example-plugin/          Reference implementation
+└── docs/PLUGIN-DEVELOPMENT.md
+```
+
+Externally-installed plugins land at `/opt/zabbix-mcp/plugins/<id>/` at runtime once the loader ships. The pip package name (`zabbix-mcp-server`), the Python import path (`from zabbix_mcp import ...`), and every operator-facing surface (CLI, systemd unit, OAuth issuer, MCP server identity) are unchanged from v1.30 - only the on-disk source layout moved.
+
+### Disabling the bundled Zabbix module (forthcoming)
+
+The `[modules.<id>].enabled` toggle is documented in v1.31 for operators who want to run the host as a pure plugin loader without the bundled Zabbix integration:
+
+```toml
+[modules.zabbix]
+enabled = false
+```
+
+v1.31 parses this toggle and logs an info-level message when it sees `enabled = false`, but the bundled module still registers and exposes its tools - the actual disable runtime ships with the plugin loader release (issue #47). Setting `enabled = false` ahead of time is safe; v1.32+ activates the toggle without further config changes.
+
+### Writing a plugin
+
+A plugin is any executable that speaks MCP `2025-11-25` over stdio plus a `plugin.json` manifest declaring `id`, `version`, `tool_prefix`, and the read / write tool classification. A reference implementation (`examples/example-plugin/`) and an end-to-end how-to (`docs/PLUGIN-DEVELOPMENT.md`) ship with the loader release; the plugin contract itself is language-agnostic - any language that can speak JSON-RPC over stdio can host a plugin.
 
 ## PDF Reports (beta)
 

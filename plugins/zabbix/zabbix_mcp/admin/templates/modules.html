@@ -17,7 +17,65 @@
             (install / enable / disable / update) is coming soon.
         </p>
     </div>
+    <div>
+        <button type="button" class="btn btn-primary" onclick="showInstallPluginInfo()"
+                title="Plugin loader is in development - tracked under issue #47.">
+            + Install plugin...
+        </button>
+    </div>
 </div>
+
+<div id="install-plugin-modal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)hideInstallPluginInfo()">
+    <div class="modal-card" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3>Install plugin - coming soon</h3>
+        </div>
+        <div class="modal-body">
+            <p>
+                The plugin <strong>loader</strong> (install / enable / disable /
+                update / remove) is in development and lands in a follow-up
+                release.
+            </p>
+            <p>
+                v1.31 ships the contract that the loader will use:
+                manifest schema, trust model, <code>tool_prefix</code> plumbing,
+                and a reference implementation in
+                <code>examples/example-plugin/</code>.
+                Plugin authors can already start writing against a stable
+                contract.
+            </p>
+            <ul style="margin: 12px 0 12px 24px; line-height: 1.7;">
+                <li><a href="https://github.com/initMAX/zabbix-mcp-server/issues/47" target="_blank" rel="noopener">issue #47</a> - design discussion + roadmap</li>
+                <li><a href="https://github.com/initMAX/zabbix-mcp-server/blob/main/SECURITY.md#plugin-architecture-forthcoming-design-locked-in-v131" target="_blank" rel="noopener">SECURITY.md</a> - trust boundaries</li>
+                <li><a href="https://github.com/initMAX/zabbix-mcp-server/blob/main/docs/PLUGIN-DEVELOPMENT.md" target="_blank" rel="noopener">docs/PLUGIN-DEVELOPMENT.md</a> - how-to (placeholder, expands on loader release)</li>
+            </ul>
+            <p class="text-muted">
+                When the loader ships, this button opens an
+                "install from catalog" workflow with the curated
+                <code>initmax-mcp</code> plugin list (NetBox, Nagios / PRTG,
+                Atlassian Jira / Confluence, FastSpring, ...).
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-ghost" onclick="hideInstallPluginInfo()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showInstallPluginInfo() {
+    document.getElementById('install-plugin-modal').style.display = 'flex';
+}
+function hideInstallPluginInfo() {
+    document.getElementById('install-plugin-modal').style.display = 'none';
+}
+document.addEventListener('keydown', function(ev) {
+    if (ev.key === 'Escape') {
+        var m = document.getElementById('install-plugin-modal');
+        if (m && m.style.display !== 'none') hideInstallPluginInfo();
+    }
+});
+</script>
 
 <div class="card" style="margin-bottom: 16px;">
     <h3 class="card-title">
@@ -79,6 +137,7 @@
     </p>
     <ul class="text-muted" style="margin: 12px 0 12px 24px; padding: 0; line-height: 1.7;">
         <li style="margin-bottom: 6px;"><strong>Nagios / PRTG</strong> - peer monitoring systems, query problems and host status from inside the same MCP session that already has Zabbix tools.</li>
+        <li style="margin-bottom: 6px;"><strong>NetBox</strong> - source-of-truth IPAM / DCIM, resolve devices and IP addresses to Zabbix hosts, cross-reference rack / site / tenant context for problems.</li>
         <li style="margin-bottom: 6px;"><strong>Atlassian Jira / Confluence</strong> - create and link incident tickets, pull runbook docs, attach Zabbix problem context.</li>
         <li style="margin-bottom: 6px;"><strong>FastSpring</strong> - subscription / order data when monitoring SaaS-billing pipelines.</li>
         <li>... and any community-contributed plugin that follows the plugin contract (a standalone MCP server speaking MCP 2025-11-25 over stdio).</li>

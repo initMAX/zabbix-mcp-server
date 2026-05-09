@@ -149,7 +149,16 @@ _SCOPE_DESCRIPTIONS: dict[str, str] = {
 
 
 def _scope_catalog(active_scopes: list[str]) -> list[dict]:
-    """Build the per-scope checkbox catalog for the detail page."""
+    """Build the per-scope checkbox catalog for the detail page.
+
+    Returns the LEGACY checkbox catalog only (wildcard + the six bundled
+    tool groups). The v1.31 grammar additions (``plugin:<id>.read/write``,
+    ``tool:<canonical>``) are surfaced separately in
+    :func:`_split_active_scopes` so the template can render them as a
+    read-only summary alongside this checkbox form. Operators who want
+    to change those grants re-run the consent flow from the client side
+    (the grants are issued at /authorize, not edited from this page).
+    """
     from zabbix_mcp.config import TOOL_GROUPS
     rows: list[dict] = []
     active_set = set(active_scopes or [])
@@ -162,6 +171,37 @@ def _scope_catalog(active_scopes: list[str]) -> list[dict]:
             "is_wildcard": sid == "*",
         })
     return rows
+
+
+def _split_active_scopes(active_scopes: list[str]) -> dict:
+    """Group the v1.31 scope grammar bits for read-only display."""
+    plugin_grants: list[dict] = []
+    tool_grants: list[str] = []
+    legacy: list[str] = []
+    for s in active_scopes or []:
+        if not s:
+            continue
+        if s == "*":
+            continue
+        if s.startswith("tool:"):
+            tool_grants.append(s[len("tool:"):])
+        elif s.startswith("plugin:"):
+            rest = s[len("plugin:"):]
+            if "." in rest:
+                pid, suffix = rest.split(".", 1)
+                level = suffix if suffix in ("read", "write") else "full"
+            else:
+                pid, level = rest, "full"
+            plugin_grants.append({"plugin_id": pid, "level": level})
+        else:
+            legacy.append(s)
+    return {
+        "plugin_grants": plugin_grants,
+        "tool_grants": tool_grants,
+        "tool_grants_visible": tool_grants[:12],
+        "tool_grants_overflow": max(0, len(tool_grants) - 12),
+        "legacy_scopes": legacy,
+    }
 
 
 async def oauth_client_detail(request: Request) -> Response:
@@ -181,11 +221,16 @@ async def oauth_client_detail(request: Request) -> Response:
 
     active_scopes = (client["scope"] or "").split() or ["*"]
     cfg_oauth = admin_app.config.oauth
+    grants_split = _split_active_scopes(active_scopes)
     return admin_app.render("oauth_clients/detail.html", request, {
         "active": "oauth-clients",
         "page_title": f"OAuth Client: {client['name']}",
         "client": client,
         "scope_catalog": _scope_catalog(active_scopes),
+        "plugin_grants": grants_split["plugin_grants"],
+        "tool_grants": grants_split["tool_grants"],
+        "tool_grants_visible": grants_split["tool_grants_visible"],
+        "tool_grants_overflow": grants_split["tool_grants_overflow"],
         "default_access_ttl": cfg_oauth.access_token_ttl_seconds,
         "default_refresh_ttl": cfg_oauth.refresh_token_ttl_seconds,
         "can_edit": session.role in ("admin", "operator"),

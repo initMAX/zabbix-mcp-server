@@ -33,7 +33,7 @@ BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled"}
 SECTION_CONFIG = {
     "server": {
         "toml_section": "server",
-        "allowed_keys": {"host", "port", "transport", "log_level", "log_file", "compact_output", "response_max_chars", "public_url"},
+        "allowed_keys": {"host", "port", "transport", "log_level", "log_file", "compact_output", "response_max_chars", "tool_prefix", "public_url"},
         "min_role": "admin",
     },
     "tls_access": {
@@ -391,6 +391,18 @@ async def settings_update(request: Request) -> Response:
                                 f"Value for '{key}' is out of range. Must be between {lo} and {hi}.",
                                 "danger",
                             )
+                # tool_prefix has the same regex constraint at the config
+                # parser; mirror it here so the operator gets a clean
+                # validation message instead of a startup ConfigError on
+                # the next reload.
+                if key == "tool_prefix" and isinstance(value, str) and value:
+                    try:
+                        from zabbix_mcp.config import _validate_tool_prefix
+                        _validate_tool_prefix(value)
+                    except Exception as exc:
+                        return admin_app.flash_redirect(
+                            "/settings", str(exc), "danger",
+                        )
                 config_section[key] = value
             else:
                 continue
