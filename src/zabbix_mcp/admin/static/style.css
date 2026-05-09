@@ -277,33 +277,76 @@ a:hover {
     user-select: none;
 }
 
-/* Plugin/module group parent - non-clickable header for the module's
-   own sub-pages (Servers, Report Templates, ...). Stays visible at the
-   same indent level as a normal .nav-item but does not get the hover/
-   active states because it has no own page (yet). */
-.nav-module-parent {
-    padding: 8px 20px 4px 20px;
-    color: #cbd5e1;
-    font-size: 0.88rem;
-    font-weight: 600;
-    cursor: default;
-    user-select: none;
+/* MCP module group - collapsible header + child links.
+   Each module (Zabbix, future plugins) gets one .nav-module li with
+   a header button that toggles .is-open and its child <ul>.
+   The header has the module's own icon + enabled status dot +
+   expand/collapse chevron. */
+.nav-module {
+    list-style: none;
 }
-.nav-module-name {
+.nav-module-header {
     display: flex;
     align-items: center;
     gap: 10px;
+    width: 100%;
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+    color: #cbd5e1;
+    font-size: 0.93rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.nav-module-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #f1f5f9;
+}
+.nav-module.is-open .nav-module-header {
+    color: #f1f5f9;
+}
+.nav-module-icon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: 4px;
+}
+.nav-module-label {
+    flex: 1;
 }
 .nav-module-status {
-    margin-left: auto;
     color: var(--color-success, #16a34a);
     font-size: 1.4rem;
     line-height: 0;
     padding-bottom: 2px;
 }
+.nav-module-chevron {
+    color: #64748b;
+    font-size: 0.7rem;
+    transition: transform var(--transition-fast);
+}
+.nav-module.is-open .nav-module-chevron {
+    transform: rotate(90deg);
+}
 
-/* Sub-items under a module parent - indented, smaller font, no own
-   icon (parent already shows the module's icon). */
+/* Children list - hidden when collapsed, revealed when .is-open. */
+.nav-module-children {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--transition-fast);
+}
+.nav-module.is-open .nav-module-children {
+    max-height: 400px;
+}
+
+/* Sub-items under a module - indented, smaller font, no own icon
+   (parent already shows the module's icon). */
 .nav-sub-item {
     padding-left: 50px;
     font-size: 0.86rem;

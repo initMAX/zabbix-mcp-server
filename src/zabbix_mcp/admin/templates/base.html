@@ -62,16 +62,27 @@
             <li class="nav-section-label">MCP Modules</li>
             <li><a href="/modules" class="nav-item {% if active == 'modules' %}active{% endif %}">
                 <span class="nav-icon">&#x1F4E6;</span> All modules</a></li>
-            <li class="nav-module-parent">
-                <span class="nav-module-name">
-                    <span class="nav-icon">&#x1F441;&#xFE0F;</span> Zabbix
+
+            {# Zabbix module - collapsible submenu. Each MCP module gets a
+               header row with its own icon, an "enabled" status dot, and a
+               chevron that expands/collapses its sub-pages. The expand state
+               is persisted in localStorage so it survives navigation. Active
+               sub-page auto-expands its parent. #}
+            {% set zabbix_active = active in ('servers', 'templates') %}
+            <li class="nav-module js-nav-module {% if zabbix_active %}is-open{% endif %}" data-module-id="zabbix">
+                <button type="button" class="nav-module-header js-nav-module-toggle" aria-expanded="{{ 'true' if zabbix_active else 'false' }}">
+                    <img src="/static/module-zabbix.svg" alt="" class="nav-module-icon">
+                    <span class="nav-module-label">Zabbix</span>
                     <span class="nav-module-status" title="Module enabled">&bull;</span>
-                </span>
+                    <span class="nav-module-chevron">&#9656;</span>
+                </button>
+                <ul class="nav-module-children">
+                    <li><a href="/servers" class="nav-item nav-sub-item {% if active == 'servers' %}active{% endif %}">
+                        Servers</a></li>
+                    <li><a href="/templates" class="nav-item nav-sub-item {% if active == 'templates' %}active{% endif %}">
+                        Report Templates</a></li>
+                </ul>
             </li>
-            <li><a href="/servers" class="nav-item nav-sub-item {% if active == 'servers' %}active{% endif %}">
-                Servers</a></li>
-            <li><a href="/templates" class="nav-item nav-sub-item {% if active == 'templates' %}active{% endif %}">
-                Report Templates</a></li>
 
             {# Section 3 - portal-level system administration #}
             <li class="nav-section-label">System</li>
@@ -700,6 +711,44 @@
             sb.classList.toggle('collapsed');
         }
     }
+
+    // MCP module submenu - expand / collapse + persist per module so the
+    // operator's preference (Zabbix open vs collapsed, future iDoklad open
+    // vs collapsed, ...) survives page navigation. The active sub-page
+    // already auto-expands its parent server-side via a Jinja class hook,
+    // this just preserves manual state across pages without an active hit.
+    (function() {
+        var STORAGE_KEY = 'mcp-module-state';
+        function loadState() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+            catch (e) { return {}; }
+        }
+        function saveState(state) {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+            catch (e) { /* private mode / quota - ignore, falls back to per-page state */ }
+        }
+        var state = loadState();
+        document.querySelectorAll('.js-nav-module').forEach(function(mod) {
+            var id = mod.dataset.moduleId;
+            // Honour stored preference unless the active sub-page already forced is-open.
+            if (!mod.classList.contains('is-open') && state[id] === 'open') {
+                mod.classList.add('is-open');
+                var btn = mod.querySelector('.js-nav-module-toggle');
+                if (btn) btn.setAttribute('aria-expanded', 'true');
+            }
+        });
+        document.querySelectorAll('.js-nav-module-toggle').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var mod = btn.closest('.js-nav-module');
+                if (!mod) return;
+                var nowOpen = !mod.classList.contains('is-open');
+                mod.classList.toggle('is-open', nowOpen);
+                btn.setAttribute('aria-expanded', String(nowOpen));
+                state[mod.dataset.moduleId] = nowOpen ? 'open' : 'closed';
+                saveState(state);
+            });
+        });
+    })();
 
     // Close sidebar on outside click (mobile)
     document.addEventListener('click', function(e) {

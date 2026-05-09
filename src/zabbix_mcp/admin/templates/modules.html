@@ -14,7 +14,7 @@
         <p class="page-subtitle">
             Plugins extending this MCP server with additional integrations.
             Today only the bundled Zabbix module ships; the full plugin loader
-            (install / enable / disable / update) lands in v2.0.
+            (install / enable / disable / update) is coming soon.
         </p>
     </div>
 </div>
@@ -52,6 +52,8 @@
                 <td>
                     <a href="/servers" class="btn btn-sm btn-secondary">Configure servers</a>
                     <a href="/templates" class="btn btn-sm btn-secondary">Templates</a>
+                    <button type="button" class="btn btn-sm btn-danger" disabled
+                            title="Disable / uninstall is coming soon - the plugin loader is in development. Today the Zabbix module is bundled and required.">Disable</button>
                 </td>
             </tr>
         </tbody>
@@ -60,11 +62,11 @@
 
 <div class="card">
     <h3 class="card-title">
-        Coming in v2.0
+        Coming soon
         <span class="tooltip-icon" tabindex="0" data-tooltip="Roadmap preview - will become a real install / enable / update / uninstall page when the plugin loader lands.">&#x1F6C8;</span>
     </h3>
     <p class="text-muted" style="margin-top: 8px;">
-        v2.0 ships a plugin loader that installs additional MCP integrations
+        A plugin loader is in development that installs additional MCP integrations
         from the upcoming <a href="https://github.com/initMAX/initmax-mcp" target="_blank" rel="noopener"><code>initmax-mcp</code></a>
         catalog. Focus is monitoring + the surrounding DevOps stack:
     </p>
@@ -76,7 +78,7 @@
     </ul>
     <p class="text-muted" style="margin-top: 12px;">
         See <a href="https://github.com/initMAX/zabbix-mcp-server/issues/47" target="_blank" rel="noopener">issue #47</a>
-        for the full design + roadmap, and the upcoming <code>docs/PLUGIN-DEVELOPMENT.md</code>
+        for the full design, and the upcoming <code>docs/PLUGIN-DEVELOPMENT.md</code>
         + <code>examples/example-plugin/</code> reference implementation for
         plugin authors.
     </p>
