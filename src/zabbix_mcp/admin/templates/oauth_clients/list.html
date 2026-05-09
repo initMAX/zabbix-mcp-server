@@ -198,8 +198,9 @@
                     <td>
                         <form id="revoke-form-{{ loop.index }}" method="post" action="/oauth-clients/{{ c.id | urlencode }}/revoke" style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="button" class="btn btn-sm btn-danger"
-                                    onclick="confirmRevokeOAuthClient({{ c.name | tojson }}, 'revoke-form-{{ loop.index }}')">Revoke</button>
+                            <button type="button" class="btn btn-sm btn-danger js-revoke-oauth-client"
+                                    data-form-id="revoke-form-{{ loop.index }}"
+                                    data-client-name="{{ c.name }}">Revoke</button>
                         </form>
                     </td>
                     {% endif %}
@@ -218,17 +219,28 @@
 // base.html so the dialog matches every other destructive action
 // in the portal (Restart, Delete token, ...) instead of the bare
 // browser confirm() popup.
-function confirmRevokeOAuthClient(clientName, formId) {
-    showConfirm(
-        'Revoke OAuth client',
-        'Revoke "' + clientName + '"? This deletes the registration AND invalidates every access/refresh token it currently holds.',
-        'Revoke',
-        'btn-danger',
-        function() {
-            var form = document.getElementById(formId);
-            if (form) form.submit();
-        }
-    );
-}
+//
+// Wired via data-* attributes + addEventListener (NOT inline onclick=)
+// because the client name is rendered into the HTML attribute, and
+// names containing quotes/apostrophes would otherwise break the
+// attribute boundary on the inline-handler form. data-* attributes
+// go through Jinja2 autoescape and the values come out as plain
+// strings via dataset.clientName / dataset.formId.
+document.querySelectorAll('.js-revoke-oauth-client').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        var name = btn.dataset.clientName || '(unknown)';
+        var formId = btn.dataset.formId;
+        showConfirm(
+            'Revoke OAuth client',
+            'Revoke "' + name + '"? This deletes the registration AND invalidates every access/refresh token it currently holds.',
+            'Revoke',
+            'btn-danger',
+            function() {
+                var form = document.getElementById(formId);
+                if (form) form.submit();
+            }
+        );
+    });
+});
 </script>
 {% endblock %}
