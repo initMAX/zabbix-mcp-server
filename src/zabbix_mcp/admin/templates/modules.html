@@ -37,8 +37,13 @@
         <tbody>
             <tr>
                 <td>
-                    <strong>&#x1F441;&#xFE0F; Zabbix</strong><br>
-                    <span class="text-sm text-muted">Bundled, default-installed</span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="/static/module-zabbix.svg" alt="Zabbix" style="width:28px; height:28px; border-radius:5px; flex-shrink:0;">
+                        <div>
+                            <strong>Zabbix</strong><br>
+                            <span class="text-sm text-muted">Bundled, default-installed</span>
+                        </div>
+                    </div>
                 </td>
                 <td>
                     Full Zabbix API integration: hosts, problems, triggers, items,
@@ -65,15 +70,15 @@
         Coming soon
         <span class="tooltip-icon" tabindex="0" data-tooltip="Roadmap preview - will become a real install / enable / update / uninstall page when the plugin loader lands.">&#x1F6C8;</span>
     </h3>
-    <p class="text-muted" style="margin-top: 8px;">
+    <p class="text-muted" style="margin-top: 12px;">
         A plugin loader is in development that installs additional MCP integrations
         from the upcoming <a href="https://github.com/initMAX/initmax-mcp" target="_blank" rel="noopener"><code>initmax-mcp</code></a>
         catalog. Focus is monitoring + the surrounding DevOps stack:
     </p>
-    <ul class="text-muted" style="margin-top: 8px; line-height: 1.8;">
-        <li><strong>Nagios / PRTG</strong> - peer monitoring systems, query problems and host status from inside the same MCP session that already has Zabbix tools.</li>
-        <li><strong>Atlassian Jira / Confluence</strong> - create and link incident tickets, pull runbook docs, attach Zabbix problem context.</li>
-        <li><strong>FastSpring</strong> - subscription / order data when monitoring SaaS-billing pipelines.</li>
+    <ul class="text-muted" style="margin: 12px 0 12px 24px; padding: 0; line-height: 1.7;">
+        <li style="margin-bottom: 6px;"><strong>Nagios / PRTG</strong> - peer monitoring systems, query problems and host status from inside the same MCP session that already has Zabbix tools.</li>
+        <li style="margin-bottom: 6px;"><strong>Atlassian Jira / Confluence</strong> - create and link incident tickets, pull runbook docs, attach Zabbix problem context.</li>
+        <li style="margin-bottom: 6px;"><strong>FastSpring</strong> - subscription / order data when monitoring SaaS-billing pipelines.</li>
         <li>... and any community-contributed plugin that follows the plugin contract (a standalone MCP server speaking MCP 2025-11-25 over stdio).</li>
     </ul>
     <p class="text-muted" style="margin-top: 12px;">
