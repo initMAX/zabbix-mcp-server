@@ -178,12 +178,15 @@ class UpdateChecker:
 
         Wired to the manual "Check now" button on the admin portal.
         Blocks for up to HTTP_TIMEOUT_SECONDS, returns a dict the
-        AJAX endpoint can hand straight back to the browser. Honours
-        the feature toggle - returns ``{"ok": False, "reason": "disabled"}``
-        when ``[admin].update_check_enabled = false``.
+        AJAX endpoint can hand straight back to the browser.
+
+        **Does not** honour the ``[admin].update_check_enabled`` toggle:
+        that toggle gates only the *automatic* polls (boot + login).
+        A manual "Check now" click is an explicit user action so the
+        operator gets a fresh GitHub poll on demand even when the
+        background poll is off (e.g. air-gapped lab where the operator
+        wants ad-hoc release info without the recurring outbound).
         """
-        if not self.enabled:
-            return {"ok": False, "reason": "disabled", **self.to_context()}
         # Serialize concurrent force-checks. If another check is
         # already running (login-triggered or earlier "Check now")
         # we wait for it, then re-check whether last_checked has

@@ -365,37 +365,24 @@
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">Check for updates <span class="tooltip-icon" tabindex="0" data-tooltip="Polls the GitHub releases API at server boot, on every successful admin login (throttled to one poll per 60 sec to avoid rate-limit), and on demand via the 'Check now' button below. When a newer stable tag is found, an 'Update vX.Y available' pill appears in the top bar. Disable for fully air-gapped deployments.">&#x1F6C8;</span></div>
+            <div class="settings-label">Check for updates <span class="tooltip-icon" tabindex="0" data-tooltip="Toggle controls the AUTOMATIC poll only - server pings the GitHub releases API at boot and on every successful admin login (throttled to once per 60 sec). The 'Check now' button below is a manual user action and works regardless of this toggle.">&#x1F6C8;</span></div>
             <div>
                 <label class="toggle-label">
                     <span class="toggle">
-                        <input type="checkbox" name="update_check_enabled" id="update-check-toggle" value="true"
-                               {% if settings.update_check_enabled is not defined or settings.update_check_enabled %}checked{% endif %}
-                               onchange="onUpdateCheckToggle()">
+                        <input type="checkbox" name="update_check_enabled" value="true"
+                               {% if settings.update_check_enabled is not defined or settings.update_check_enabled %}checked{% endif %}>
                         <span class="toggle-slider"></span>
                     </span>
-                    Notify me when a newer version is released
+                    Automatic update notifications (boot + login)
                 </label>
-                <div class="form-hint">When on, this server pings the GitHub releases API at boot, after every successful admin login (throttled to once per 60 sec), and on demand via the &ldquo;Check now&rdquo; button below. Shows an &ldquo;Update vX.Y available&rdquo; banner in the top bar when a newer release lands. Outbound HTTPS to <code>api.github.com</code>; no other data leaves the server. Off-line / restricted networks should disable this.</div>
+                <div class="form-hint">Controls the <strong>automatic</strong> GitHub poll: server checks at boot and on every successful admin login (throttled to once per 60 sec). The &ldquo;Check now&rdquo; button below is a manual user-driven request and runs even when this toggle is off - turn off here only when you want to silence the recurring outbound, not the on-demand check. Outbound HTTPS to <code>api.github.com</code>.</div>
                 <div style="margin-top: 10px;">
                     <button type="button"
                             id="check-updates-btn"
                             onclick="checkUpdatesNow(event)"
                             class="btn btn-primary btn-sm"
-                            {% if settings.update_check_enabled is defined and not settings.update_check_enabled %}disabled{% endif %}
-                            title="Force a fresh GitHub release poll, bypassing the 60-second throttle. Useful right after upgrading to confirm the server registers the new version.">&#x21BB; Check now</button>
+                            title="Manual one-shot GitHub release poll. Always works - independent of the automatic notifications toggle.">&#x21BB; Check now</button>
                 </div>
-                <script>
-                // Mirror the master toggle into the Check now button so an
-                // operator who flicks the toggle off sees the button grey
-                // out without having to save first. Re-enabling re-arms it.
-                function onUpdateCheckToggle() {
-                    var box = document.getElementById('update-check-toggle');
-                    var btn = document.getElementById('check-updates-btn');
-                    if (!box || !btn) return;
-                    btn.disabled = !box.checked;
-                }
-                </script>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
