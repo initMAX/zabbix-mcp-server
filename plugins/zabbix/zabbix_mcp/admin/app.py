@@ -176,6 +176,25 @@ class _SecurityHeadersMiddleware:
         await self.app(scope, receive, _wrapped_send)
 
 
+def _ip_in_any_cidr(ip: str, cidrs: list[str]) -> bool:
+    """Best-effort match: True iff ``ip`` is in any of the listed CIDR
+    ranges. Malformed entries are silently skipped."""
+    if not ip:
+        return False
+    try:
+        from ipaddress import ip_address, ip_network
+        addr = ip_address(ip)
+    except ValueError:
+        return False
+    for cidr in cidrs:
+        try:
+            if addr in ip_network(cidr, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 class _AuditorRoleMiddleware:
     """Restrict ``auditor`` role sessions to the audit log surface.
 
@@ -529,6 +548,7 @@ class AdminApp:
 
         routes = [
             Route("/health", self._admin_health, methods=["GET"]),
+            Route("/metrics", self._metrics, methods=["GET"]),
             Route("/api/mcp-status", self._mcp_status, methods=["GET"]),
             Route("/api/server-status", self._server_status, methods=["GET"]),
             Route("/api/check-updates", self._check_updates, methods=["POST"]),
@@ -724,6 +744,45 @@ class AdminApp:
     async def _admin_health(self, request: Request) -> Response:
         """Health check endpoint — no auth required."""
         return JSONResponse({"status": "ok", "portal": "admin", "version": __version__})
+
+    async def _metrics(self, request: Request) -> Response:
+        """Prometheus /metrics endpoint - no auth, IP-allowlisted by config.
+
+        Returns the Prometheus text exposition format. Default
+        behaviour: every request is served (any operator that exposes
+        the admin port has already chosen the audience). For
+        externally-reachable deployments, set
+        ``[metrics].allowed_ips`` to a list of CIDR ranges that are
+        allowed to scrape; everything else gets a 403.
+        """
+        m_cfg = getattr(self.config, "metrics", None)
+        if m_cfg is not None and not getattr(m_cfg, "enabled", True):
+            return Response("metrics endpoint disabled", status_code=404,
+                            media_type="text/plain")
+        # Light IP gate. `[metrics].allowed_ips` is optional - empty
+        # list = open (matches "Prometheus on the same VLAN" common
+        # case). Operator-supplied list short-circuits non-members.
+        allowed = list(getattr(m_cfg, "allowed_ips", []) or []) if m_cfg else []
+        if allowed:
+            client_ip = request.client.host if request.client else ""
+            if not _ip_in_any_cidr(client_ip, allowed):
+                return Response("forbidden", status_code=403, media_type="text/plain")
+        # Optional bearer token (operators behind public ingress).
+        tok_required = str(getattr(m_cfg, "bearer_token", "") or "").strip() if m_cfg else ""
+        if tok_required:
+            auth_header = request.headers.get("authorization", "")
+            if not auth_header.startswith("Bearer "):
+                return Response("unauthorized", status_code=401, media_type="text/plain")
+            if auth_header[len("Bearer "):] != tok_required:
+                return Response("unauthorized", status_code=401, media_type="text/plain")
+        try:
+            from zabbix_mcp.admin import metrics
+            body = metrics.render_with_provider(self.oauth_provider)
+        except Exception as exc:
+            logger.exception("metrics render failed")
+            return Response(f"# metrics render failed: {exc}\n",
+                            status_code=500, media_type="text/plain; version=0.0.4")
+        return Response(body, media_type="text/plain; version=0.0.4; charset=utf-8")
 
     async def _mcp_status(self, request: Request) -> Response:
         """Proxy health check to MCP server — returns status for header indicator."""

@@ -460,6 +460,19 @@ def write_audit(
     """
     if not _should_emit(action):
         return
+    # Hook into the /metrics counter so dashboards show the rate
+    # without having to tail the audit log.
+    try:
+        from zabbix_mcp.admin import metrics as _metrics
+        if action == "tool.invoke":
+            cat = "mcp_actions"
+        elif _is_background_event(action):
+            cat = "background"
+        else:
+            cat = "portal"
+        _metrics.record_audit_row(cat)
+    except Exception:
+        pass
     safe_details = redact(details or {})
     entry = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -528,6 +541,13 @@ def write_tool_audit(
     """
     if not _AUDIT_ENABLED or not _LOG_MCP_ACTIONS:
         return
+    # /metrics counter for tool.invoke (split by tool + decision so
+    # SLO dashboards have a useful per-tool breakdown).
+    try:
+        from zabbix_mcp.admin import metrics as _metrics
+        _metrics.record_tool_invocation(tool_name, policy_decision)
+    except Exception:
+        pass
     safe_target = redact(target or {})
     safe_filters = redact(filters or {})
     operator_entry = {

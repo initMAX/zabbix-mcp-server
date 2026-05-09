@@ -213,6 +213,25 @@ class OAuthConfig:
 
 
 @dataclass(frozen=True)
+class MetricsConfig:
+    """Prometheus /metrics endpoint settings.
+
+    Always reachable at /metrics on the admin portal port. Empty
+    ``allowed_ips`` means "open" (matches the common case where the
+    admin portal already lives on a non-public network and any
+    Prometheus on the same VLAN can scrape). Set ``allowed_ips`` to
+    explicit CIDRs when the admin portal is reachable from the
+    internet but only the SRE network should scrape. Set
+    ``bearer_token`` for an additional auth layer when the endpoint
+    is exposed via a public ingress without IP filtering.
+    """
+
+    enabled: bool = True
+    allowed_ips: list[str] = field(default_factory=list)
+    bearer_token: str = ""
+
+
+@dataclass(frozen=True)
 class AuditForwardConfig:
     """External SIEM / syslog forwarding for the audit log.
 
@@ -322,6 +341,7 @@ class AppConfig:
     oauth: OAuthConfig = field(default_factory=OAuthConfig)
     audit: AuditConfig = field(default_factory=AuditConfig)
     audit_forward: AuditForwardConfig = field(default_factory=AuditForwardConfig)
+    metrics: MetricsConfig = field(default_factory=MetricsConfig)
 
     @property
     def default_server(self) -> str | None:
@@ -927,6 +947,26 @@ def load_config(path: str | Path) -> AppConfig:
         queue_size=forward_queue,
     )
 
+    # [metrics] - Prometheus endpoint config. Defaults: enabled, no IP
+    # filter, no bearer token (open endpoint - operator-controlled
+    # admin port is the only access gate).
+    metrics_raw = raw.get("metrics", {}) or {}
+    metrics_allowed_ips_raw = metrics_raw.get("allowed_ips", [])
+    if isinstance(metrics_allowed_ips_raw, str):
+        metrics_allowed_ips = [
+            s.strip() for s in metrics_allowed_ips_raw.replace(",", "\n").split("\n")
+            if s.strip()
+        ]
+    elif isinstance(metrics_allowed_ips_raw, list):
+        metrics_allowed_ips = [str(s).strip() for s in metrics_allowed_ips_raw if str(s).strip()]
+    else:
+        metrics_allowed_ips = []
+    metrics_cfg = MetricsConfig(
+        enabled=bool(metrics_raw.get("enabled", True)),
+        allowed_ips=metrics_allowed_ips,
+        bearer_token=str(metrics_raw.get("bearer_token", "") or "").strip(),
+    )
+
     # Optional [plugins.<id>] blocks - the contract is locked in v1.31
     # but the plugin loader itself ships in a follow-up release (issue
     # #47). Eager operators may have already added plugin entries to
@@ -985,4 +1025,5 @@ def load_config(path: str | Path) -> AppConfig:
         server=server_config, zabbix_servers=zabbix_servers,
         admin_ai=admin_ai, oauth=oauth_cfg, audit=audit_cfg,
         audit_forward=audit_forward_cfg,
+        metrics=metrics_cfg,
     )
