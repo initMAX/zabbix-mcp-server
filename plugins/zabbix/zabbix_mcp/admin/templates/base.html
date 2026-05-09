@@ -805,6 +805,11 @@
         if (ev) { ev.preventDefault(); }
         var btn = document.getElementById('check-updates-btn');
         if (!btn) return;
+        // Safety guard: if the toggle is off, refuse to fire a backend
+        // request. Disabled-button clicks usually never reach here, but
+        // a programmatic dispatchEvent could bypass that.
+        var box = document.getElementById('update-check-toggle');
+        if (box && !box.checked) return;
         var orig = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '↻ Checking...';

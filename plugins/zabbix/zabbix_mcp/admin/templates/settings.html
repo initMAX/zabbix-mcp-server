@@ -369,7 +369,9 @@
             <div>
                 <label class="toggle-label">
                     <span class="toggle">
-                        <input type="checkbox" name="update_check_enabled" value="true" {% if settings.update_check_enabled is not defined or settings.update_check_enabled %}checked{% endif %}>
+                        <input type="checkbox" name="update_check_enabled" id="update-check-toggle" value="true"
+                               {% if settings.update_check_enabled is not defined or settings.update_check_enabled %}checked{% endif %}
+                               onchange="onUpdateCheckToggle()">
                         <span class="toggle-slider"></span>
                     </span>
                     Notify me when a newer version is released
@@ -380,8 +382,20 @@
                             id="check-updates-btn"
                             onclick="checkUpdatesNow(event)"
                             class="btn btn-primary btn-sm"
+                            {% if settings.update_check_enabled is defined and not settings.update_check_enabled %}disabled{% endif %}
                             title="Force a fresh GitHub release poll, bypassing the 60-second throttle. Useful right after upgrading to confirm the server registers the new version.">&#x21BB; Check now</button>
                 </div>
+                <script>
+                // Mirror the master toggle into the Check now button so an
+                // operator who flicks the toggle off sees the button grey
+                // out without having to save first. Re-enabling re-arms it.
+                function onUpdateCheckToggle() {
+                    var box = document.getElementById('update-check-toggle');
+                    var btn = document.getElementById('check-updates-btn');
+                    if (!box || !btn) return;
+                    btn.disabled = !box.checked;
+                }
+                </script>
             </div>
         </div>
         {% if current_user_role != 'viewer' %}
