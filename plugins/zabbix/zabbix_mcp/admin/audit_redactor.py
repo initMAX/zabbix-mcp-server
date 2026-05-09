@@ -59,8 +59,16 @@ from typing import Any
 
 # Substrings (case-insensitive). If a key name contains ANY of these,
 # the value is replaced with the redaction marker. Order does not matter.
+#
+# When extending this list, prefer specific substrings over generic ones
+# (e.g. ``api_key`` rather than ``key``) - generic names like ``key``
+# would also match legitimate fields like ``hostkey``, ``itemkey``,
+# ``key_`` (Zabbix item key field). The audit log loses information
+# every time the redactor is too aggressive, so be specific.
 _REDACT_KEY_SUBSTRINGS = frozenset({
+    # Generic auth credentials
     "password",
+    "passwd",
     "secret",
     "api_key",
     "apikey",
@@ -70,13 +78,38 @@ _REDACT_KEY_SUBSTRINGS = frozenset({
     "access_token",
     "auth_token",
     "raw_token",
+    "bearer",   # HTTP Bearer tokens (Authorization headers, etc.)
     "private_key",
     "privkey",
     "frontend_password",
+    # Session-scoped secrets
     "zbx_session",
     "session_cookie",
-    "csrf",   # CSRF tokens are session-scoped secrets
+    "cookie",   # Set-Cookie / Cookie headers carry session ids
+    "csrf",     # CSRF tokens are session-scoped secrets
     "pkce",
+    # MFA / OTP secrets
+    "mfa_code",
+    "totp",
+    "otp_code",
+    "totp_secret",
+    # Crypto primitives that should never appear in plaintext audit
+    "signature",
+    "nonce",
+    # Zabbix-specific credentials
+    "tls_psk",        # PSK identity + secret on host interface
+    "psk_identity",
+    "snmp_community", # SNMP v1/v2c community string is auth
+    "community",      # bare 'community' field on SNMP interface
+    "bind_password",  # LDAP bind credential
+    "smtp_password",  # mediatype SMTP auth
+    "smtp_secret",
+    "webhook_secret", # webhook signing secret
+    "webhook_token",
+    # Database / ODBC connection strings (often embed creds)
+    "connect_string",
+    "connection_string",
+    "dsn",
 })
 
 # Keys that ARE allowed to carry secret-like values because they
@@ -89,6 +122,8 @@ _HASH_KEYS_EXACT = frozenset({
     "password_hash",
     "client_secret_hash",
     "secret_hash",
+    "oauth_token_hash",
+    "refresh_token_hash",
 })
 
 # Maximum length of any string value before truncation marker is added.

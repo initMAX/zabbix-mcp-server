@@ -186,10 +186,24 @@ class TokenInfo:
     # LLM clients - operators must explicitly opt a token in for use by
     # programmatic / non-LLM consumers (Python scripts, n8n workflows).
     allow_raw_json: bool = False
+    # Operator-set Zabbix-side identity that this token represents
+    # (issue #49). Surfaces as ``mapped_zabbix_user`` in tool audit
+    # rows, so an incident reviewer can correlate an MCP tool
+    # invocation with the Zabbix auditlog row written by the same
+    # underlying API user. Optional; left None when the operator has
+    # not configured an explicit mapping (the audit row carries None
+    # in that case rather than guessing). Configured via
+    # ``[tokens.<id>] zbx_user = "Admin"`` in config.toml.
+    zbx_user: str | None = None
     # Runtime stats (in-memory only, not persisted)
     last_used_at: str | None = None
     last_used_ip: str | None = None
     use_count: int = 0
+    # Last tool invocation timestamp - per-token activity heartbeat
+    # for the OAuth Clients "Last activity" column (issue #49 Track B
+    # revocation visibility). Updated by the audit emit path on every
+    # tool call. ISO 8601 UTC.
+    last_tool_invoke_at: str | None = None
 
     @property
     def is_expired(self) -> bool:
@@ -289,6 +303,7 @@ class TokenStore:
                 is_legacy=cfg.get("is_legacy", False),
                 revoked=not cfg.get("is_active", True),
                 allow_raw_json=allow_raw_json_val,
+                zbx_user=(cfg.get("zbx_user") or None),
             )
 
             # Preserve runtime stats from existing token
@@ -297,6 +312,7 @@ class TokenStore:
                 info.last_used_at = existing.last_used_at
                 info.last_used_ip = existing.last_used_ip
                 info.use_count = existing.use_count
+                info.last_tool_invoke_at = existing.last_tool_invoke_at
 
             new_tokens[token_hash] = info
             new_by_id[token_id] = info

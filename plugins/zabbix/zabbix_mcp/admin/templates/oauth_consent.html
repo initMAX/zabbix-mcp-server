@@ -224,6 +224,17 @@
                         </div>
                     </div>
                 </label>
+                <div id="wildcard-active-banner" class="consent-warning"
+                     style="display: none; border-color: var(--color-danger, #c0392b); background: var(--color-danger-light, #fdecea); color: var(--color-danger, #c0392b);">
+                    <strong>&#x26A0;&#xFE0F; You are about to grant unlimited access.</strong>
+                    This client will be able to call <em>every</em> tool, including writes
+                    that mutate Zabbix configuration (host_create, item_delete,
+                    action_confirm, ...) on <em>every</em> configured server.
+                    Untick the box above and pick per-plugin scopes if you want a
+                    narrower grant. The grant is recorded in the audit log
+                    (action <code>consent_granted</code>) and can be revoked anytime
+                    via <em>OAuth Clients</em>.
+                </div>
                 {% endif %}
 
                 {% for plugin in plugins %}
@@ -363,10 +374,13 @@
     // Wildcard: when ticked, dim all plugin sections (the per-plugin
     // grants become redundant) and disable their hidden scope inputs to
     // avoid posting both wildcard AND plugin scopes (audit log clarity).
+    // Also surfaces the danger-styled banner explaining the blast radius.
     function onWildcardToggle() {
         var box = document.getElementById('grant-wildcard');
         if (!box) return;
         var on = box.checked;
+        var banner = document.getElementById('wildcard-active-banner');
+        if (banner) banner.style.display = on ? 'block' : 'none';
         document.querySelectorAll('.plugin-section').forEach(function(sec) {
             sec.classList.toggle('dimmed', on);
             sec.querySelectorAll('input[type=radio], input[type=checkbox], button.plugin-tools-toggle')

@@ -36,13 +36,14 @@ no error, just no data.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
-from zabbix_mcp.admin.audit_writer import write_audit
+from zabbix_mcp.admin.audit_writer import AUDIT_LOG_PATH, write_audit
 from zabbix_mcp.admin.config_writer import (
     load_config_document,
     remove_config_table,
@@ -62,6 +63,64 @@ def _ts_human(ts: int | None) -> str:
         return ""
 
 
+# Audit log tail size scanned for the per-client "Last activity"
+# heartbeat (issue #49 Track B). 512 KB ~= 3000 rows on a typical
+# audit log, which is enough to capture the last 24 h of activity
+# even on a busy box without forcing the admin page to re-read the
+# full log on every render.
+_OAUTH_ACTIVITY_SCAN_BYTES = 512 * 1024
+
+
+def _scan_audit_for_oauth_activity() -> dict[str, str]:
+    """Populate the per-OAuth-client ``last_activity`` heartbeat from the audit log.
+
+    Issue #49 Track B revocation visibility: the operator wants to see
+    "this DCR-registered client has not invoked any tool in 14 days,
+    safe to revoke". The signal lives in ``tool.invoke`` audit rows
+    (``oauth_subject`` carries the ``oauth:<client_id>:<user>`` form
+    when the bearer is an OAuth token). Scanning the tail of the log
+    on every render is cheap because (a) the bound is fixed at
+    ``_OAUTH_ACTIVITY_SCAN_BYTES`` and (b) only operators reach this
+    page.
+
+    Returns ``{client_id: ISO-8601-string}`` containing the most recent
+    timestamp seen per client. Missing clients are simply absent (the
+    template renders an em-dash placeholder via the ``or "-"`` filter).
+    """
+    result: dict[str, str] = {}
+    try:
+        with open(AUDIT_LOG_PATH, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            read_bytes = min(size, _OAUTH_ACTIVITY_SCAN_BYTES)
+            f.seek(size - read_bytes)
+            blob = f.read()
+    except (OSError, ValueError):
+        return result
+    text = blob.decode("utf-8", errors="ignore")
+    for line in text.split("\n"):
+        if not line or '"tool.invoke"' not in line:
+            continue
+        try:
+            row = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        subj = row.get("oauth_subject") or ""
+        # Format produced by _emit_ext_tool_audit / _make_tool_handler:
+        # "token:oauth:<client_id>:<subject_user>" for OAuth-bound calls.
+        marker = "token:oauth:"
+        if not subj.startswith(marker):
+            continue
+        rest = subj[len(marker):]
+        client_id = rest.split(":", 1)[0] if rest else ""
+        if not client_id:
+            continue
+        ts = row.get("timestamp") or ""
+        if ts and (client_id not in result or ts > result[client_id]):
+            result[client_id] = ts
+    return result
+
+
 def _list_registered_clients(admin_app) -> list[dict]:
     """Read [oauth_clients.*] from config.toml and join with live token counts."""
     if not TOMLKIT_AVAILABLE:
@@ -74,6 +133,7 @@ def _list_registered_clients(admin_app) -> list[dict]:
 
     raw = doc.get("oauth_clients", {}) or {}
     provider = admin_app.oauth_provider
+    activity = _scan_audit_for_oauth_activity()
 
     rows: list[dict] = []
     for cid, body in raw.items():
@@ -111,6 +171,11 @@ def _list_registered_clients(admin_app) -> list[dict]:
             "allowed_ips": list(body.get("allowed_ips") or []),
             "access_token_ttl_seconds": body.get("access_token_ttl_seconds") or "",
             "refresh_token_ttl_seconds": body.get("refresh_token_ttl_seconds") or "",
+            # Last tool invocation seen in the audit log for this client.
+            # Empty string when the client has never invoked a tool (the
+            # grant exists but the client never logged in to actually
+            # use it - prime revocation candidate).
+            "last_activity": activity.get(cid, ""),
         })
     rows.sort(key=lambda r: r["client_id_issued_at"] or 0, reverse=True)
     return rows

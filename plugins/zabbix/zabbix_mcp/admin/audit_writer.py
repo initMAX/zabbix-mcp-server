@@ -25,8 +25,11 @@ The denylist is centralised; adding a new sensitive key is one edit in
 
 import json
 import os
+import threading
 import time
+from collections import deque
 from pathlib import Path
+from typing import Any, Iterable
 
 from zabbix_mcp.admin.audit_redactor import redact
 
@@ -40,6 +43,54 @@ AUDIT_LOG_PATH = Path("/var/log/zabbix-mcp/audit.log")
 CLIENT_AUDIT_LOG_PATH = Path("/var/log/zabbix-mcp/client-audit.log")
 
 MAX_AUDIT_SIZE = 50 * 1024 * 1024  # 50 MB
+
+# Per-subject ring buffer of recent client-side audit rows. Backs the
+# ``audit_self_get`` MCP tool (issue #49 Phase 5): a client can pull
+# its own recent activity without the operator handing them the raw
+# log file (which would carry every other client's activity too).
+#
+# Keyed by ``oauth_subject`` rather than client_id so OAuth + bearer
+# tokens use the same path. Per-subject deques are bounded so a
+# misbehaving client cannot grow the process RSS unboundedly.
+_PER_SUBJECT_RING_MAX = 100
+_per_subject_audit: dict[str, deque[dict[str, Any]]] = {}
+_per_subject_audit_lock = threading.Lock()
+
+
+def get_recent_client_audit(oauth_subject: str, limit: int = 50) -> list[dict[str, Any]]:
+    """Return up to ``limit`` most recent client-audit rows for a subject.
+
+    Used by ``audit_self_get`` to surface a client's own activity. The
+    ring buffer is in-memory only - it is reset on process restart and
+    bounded at :data:`_PER_SUBJECT_RING_MAX` entries per subject. A
+    client that wants longer history asks the operator for the audit
+    log directly.
+
+    Returns newest-first. Empty list when no rows are recorded for
+    ``oauth_subject`` yet.
+    """
+    if not oauth_subject:
+        return []
+    with _per_subject_audit_lock:
+        ring = _per_subject_audit.get(oauth_subject)
+        if not ring:
+            return []
+        # deque iter is oldest-first; reverse + cap at limit.
+        items = list(ring)[-limit:]
+    items.reverse()
+    return items
+
+
+def _push_client_ring(oauth_subject: str, entry: dict[str, Any]) -> None:
+    """Append a client-audit entry to the per-subject ring buffer."""
+    if not oauth_subject:
+        return
+    with _per_subject_audit_lock:
+        ring = _per_subject_audit.get(oauth_subject)
+        if ring is None:
+            ring = deque(maxlen=_PER_SUBJECT_RING_MAX)
+            _per_subject_audit[oauth_subject] = ring
+        ring.append(entry)
 
 
 def _rotate_audit_log(path: Path) -> None:
@@ -171,6 +222,11 @@ def write_tool_audit(
             # these IDs to the tool.
             "target": safe_target,
         }
+        # Push to the per-subject ring buffer first - audit_self_get
+        # reads from this in-memory store. The file write below is for
+        # operators (separate, longer retention) and may fail without
+        # affecting the in-memory path.
+        _push_client_ring(oauth_subject, client_entry)
         try:
             CLIENT_AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
             if CLIENT_AUDIT_LOG_PATH.exists() and CLIENT_AUDIT_LOG_PATH.stat().st_size > MAX_AUDIT_SIZE:

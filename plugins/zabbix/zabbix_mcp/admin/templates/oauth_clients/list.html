@@ -164,6 +164,7 @@
                     <th>Redirect URIs <span class="tooltip-icon" tabindex="0" data-tooltip="Exact-match callbacks the client may receive the authorization code on. Any other URI is rejected at /authorize. Set during registration.">&#x1F6C8;</span></th>
                     <th>Auth method <span class="tooltip-icon" tabindex="0" data-tooltip="public (PKCE) = no client_secret, the client proves itself with PKCE on /token. client_secret_post / basic = confidential client with a shared secret. Set during registration.">&#x1F6C8;</span></th>
                     <th>Active tokens <span class="tooltip-icon" tabindex="0" data-tooltip="Access + refresh tokens currently held in memory by the running MCP server for this client. Counts go to zero on server restart (clients re-auth via refresh or fresh login).">&#x1F6C8;</span></th>
+                    <th>Last activity <span class="tooltip-icon" tabindex="0" data-tooltip="Most recent tool invocation by this client found in the audit log (issue #49). Empty when the client has registered but never called a tool - safe revocation candidate. Scanned from the most recent 512 KB of /var/log/zabbix-mcp/audit.log on every page render.">&#x1F6C8;</span></th>
                     <th>Registered <span class="tooltip-icon" tabindex="0" data-tooltip="When the client first called POST /register. Persists in [oauth_clients.X] across restarts.">&#x1F6C8;</span></th>
                     {% if can_revoke %}<th>Actions</th>{% endif %}
                 </tr>
@@ -192,6 +193,13 @@
                     <td>
                         <span class="badge badge-success" title="Currently issued, not yet expired">{{ c.active_access_tokens }} access</span>
                         <span class="badge badge-muted" title="Refresh tokens still valid">{{ c.active_refresh_tokens }} refresh</span>
+                    </td>
+                    <td class="text-sm text-muted">
+                        {% if c.last_activity %}
+                            {{ c.last_activity }}
+                        {% else %}
+                            <span title="No tool.invoke audit row found for this client_id" style="color: var(--text-muted);">never</span>
+                        {% endif %}
                     </td>
                     <td class="text-sm text-muted">{{ c.issued_human }}</td>
                     {% if can_revoke %}

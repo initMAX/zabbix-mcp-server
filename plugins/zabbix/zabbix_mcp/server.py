@@ -28,6 +28,7 @@ import re
 import secrets
 import threading
 import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any, Optional
@@ -1493,6 +1494,49 @@ def _truncate_result(result: Any, *, max_chars: int = _RESPONSE_MAX_CHARS) -> st
     return _dumps(summary)
 
 
+def _count_from_extension_result(result: Any) -> int | str | None:
+    """Bucket an extension-tool result into 0 / 1 / 'N' for the audit row.
+
+    Extension tools return JSON strings shaped differently per tool
+    (``problem_active_get`` -> ``{"problems": [...], "count": N}``,
+    ``item_threshold_search`` -> ``{"items": [...], "scanned": N}``,
+    ``graph_render`` -> base64 data URI, ``report_generate`` -> PDF
+    data URI, ...). The audit row only needs the cardinality bucket
+    spec'd in issue #49 (0 / 1 / N), so this helper extracts that
+    without forcing every tool to bookkeep a count.
+
+    Returns ``None`` when the cardinality cannot be inferred (e.g. an
+    error payload) - the audit row records that as a missing field
+    rather than guessing.
+    """
+    if result is None:
+        return 0
+    if isinstance(result, str):
+        try:
+            parsed = json.loads(result)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return 1
+        result = parsed
+    if isinstance(result, dict):
+        # Error envelope from extension functions - no count to report.
+        if "error" in result and len(result) <= 3:
+            return None
+        # Bucketise on the most common collection-key shapes used by
+        # extensions: problems, items, hosts, results.
+        for k in ("problems", "items", "hosts", "results", "anomalies", "matches"):
+            v = result.get(k)
+            if isinstance(v, list):
+                return "N" if len(v) > 1 else len(v)
+        # Numeric count field (problem_active_get, hostgroup_overview_get).
+        n = result.get("count")
+        if isinstance(n, int):
+            return "N" if n > 1 else n
+        return 1
+    if isinstance(result, list):
+        return "N" if len(result) > 1 else len(result)
+    return 1
+
+
 def _emit_ext_tool_audit(
     tool_name: str,
     kwargs: dict,
@@ -1524,7 +1568,7 @@ def _emit_ext_tool_audit(
         )
         write_tool_audit(
             oauth_subject=subject,
-            mapped_zabbix_user=None,
+            mapped_zabbix_user=_resolve_mapped_zabbix_user(token),
             mcp_session_id=current_session_id.get(),
             tool_name=tool_name,
             scopes=list(getattr(token, "scopes", None) or []),
@@ -1535,8 +1579,45 @@ def _emit_ext_tool_audit(
             result_count=count,
             ip=current_client_ip.get() or "",
         )
+        # Heartbeat: stamp the token so the OAuth Clients "Last
+        # activity" column (issue #49 Track B) has fresh data without
+        # the operator having to scrape the audit log. Best-effort -
+        # ignore if the token object lacks the field (legacy callers
+        # using a non-TokenInfo shape).
+        if token is not None and hasattr(token, "last_tool_invoke_at"):
+            try:
+                token.last_tool_invoke_at = datetime.now(timezone.utc).isoformat()
+            except Exception:
+                pass
     except Exception:
         logger.exception("Failed to emit ext-tool audit row for %s", tool_name)
+
+
+def _resolve_mapped_zabbix_user(token: Any) -> str | None:
+    """Return the Zabbix-side user identity bound to ``token`` for the audit row.
+
+    The audit log answers "who did this?" with two layers: the
+    OAuth-side / MCP-side ``oauth_subject`` (token name or admin user)
+    and the Zabbix-side ``mapped_zabbix_user`` (the actual Zabbix user
+    whose API session executes the call). Without the second layer an
+    incident reviewer cannot tie a tool invocation back to a Zabbix
+    auditlog entry.
+
+    Resolution comes from the token's bound Zabbix server config
+    (``[zabbix.<server>] api_user`` / ``[tokens.<id>] zbx_user``) -
+    cached on the token object so we do not hit the Zabbix API on every
+    audit emit. ``None`` when no binding exists (anonymous / stdio
+    sessions, or token without a Zabbix server attached).
+    """
+    if token is None:
+        return None
+    # Cached on the token by token_store on bind. Falls back to the
+    # configured api_user on the default server when the token did not
+    # carry an explicit zbx_user mapping.
+    cached = getattr(token, "mapped_zabbix_user", None)
+    if cached:
+        return str(cached)
+    return None
 
 
 def _make_tool_handler(
@@ -1578,7 +1659,7 @@ def _make_tool_handler(
             try:
                 write_tool_audit(
                     oauth_subject=_audit_subject,
-                    mapped_zabbix_user=None,
+                    mapped_zabbix_user=_resolve_mapped_zabbix_user(_audit_token),
                     mcp_session_id=_audit_session,
                     tool_name=method_def.tool_name,
                     scopes=_audit_scopes,
@@ -1589,6 +1670,11 @@ def _make_tool_handler(
                     result_count=count,
                     ip=_audit_ip,
                 )
+                if _audit_token is not None and hasattr(_audit_token, "last_tool_invoke_at"):
+                    try:
+                        _audit_token.last_tool_invoke_at = datetime.now(timezone.utc).isoformat()
+                    except Exception:
+                        pass
             except Exception:
                 logger.exception("Failed to emit tool audit row for %s", method_def.tool_name)
             _audit_emitted = True
@@ -1881,12 +1967,19 @@ def _register_tools(
     ) -> str:
         """Execute any Zabbix API method directly. Use this for methods not covered
         by dedicated tools, or for advanced/undocumented API calls."""
+        # Build the audit kwargs once - the extractor surfaces ``method``
+        # as ``api_method`` (target) and drops ``params`` (so secret-bearing
+        # payloads like ``host.create({password: ...})`` cannot leak into
+        # the audit row even via the raw escape hatch).
+        _audit_kwargs = {"method": method, "params": params, "server": server}
         _raw_err = _check_raw_json_allowed(raw_json)
         if _raw_err:
+            _emit_ext_tool_audit("zabbix_raw_api_call", _audit_kwargs, "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
 
         server_name = server or client_manager.default_server
         if not server_name:
+            _emit_ext_tool_audit("zabbix_raw_api_call", _audit_kwargs, "deny_server", "No Zabbix server configured", None)
             raise ToolError("No Zabbix server configured.")
         try:
             server_name = client_manager.resolve_server(server_name)
@@ -1903,6 +1996,8 @@ def _register_tools(
             _prefix = method.split(".")[0].lower() if "." in method else ""
             _auth_err = check_token_authorization(server_name, tool_prefix=_prefix, tool_name="zabbix_raw_api_call", is_write=not is_read_only)
             if _auth_err:
+                policy = "deny_read_only" if "is read-only" in _auth_err else "deny_scope"
+                _emit_ext_tool_audit("zabbix_raw_api_call", _audit_kwargs, policy, _auth_err, None)
                 raise ToolError(_auth_err)
 
             if not is_read_only:
@@ -1911,13 +2006,17 @@ def _register_tools(
             result = await asyncio.to_thread(
                 client_manager.call, server_name, method, params or {},
             )
+            _emit_ext_tool_audit("zabbix_raw_api_call", _audit_kwargs, "allow", None, _count_from_extension_result(result))
             return _format_result(_truncate_result(result, max_chars=response_max_chars), raw_json)
         except ToolError:
             raise
         except (ReadOnlyError, RateLimitError, ValueError) as e:
+            policy = "deny_read_only" if isinstance(e, ReadOnlyError) else "deny_other"
+            _emit_ext_tool_audit("zabbix_raw_api_call", _audit_kwargs, policy, str(e), None)
             raise ToolError(str(e))
         except Exception:
             logger.exception("Error in raw API call '%s' on server '%s'", method, server_name)
+            _emit_ext_tool_audit("zabbix_raw_api_call", _audit_kwargs, "error", "API call failed", None)
             raise ToolError(
                 f"API call failed for {method}. Check server logs for details."
             )
@@ -1955,6 +2054,62 @@ def _register_tools(
         count += 1
 
     # ------------------------------------------------------------------
+    # audit_self_get: client-side activity self-feed (issue #49 Phase 5)
+    # ------------------------------------------------------------------
+    async def audit_self_get(
+        *,
+        limit: Annotated[Optional[int], Field(description="Max number of recent activity entries to return (default 50, max 100).")] = 50,
+    ) -> str:
+        """Return recent tool-call activity for the calling token.
+
+        Self-service activity feed: a connected client (Claude Desktop,
+        ChatGPT, an automation script) can pull its own recent
+        invocations so it can answer "what did I just do?" without the
+        operator handing over the full audit log file. Cross-client
+        isolation is enforced server-side - each subject sees only its
+        own ring buffer.
+
+        Each entry carries: timestamp (server clock), tool (canonical
+        name), decision (allow / deny_*), denial_bucket
+        (scope / read_only / auth / server / other - high-level
+        reason without operator-internal detail), result_count
+        (0 / 1 / 'N' bucket), and target (resource references the
+        caller passed in - host_id / hostgroup_id / item_id).
+
+        The buffer is in-memory only, bounded at 100 entries per
+        subject. Older entries roll off as new calls come in. The
+        operator log keeps full history; this tool is for fast
+        self-introspection only.
+        """
+        from zabbix_mcp.admin.audit_writer import get_recent_client_audit
+        from zabbix_mcp.token_store import current_token_info as _cti
+        n = max(1, min(int(limit or 50), 100))
+        token = _cti.get()
+        if token is None:
+            return json.dumps({
+                "entries": [], "count": 0,
+                "note": "No bearer token in context - audit_self_get only works on authenticated transports.",
+            }, indent=2)
+        subject = f"token:{getattr(token, 'name', '?')}"
+        items = get_recent_client_audit(subject, limit=n)
+        return json.dumps({
+            "entries": items,
+            "count": len(items),
+            "subject": subject,
+            "note": (
+                "In-memory ring buffer, max 100 entries per subject, "
+                "oldest entries roll off, reset on server restart."
+            ),
+        }, indent=2)
+
+    if _ext_allowed("audit_self_get"):
+        _add_tool(
+            audit_self_get, name="audit_self_get",
+            annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=False),
+        )
+        count += 1
+
+    # ------------------------------------------------------------------
     # Extension tools (server-side analytics, graph export, reporting)
     # ------------------------------------------------------------------
     from zabbix_mcp.api.extensions import (
@@ -1977,16 +2132,19 @@ def _register_tools(
         to find graph IDs first."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("graph_render", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="graph", tool_name="graph_render")
         if _auth_err:
             _emit_ext_tool_audit("graph_render", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             graph_render, client_manager, srv,
             graphid=graphid, period=period, width=width, height=height,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("graph_render", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("graph_render"):
         _add_tool(
@@ -2010,17 +2168,20 @@ def _register_tools(
         from the group average. Requires at least 2 hosts with data."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("anomaly_detect", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="anomaly_detect")
         if _auth_err:
             _emit_ext_tool_audit("anomaly_detect", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             anomaly_detect, client_manager, srv,
             item_key=item_key, hostgroupid=hostgroupid, hostid=hostid,
             period=period, threshold=threshold,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("anomaly_detect", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("anomaly_detect"):
         _add_tool(
@@ -2043,16 +2204,19 @@ def _register_tools(
         and R-squared confidence. Useful for capacity planning (disk, CPU, memory)."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("capacity_forecast", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="capacity_forecast")
         if _auth_err:
             _emit_ext_tool_audit("capacity_forecast", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             capacity_forecast, client_manager, srv,
             hostid=hostid, item_key=item_key, threshold=threshold, period=period,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("capacity_forecast", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("capacity_forecast"):
         _add_tool(
@@ -2093,20 +2257,23 @@ def _register_tools(
         matched = total passing threshold; returned = items included (may be less if result_limit set)."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("item_threshold_search", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="item", tool_name="item_threshold_search")
         if _auth_err:
             _emit_ext_tool_audit("item_threshold_search", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             item_threshold_search, client_manager, srv,
             lastvalue_gt=lastvalue_gt, lastvalue_ge=lastvalue_ge,
             lastvalue_lt=lastvalue_lt, lastvalue_le=lastvalue_le,
             search=search, filter=filter, hostids=hostids, groupids=groupids,
             output=output, extra_params=extra_params,
             sort_desc=sort_desc, result_limit=result_limit,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("item_threshold_search", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("item_threshold_search"):
         _add_tool(
@@ -2149,17 +2316,20 @@ def _register_tools(
         """
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("problem_active_get", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="problem", tool_name="problem_active_get")
         if _auth_err:
             _emit_ext_tool_audit("problem_active_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             problem_active_get, client_manager, srv,
             severities=severities, hostids=hostids, groupids=groupids,
             limit=limit, sortfield=sortfield, sortorder=sortorder,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("problem_active_get", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("problem_active_get"):
         _add_tool(
@@ -2183,6 +2353,7 @@ def _register_tools(
         Use this whenever an operator asks 'what is the status of <hostname>?' or 'what is wrong on <hostname>?'. Replaces the typical 3-4 tool chain (host_get + hostinterface_get + problem_get + item_get) so a one-shot LLM prompt can answer without follow-up tool calls."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("host_status_get", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         # Composite read - require scope for every Zabbix endpoint we
@@ -2194,10 +2365,12 @@ def _register_tools(
         if _auth_err:
             _emit_ext_tool_audit("host_status_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             host_status_get, client_manager, srv,
             host_id=host_id, host=host,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("host_status_get", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("host_status_get"):
         _add_tool(_host_status_get, name="host_status_get",
@@ -2217,6 +2390,7 @@ def _register_tools(
         Use this for 'how is the <hostgroup> doing?' / 'give me a daily health report for <group>' style prompts. Replaces hostgroup_get + host_get(groupids=) + problem_get(hostids=) chain."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("hostgroup_overview_get", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         # Composite read - covers hostgroup + member host + active problems.
@@ -2226,10 +2400,12 @@ def _register_tools(
         if _auth_err:
             _emit_ext_tool_audit("hostgroup_overview_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             hostgroup_overview_get, client_manager, srv,
             groupid=groupid, group=group, top_n=top_n,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("hostgroup_overview_get", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("hostgroup_overview_get"):
         _add_tool(_hostgroup_overview_get, name="hostgroup_overview_get",
@@ -2247,6 +2423,7 @@ def _register_tools(
         Use this for 'show me the overall status' / 'is everything OK?' / 'how many problems do we have right now?' style first-look prompts. Replaces five separate count + filter calls and the LLM correlation step that local models often get wrong."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("infrastructure_summary_get", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         # Composite read - aggregates host / item / trigger / template /
@@ -2258,9 +2435,11 @@ def _register_tools(
         if _auth_err:
             _emit_ext_tool_audit("infrastructure_summary_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             infrastructure_summary_get, client_manager, srv, top_n=top_n,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("infrastructure_summary_get", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("infrastructure_summary_get"):
         _add_tool(_infrastructure_summary_get, name="infrastructure_summary_get",
@@ -2282,6 +2461,7 @@ def _register_tools(
         Use this for 'what was the average load on <host> over the last hour?' / 'show me memory usage trend on <host>'. Replaces the item_get + history_get + manual statistics loop the LLM has to write to answer trend questions."""
         _raw_err = _check_raw_json_allowed(bool(raw_json))
         if _raw_err:
+            _emit_ext_tool_audit("item_history_summary_get", locals(), "deny_scope", _raw_err, None)
             raise ToolError(_raw_err)
         srv = client_manager.resolve_server(server or client_manager.default_server)
         # Composite read - item metadata + history + parent host name.
@@ -2291,10 +2471,12 @@ def _register_tools(
         if _auth_err:
             _emit_ext_tool_audit("item_history_summary_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
-        return _raise_if_extension_error(await asyncio.to_thread(
+        _ext_result = await asyncio.to_thread(
             item_history_summary_get, client_manager, srv,
             itemid=itemid, host=host, key=key, period=period, limit=limit,
-        ), raw_json=bool(raw_json))
+        )
+        _emit_ext_tool_audit("item_history_summary_get", locals(), "allow", None, _count_from_extension_result(_ext_result))
+        return _raise_if_extension_error(_ext_result, raw_json=bool(raw_json))
 
     if _ext_allowed("item_history_summary_get"):
         _add_tool(_item_history_summary_get, name="item_history_summary_get",
@@ -2362,6 +2544,12 @@ def _register_tools(
                         report_engine.generate_report, report_type, context,
                     )
                     encoded = base64.b64encode(pdf_bytes).decode("ascii")
+                    _emit_ext_tool_audit("report_generate", {
+                        "report_type": report_type,
+                        "hostgroupid": hostgroupid,
+                        "period": period,
+                        "server": srv,
+                    }, "allow", None, 1)
                     return json.dumps({
                         "report": f"data:application/pdf;base64,{encoded}",
                         "report_type": report_type,
@@ -2456,16 +2644,21 @@ def _register_tools(
         token to actually execute it. Tokens expire after 5 minutes."""
         srv = client_manager.resolve_server(server or client_manager.default_server)
 
-        # Token authorization: server + write permission
+        # Token authorization: server + write permission. Note: this is
+        # the *prepare* step's audit row - the actual write only happens
+        # after action_confirm pops the same token, so this row records
+        # an intent-to-mutate, not an executed mutation. The matching
+        # action_confirm row (below) carries the executed-write evidence.
         _prefix = action.split(".")[0].lower() if "." in action else ""
-        _auth_err = check_token_authorization(srv, tool_prefix=_prefix, tool_name="action_confirm", is_write=True)
+        _auth_err = check_token_authorization(srv, tool_prefix=_prefix, tool_name="action_prepare", is_write=True)
         if _auth_err:
-            _emit_ext_tool_audit("action_confirm", locals(), "deny_scope", _auth_err, None)
+            _emit_ext_tool_audit("action_prepare", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
 
         try:
             client_manager.check_write(srv)
         except ReadOnlyError as e:
+            _emit_ext_tool_audit("action_prepare", locals(), "deny_read_only", str(e), None)
             raise ToolError(str(e))
 
         # Generate secure token
@@ -2509,6 +2702,10 @@ def _register_tools(
             if any(frag in kl for frag in _SECRET_NAME_FRAGMENTS):
                 return "***REDACTED***"
             return v
+        _emit_ext_tool_audit("action_prepare", {
+            "action": action,
+            "server": srv,
+        }, "allow", None, 1)
         return json.dumps({
             "status": "pending_confirmation",
             "confirmation_token": token,
@@ -2538,6 +2735,12 @@ def _register_tools(
         with _pending_actions_lock:
             action_data = _pending_actions.pop(confirmation_token, None)
         if action_data is None:
+            # No locals() leak - the token value would expose the
+            # confirmation token to the audit log. Build a clean kwargs
+            # dict that only carries the resource-shaped fields we want
+            # the auditor to see.
+            _emit_ext_tool_audit("action_confirm", {}, "deny_token_invalid",
+                                 "Invalid or expired confirmation token", None)
             raise ToolError("Invalid or expired confirmation token.")
 
         # Verify caller identity matches the preparer
@@ -2545,9 +2748,17 @@ def _register_tools(
         _caller_token = _cti.get()
         _caller_id = _caller_token.id if _caller_token else None
         if action_data.get("caller_token_id") != _caller_id:
+            _emit_ext_tool_audit("action_confirm", {
+                "action": action_data["action"],
+                "server": action_data["server"],
+            }, "deny_scope", "Confirmation token belongs to a different caller", None)
             raise ToolError("Confirmation token was prepared by a different caller. Access denied.")
 
         if action_data["expires"] < time.time():
+            _emit_ext_tool_audit("action_confirm", {
+                "action": action_data["action"],
+                "server": action_data["server"],
+            }, "deny_token_invalid", "Confirmation token expired", None)
             raise ToolError("Confirmation token has expired. Prepare the action again.")
 
         try:
@@ -2555,6 +2766,10 @@ def _register_tools(
                 client_manager.call, action_data["server"],
                 action_data["action"], action_data["params"],
             )
+            _emit_ext_tool_audit("action_confirm", {
+                "action": action_data["action"],
+                "server": action_data["server"],
+            }, "allow", None, _count_from_extension_result(result))
             return _UNTRUSTED_PREAMBLE + json.dumps({
                 "status": "executed",
                 "action": action_data["action"],
@@ -2565,6 +2780,10 @@ def _register_tools(
             raise
         except Exception as exc:
             logger.exception("Action execution failed: %s", action_data["action"])
+            _emit_ext_tool_audit("action_confirm", {
+                "action": action_data["action"],
+                "server": action_data["server"],
+            }, "error", "Action execution failed", None)
             raise ToolError(f"Execution failed: {exc} (action: {action_data['action']})")
 
     if _ext_allowed("action_confirm"):
