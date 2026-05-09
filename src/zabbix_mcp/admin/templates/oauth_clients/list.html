@@ -196,9 +196,10 @@
                     <td class="text-sm text-muted">{{ c.issued_human }}</td>
                     {% if can_revoke %}
                     <td>
-                        <form method="post" action="/oauth-clients/{{ c.id | urlencode }}/revoke" style="display:inline;" onsubmit="return confirm('Revoke OAuth client &quot;{{ c.name }}&quot;? This deletes the registration AND invalidates every access/refresh token it currently holds.');">
+                        <form id="revoke-form-{{ loop.index }}" method="post" action="/oauth-clients/{{ c.id | urlencode }}/revoke" style="display:inline;">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                            <button type="submit" class="btn btn-sm btn-danger">Revoke</button>
+                            <button type="button" class="btn btn-sm btn-danger"
+                                    onclick="confirmRevokeOAuthClient({{ c.name | tojson }}, 'revoke-form-{{ loop.index }}')">Revoke</button>
                         </form>
                     </td>
                     {% endif %}
@@ -211,4 +212,23 @@
 </div>
 
 {% endif %}
+
+<script>
+// Revoke confirmation - reuses the showConfirm modal helper from
+// base.html so the dialog matches every other destructive action
+// in the portal (Restart, Delete token, ...) instead of the bare
+// browser confirm() popup.
+function confirmRevokeOAuthClient(clientName, formId) {
+    showConfirm(
+        'Revoke OAuth client',
+        'Revoke "' + clientName + '"? This deletes the registration AND invalidates every access/refresh token it currently holds.',
+        'Revoke',
+        'btn-danger',
+        function() {
+            var form = document.getElementById(formId);
+            if (form) form.submit();
+        }
+    );
+}
+</script>
 {% endblock %}
