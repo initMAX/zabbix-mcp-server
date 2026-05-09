@@ -263,11 +263,13 @@ class AuditConfig:
       disabled) so a compliance reviewer can see that audit logging
       was turned off and by whom. The admin portal renders a persistent
       banner while audit is disabled.
-    * ``log_system_actions`` - whether automated MCP server events
-      (retention purge, forwarder reconnect, config reload, background
-      housekeeping cycles) land in the audit log. Default off so the
-      operator log stays focused on user-driven actions; flip on for
-      forensics or to chase a flaky background subsystem.
+    * ``log_background_events`` - whether automated MCP server events
+      (log rotation, retention purge, SIEM forwarder reconnect,
+      background config reload) land in the audit log alongside
+      user-driven actions. Default on so an operator new to the
+      system can see "is the daemon doing its job?" without having
+      to flip a hidden knob. Turn off only when the operator log is
+      noisy and you only want user-driven actions.
     * ``housekeeping_enabled`` - whether the MCP server itself rotates
       and purges the audit log files. Default on. Disable when an
       external rsyslog / Fluentd / cron job manages rotation.
@@ -286,7 +288,7 @@ class AuditConfig:
     """
 
     enabled: bool = True
-    log_system_actions: bool = False
+    log_background_events: bool = True
     housekeeping_enabled: bool = True
     # Stored as seconds for runtime simplicity; the original Zabbix-style
     # string ("31d") is preserved on the config document so /settings
@@ -847,9 +849,18 @@ def load_config(path: str | Path) -> AppConfig:
         ) from None
     if audit_max_size_mb < 1:
         raise ConfigError("[audit].max_file_size_mb must be >= 1")
+    # The field renamed from ``log_system_actions`` (v1.31 dev) to
+    # ``log_background_events`` (final v1.31). Read the old key as a
+    # fallback so an operator who set it during the v1.31 dev cycle is
+    # not surprised by the toggle silently flipping back to default.
+    log_bg_default = True
+    log_bg_raw = audit_raw.get(
+        "log_background_events",
+        audit_raw.get("log_system_actions", log_bg_default),
+    )
     audit_cfg = AuditConfig(
         enabled=bool(audit_raw.get("enabled", True)),
-        log_system_actions=bool(audit_raw.get("log_system_actions", False)),
+        log_background_events=bool(log_bg_raw),
         housekeeping_enabled=bool(audit_raw.get("housekeeping_enabled", True)),
         data_storage_period_seconds=audit_period_seconds,
         data_storage_period_raw=audit_period_str,

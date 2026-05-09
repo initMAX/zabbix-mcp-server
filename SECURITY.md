@@ -149,7 +149,7 @@ Negative-test contract for the audit pipeline lives in [`tests/test_audit_negati
 The Settings -> Audit log admin panel mirrors Zabbix's own audit log panel field for field. Four user-visible knobs:
 
 - **Enable audit logging** - master toggle. Off silences `write_audit` / `write_tool_audit` and the `audit_self_get` ring buffer. The toggle change itself is always recorded (action `audit.toggle`) bypassing the gate. Disabling requires typing `DISABLE` in a confirmation field; the admin portal renders a persistent red banner across every page until audit is re-enabled.
-- **Log system actions** - off by default. When on, automated server events (`housekeeping.cycle`, `forwarder.queue_full`, `system.config_reload`) also land in the audit log. Useful for forensics; off by default to keep the operator log focused on user-driven actions.
+- **Log background server events** - on by default. When on, server-side events that happen without an operator action (`housekeeping.cycle`, `forwarder.queue_full`, `forwarder.reconnect`, `system.config_reload`) also land in the audit log. Useful for forensics and to verify the housekeeping daemon is doing its job; turn off when the operator log is noisy and you only want user-driven actions.
 - **Enable internal housekeeping** - default on. Daily rotation to `audit.log.YYYY-MM-DD.gz` plus age-based purge per the data storage period. Disable when an external rsyslog / Fluentd / cron job manages rotation.
 - **Data storage period** - Zabbix-style time period (`31d` default, `90d`, `1y`, `6h`, ...). Files older than this window are deleted by the housekeeping cycle.
 

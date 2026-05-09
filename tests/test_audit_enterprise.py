@@ -91,7 +91,7 @@ class TestAuditMasterToggle(unittest.TestCase):
         audit_writer.CLIENT_AUDIT_LOG_PATH = self.client_path
         # Reset to known runtime state.
         audit_writer.configure(
-            enabled=True, log_system_actions=False,
+            enabled=True, log_background_events=False,
             housekeeping_enabled=False, retention_seconds=0,
             max_file_size_bytes=50 * 1024 * 1024,
         )
@@ -104,7 +104,7 @@ class TestAuditMasterToggle(unittest.TestCase):
 
     def test_disabling_audit_silences_tool_invoke(self):
         from zabbix_mcp.admin.audit_writer import write_tool_audit, configure
-        configure(enabled=False, log_system_actions=False, housekeeping_enabled=False,
+        configure(enabled=False, log_background_events=False, housekeeping_enabled=False,
                   retention_seconds=0, max_file_size_bytes=50 * 1024 * 1024)
         write_tool_audit(
             oauth_subject="token:Disabled",
@@ -121,7 +121,7 @@ class TestAuditMasterToggle(unittest.TestCase):
 
     def test_disabling_audit_silences_admin_event(self):
         from zabbix_mcp.admin.audit_writer import write_audit, configure
-        configure(enabled=False, log_system_actions=False, housekeeping_enabled=False,
+        configure(enabled=False, log_background_events=False, housekeeping_enabled=False,
                   retention_seconds=0, max_file_size_bytes=50 * 1024 * 1024)
         write_audit("token_create", user="alice", target_type="token", target_id="ci")
         self.assertFalse(self.path.exists() and self.path.stat().st_size > 0)
@@ -130,7 +130,7 @@ class TestAuditMasterToggle(unittest.TestCase):
         """Disabling audit is itself a compliance-relevant event - the
         toggle audit row must survive the master gate."""
         from zabbix_mcp.admin.audit_writer import write_audit, configure
-        configure(enabled=False, log_system_actions=False, housekeeping_enabled=False,
+        configure(enabled=False, log_background_events=False, housekeeping_enabled=False,
                   retention_seconds=0, max_file_size_bytes=50 * 1024 * 1024)
         write_audit("audit.toggle", user="alice", target_type="audit",
                     target_id="enabled", details={"from": True, "to": False})
@@ -139,16 +139,16 @@ class TestAuditMasterToggle(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["action"], "audit.toggle")
 
-    def test_log_system_actions_off_drops_housekeeping_events(self):
+    def test_log_background_events_off_drops_housekeeping_rows(self):
         from zabbix_mcp.admin.audit_writer import write_audit, configure
-        configure(enabled=True, log_system_actions=False, housekeeping_enabled=False,
+        configure(enabled=True, log_background_events=False, housekeeping_enabled=False,
                   retention_seconds=0, max_file_size_bytes=50 * 1024 * 1024)
         write_audit("housekeeping.cycle", details={"archives_made": 1})
         self.assertFalse(self.path.exists() and self.path.stat().st_size > 0)
 
-    def test_log_system_actions_on_lets_housekeeping_through(self):
+    def test_log_background_events_on_lets_housekeeping_through(self):
         from zabbix_mcp.admin.audit_writer import write_audit, configure
-        configure(enabled=True, log_system_actions=True, housekeeping_enabled=False,
+        configure(enabled=True, log_background_events=True, housekeeping_enabled=False,
                   retention_seconds=0, max_file_size_bytes=50 * 1024 * 1024)
         write_audit("housekeeping.cycle", details={"archives_made": 1})
         self.assertTrue(self.path.exists())

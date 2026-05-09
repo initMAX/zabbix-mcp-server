@@ -27,7 +27,7 @@ RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file"
 LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools"}
 
 # Boolean fields — checkbox present = True, absent = False
-BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_system_actions", "housekeeping_enabled"}
+BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_background_events", "housekeeping_enabled"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -74,7 +74,7 @@ SECTION_CONFIG = {
     # names, same defaults, same Reset defaults semantics).
     "audit": {
         "toml_section": "audit",
-        "allowed_keys": {"enabled", "log_system_actions", "housekeeping_enabled", "data_storage_period", "max_file_size_mb"},
+        "allowed_keys": {"enabled", "log_background_events", "housekeeping_enabled", "data_storage_period", "max_file_size_mb"},
         "min_role": "admin",
     },
     # [audit.forward] - external SIEM / syslog forwarder. Optional.
@@ -266,13 +266,13 @@ async def settings_view(request: Request) -> Response:
                 _aw_state = get_runtime_state()
             except Exception:
                 _aw_state = {
-                    "enabled": True, "log_system_actions": False,
+                    "enabled": True, "log_background_events": True,
                     "housekeeping_enabled": True, "retention_seconds": 31 * 86400,
                     "max_file_size_bytes": 50 * 1024 * 1024,
                 }
             audit_cfg = dict(doc.get("audit", {})) if isinstance(doc.get("audit"), dict) else {}
             settings["audit_enabled"] = bool(_aw_state["enabled"])
-            settings["audit_log_system_actions"] = bool(_aw_state["log_system_actions"])
+            settings["audit_log_background_events"] = bool(_aw_state["log_background_events"])
             settings["audit_housekeeping_enabled"] = bool(_aw_state["housekeeping_enabled"])
             settings["audit_data_storage_period"] = (
                 str(audit_cfg.get("data_storage_period") or "31d")
@@ -620,7 +620,7 @@ async def settings_update(request: Request) -> Response:
                 size_mb_saved = int(config_section.get("max_file_size_mb", 50))
                 new_state = {
                     "enabled": bool(config_section.get("enabled", True)),
-                    "log_system_actions": bool(config_section.get("log_system_actions", False)),
+                    "log_background_events": bool(config_section.get("log_background_events", True)),
                     "housekeeping_enabled": bool(config_section.get("housekeeping_enabled", True)),
                     "retention_seconds": parse_time_period(period_raw_saved, default_unit="d"),
                     "max_file_size_bytes": size_mb_saved * 1024 * 1024,

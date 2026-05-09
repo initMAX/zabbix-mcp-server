@@ -437,19 +437,19 @@
         </div>
         <div class="settings-row">
             <div class="settings-label">
-                Log system actions
-                <span class="tooltip-icon" tabindex="0" data-tooltip="Includes automated MCP server events: retention purge, forwarder reconnect, config reload, background housekeeping. Off by default to keep the operator log focused on user-driven actions; flip on for forensics or to chase a flaky background subsystem.">&#x1F6C8;</span>
+                Log background server events
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Records server-side events that happen without an operator action: daily log rotation, retention purge, SIEM forwarder reconnects + queue overflow, and background config reloads. Useful for forensics and verifying the housekeeping daemon is doing its job. Turn off when the operator log is noisy and you only want user-driven actions.">&#x1F6C8;</span>
             </div>
             <div>
                 <label class="toggle-label">
                     <span class="toggle">
-                        <input type="checkbox" name="log_system_actions" value="true"
-                               {% if settings.audit_log_system_actions %}checked{% endif %}>
+                        <input type="checkbox" name="log_background_events" value="true"
+                               {% if settings.audit_log_background_events %}checked{% endif %}>
                         <span class="toggle-slider"></span>
                     </span>
-                    Include automated server events in the audit log
+                    Record housekeeping, retention, forwarder, and config-reload events
                 </label>
-                <div class="form-hint">Adds rows for housekeeping cycles, retention purges, and forwarder reconnects. Off by default to keep the log focused on user-driven actions.</div>
+                <div class="form-hint">Server-side events that happen without an operator action. Useful for forensics and to verify the housekeeping daemon is running.</div>
             </div>
         </div>
         <div class="settings-row">
@@ -516,7 +516,7 @@ function resetAuditDefaults() {
     var form = document.getElementById('audit-settings-form');
     if (!form) return;
     form.querySelector('[name=enabled]').checked = true;
-    form.querySelector('[name=log_system_actions]').checked = false;
+    form.querySelector('[name=log_background_events]').checked = true;
     form.querySelector('[name=housekeeping_enabled]').checked = true;
     form.querySelector('[name=data_storage_period]').value = '31d';
     form.querySelector('[name=max_file_size_mb]').value = 50;

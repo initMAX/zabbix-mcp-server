@@ -23,7 +23,7 @@ The denylist is centralised; adding a new sensitive key is one edit in
 ``audit_redactor.py``.
 
 The four user-visible knobs from the Settings -> Audit log panel
-(``enabled``, ``log_system_actions``, ``housekeeping_enabled``,
+(``enabled``, ``log_background_events``, ``housekeeping_enabled``,
 ``data_storage_period``) are surfaced here as module-level runtime
 state. The admin app calls :func:`configure` at boot and again on
 every successful Settings save so a config reload takes effect
@@ -64,7 +64,7 @@ MAX_AUDIT_SIZE = 50 * 1024 * 1024  # 50 MB - default, overridden by configure()
 # ----------------------------------------------------------------------
 
 _AUDIT_ENABLED: bool = True
-_LOG_SYSTEM_ACTIONS: bool = False
+_LOG_BACKGROUND_EVENTS: bool = True
 _HOUSEKEEPING_ENABLED: bool = True
 _RETENTION_SECONDS: int = 31 * 86400  # 31 days
 _MAX_FILE_SIZE_BYTES: int = MAX_AUDIT_SIZE
@@ -74,7 +74,7 @@ _state_lock = threading.Lock()
 def configure(
     *,
     enabled: bool = True,
-    log_system_actions: bool = False,
+    log_background_events: bool = True,
     housekeeping_enabled: bool = True,
     retention_seconds: int = 31 * 86400,
     max_file_size_bytes: int = MAX_AUDIT_SIZE,
@@ -85,11 +85,11 @@ def configure(
     :class:`AuditConfig`) and again on every successful Settings save.
     Idempotent - re-applying the same values is a no-op.
     """
-    global _AUDIT_ENABLED, _LOG_SYSTEM_ACTIONS, _HOUSEKEEPING_ENABLED
+    global _AUDIT_ENABLED, _LOG_BACKGROUND_EVENTS, _HOUSEKEEPING_ENABLED
     global _RETENTION_SECONDS, _MAX_FILE_SIZE_BYTES
     with _state_lock:
         _AUDIT_ENABLED = bool(enabled)
-        _LOG_SYSTEM_ACTIONS = bool(log_system_actions)
+        _LOG_BACKGROUND_EVENTS = bool(log_background_events)
         _HOUSEKEEPING_ENABLED = bool(housekeeping_enabled)
         _RETENTION_SECONDS = int(retention_seconds)
         _MAX_FILE_SIZE_BYTES = int(max_file_size_bytes)
@@ -100,7 +100,7 @@ def get_runtime_state() -> dict:
     with _state_lock:
         return {
             "enabled": _AUDIT_ENABLED,
-            "log_system_actions": _LOG_SYSTEM_ACTIONS,
+            "log_background_events": _LOG_BACKGROUND_EVENTS,
             "housekeeping_enabled": _HOUSEKEEPING_ENABLED,
             "retention_seconds": _RETENTION_SECONDS,
             "max_file_size_bytes": _MAX_FILE_SIZE_BYTES,
@@ -116,10 +116,12 @@ _ALWAYS_AUDIT_ACTIONS = frozenset({
     "audit.config_change",
 })
 
-# Action prefixes treated as "system actions". The
-# ``log_system_actions`` toggle gates these. Default off so the
-# operator log stays focused on user-driven actions.
-_SYSTEM_ACTION_PREFIXES = (
+# Action prefixes treated as background server events. The
+# ``log_background_events`` toggle gates these. Default on so the
+# operator can see "is the housekeeping daemon doing its job?"
+# without flipping a hidden knob; turn off when the operator log is
+# noisy and you only want user-driven actions.
+_BACKGROUND_EVENT_PREFIXES = (
     "system.",
     "housekeeping.",
     "forwarder.",
@@ -128,8 +130,8 @@ _SYSTEM_ACTION_PREFIXES = (
 )
 
 
-def _is_system_action(action: str) -> bool:
-    return any(action.startswith(p) for p in _SYSTEM_ACTION_PREFIXES)
+def _is_background_event(action: str) -> bool:
+    return any(action.startswith(p) for p in _BACKGROUND_EVENT_PREFIXES)
 
 
 def _enqueue_forward(entry: dict) -> None:
@@ -146,12 +148,12 @@ def _enqueue_forward(entry: dict) -> None:
 
 
 def _should_emit(action: str) -> bool:
-    """Apply the audit master + system-action gates."""
+    """Apply the audit master + background-event gates."""
     if action in _ALWAYS_AUDIT_ACTIONS:
         return True
     if not _AUDIT_ENABLED:
         return False
-    if _is_system_action(action) and not _LOG_SYSTEM_ACTIONS:
+    if _is_background_event(action) and not _LOG_BACKGROUND_EVENTS:
         return False
     return True
 
@@ -343,7 +345,7 @@ def _housekeeping_cycle() -> None:
         purged, freed = _purge_old_archives(p, retention)
         purged_total += purged
         bytes_freed_total += freed
-    if (archives_made or purged_total) and _LOG_SYSTEM_ACTIONS:
+    if (archives_made or purged_total) and _LOG_BACKGROUND_EVENTS:
         # Self-event so an operator can see the housekeeping running.
         _bypass_audit(
             action="housekeeping.cycle",
@@ -356,11 +358,11 @@ def _housekeeping_cycle() -> None:
 
 
 def _bypass_audit(action: str, details: dict) -> None:
-    """Write a system-action audit row directly, bypassing the gate.
+    """Write a background-event audit row directly, bypassing the gate.
 
     Used by the housekeeping daemon to record its own activity when
-    ``log_system_actions`` is on. Bypasses :func:`_should_emit` so
-    we do not recurse on the system-action toggle.
+    ``log_background_events`` is on. Bypasses :func:`_should_emit` so
+    we do not recurse on the toggle.
     """
     entry = {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -423,7 +425,7 @@ def write_audit(
     :mod:`zabbix_mcp.admin.audit_redactor` for the denylist.
 
     Honours the master ``[audit].enabled`` toggle and the
-    ``log_system_actions`` sub-toggle (see :func:`_should_emit`).
+    ``log_background_events`` sub-toggle (see :func:`_should_emit`).
     Toggle-change events themselves are always recorded so a reviewer
     can see when audit logging was disabled.
     """

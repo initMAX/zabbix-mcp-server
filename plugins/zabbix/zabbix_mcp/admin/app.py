@@ -419,7 +419,7 @@ class AdminApp:
             _audit_cfg = self.config.audit
             _aw.configure(
                 enabled=_audit_cfg.enabled,
-                log_system_actions=_audit_cfg.log_system_actions,
+                log_background_events=_audit_cfg.log_background_events,
                 housekeeping_enabled=_audit_cfg.housekeeping_enabled,
                 retention_seconds=_audit_cfg.data_storage_period_seconds,
                 max_file_size_bytes=_audit_cfg.max_file_size_bytes,

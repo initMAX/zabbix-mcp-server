@@ -304,7 +304,7 @@ same defaults, same Reset defaults semantics):
 | Field | What it does |
 |---|---|
 | `Enable audit logging` | Master toggle. Off -> no rows are written to either audit.log or client-audit.log; the in-memory ring buffer for `audit_self_get` also stops accepting pushes. The toggle change itself is always recorded (action `audit.toggle`). Disabling requires typing `DISABLE` in a confirmation field. |
-| `Log system actions` | Default off. When on, automated server events (`housekeeping.cycle`, `forwarder.queue_full`, `system.config_reload`, ...) also land in the audit log. Useful for forensics; off by default to keep the operator log focused on user-driven actions. |
+| `Log background server events` | Default on. When on, server-side events that happen without an operator action (`housekeeping.cycle`, `forwarder.queue_full`, `forwarder.reconnect`, `system.config_reload`, ...) also land in the audit log. Useful for forensics and to verify the housekeeping daemon is doing its job. Turn off when the operator log is noisy and you only want user-driven actions. |
 | `Enable internal housekeeping` | Default on. When on, the server itself does daily rotation + age-based purge. Disable when an external rsyslog / Fluentd / cron job manages rotation. |
 | `Data storage period` | Zabbix time period (`31d` default, `90d`, `1y`, `6h`, ...). Files older than this window are deleted by the housekeeping cycle. `0` disables time-based purge (size-based rotation still applies). |
 | `Max file size` (MB) | Per-file rotation threshold. When the live audit.log grows past this, it is archived under today's date and a new live file starts. Default 50 MB. |
@@ -329,7 +329,7 @@ When `housekeeping_enabled` is true, a background daemon runs every
    rotation backups are left alone.
 
 A summary line is emitted as a `housekeeping.cycle` audit event when
-`log_system_actions` is on so the operator can see the daemon working.
+`log_background_events` is on so the operator can see the daemon working.
 
 ## External SIEM / syslog forwarder
 
