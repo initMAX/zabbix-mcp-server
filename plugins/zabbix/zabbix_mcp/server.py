@@ -1493,6 +1493,52 @@ def _truncate_result(result: Any, *, max_chars: int = _RESPONSE_MAX_CHARS) -> st
     return _dumps(summary)
 
 
+def _emit_ext_tool_audit(
+    tool_name: str,
+    kwargs: dict,
+    policy: str,
+    reason: str | None = None,
+    count: int | str | None = None,
+) -> None:
+    """Emit a per-tool audit row for an extension tool (issue #49 Phase 1).
+
+    Wrapped Zabbix API methods route their audit through ``_make_tool_handler``;
+    extension tools (graph_render, host_status_get, anomaly_detect, ...)
+    have their own auth-check sites and need to emit the audit row
+    themselves. This helper centralises the contextvar lookups + extractor
+    call + audit_writer dispatch so each extension tool only adds a one-
+    line call at every exit point.
+
+    Calling at any exit (allow / deny / error) is sufficient; the helper
+    is best-effort and never raises.
+    """
+    try:
+        from zabbix_mcp.audit_extractors import extract as _audit_extract
+        from zabbix_mcp.admin.audit_writer import write_tool_audit
+        from zabbix_mcp.token_store import current_token_info, current_client_ip, current_session_id
+        target, filters = _audit_extract(tool_name, kwargs)
+        token = current_token_info.get()
+        subject = (
+            f"token:{getattr(token, 'name', '?')}"
+            if token is not None else "anonymous"
+        )
+        write_tool_audit(
+            oauth_subject=subject,
+            mapped_zabbix_user=None,
+            mcp_session_id=current_session_id.get(),
+            tool_name=tool_name,
+            scopes=list(getattr(token, "scopes", None) or []),
+            policy_decision=policy,
+            denial_reason=reason,
+            target=target,
+            filters=filters,
+            result_count=count,
+            ip=current_client_ip.get() or "",
+        )
+    except Exception:
+        logger.exception("Failed to emit ext-tool audit row for %s", tool_name)
+
+
 def _make_tool_handler(
     method_def: MethodDef,
     client_manager: ClientManager,
@@ -1506,11 +1552,53 @@ def _make_tool_handler(
 
     # Build the actual handler that does the work
     async def handler(**kwargs: Any) -> str:
+        # Capture audit context up-front so the per-tool audit row gets
+        # emitted regardless of which exit path the call takes (allow,
+        # deny_scope, deny_read_only, deny_token_invalid, ...). The
+        # extractor split is also done up-front so denial rows include
+        # the resource references the operator tried to touch.
+        from zabbix_mcp.audit_extractors import extract as _audit_extract
+        from zabbix_mcp.admin.audit_writer import write_tool_audit
+        from zabbix_mcp.token_store import current_token_info, current_client_ip, current_session_id
+        _audit_target, _audit_filters = _audit_extract(method_def.tool_name, kwargs)
+        _audit_token = current_token_info.get()
+        _audit_subject = (
+            f"token:{getattr(_audit_token, 'name', '?')}"
+            if _audit_token is not None else "anonymous"
+        )
+        _audit_scopes = list(getattr(_audit_token, "scopes", None) or [])
+        _audit_session = current_session_id.get()
+        _audit_ip = current_client_ip.get() or ""
+        _audit_emitted = False
+
+        def _emit(policy: str, reason: str | None, count: int | str | None) -> None:
+            nonlocal _audit_emitted
+            if _audit_emitted:
+                return
+            try:
+                write_tool_audit(
+                    oauth_subject=_audit_subject,
+                    mapped_zabbix_user=None,
+                    mcp_session_id=_audit_session,
+                    tool_name=method_def.tool_name,
+                    scopes=_audit_scopes,
+                    policy_decision=policy,
+                    denial_reason=reason,
+                    target=_audit_target,
+                    filters=_audit_filters,
+                    result_count=count,
+                    ip=_audit_ip,
+                )
+            except Exception:
+                logger.exception("Failed to emit tool audit row for %s", method_def.tool_name)
+            _audit_emitted = True
+
         # raw_json is a token-gated policy toggle - validate before doing
         # any Zabbix work so an unauthorized request fails fast.
         raw_json = bool(kwargs.pop("raw_json", False))
         _raw_err = _check_raw_json_allowed(raw_json)
         if _raw_err:
+            _emit("deny_scope", _raw_err, None)
             # MCP 2025-11-25 (SEP-1303): tool-level errors surface as
             # CallToolResult(isError=True), not JSON-RPC -32602. FastMCP
             # converts any exception raised inside the handler into that
@@ -1540,6 +1628,7 @@ def _make_tool_handler(
 
         server_name = kwargs.get("server") or client_manager.default_server
         if not server_name:
+            _emit("deny_server", "No Zabbix server configured", None)
             raise ToolError("No Zabbix server configured.")
 
         try:
@@ -1550,6 +1639,13 @@ def _make_tool_handler(
             _tool_prefix = method_def.tool_name.rsplit("_", 1)[0] if "_" in method_def.tool_name else method_def.tool_name
             _auth_err = check_token_authorization(server_name, tool_prefix=_tool_prefix, tool_name=method_def.tool_name, is_write=not method_def.read_only)
             if _auth_err:
+                # Classify deny_scope vs deny_read_only vs deny_server.
+                if "is read-only" in _auth_err:
+                    _emit("deny_read_only", _auth_err, None)
+                elif "not authorized for server" in _auth_err:
+                    _emit("deny_server", _auth_err, None)
+                else:
+                    _emit("deny_scope", _auth_err, None)
                 raise ToolError(_auth_err)
 
             if not method_def.read_only:
@@ -1588,15 +1684,28 @@ def _make_tool_handler(
                     _filter_active_problems, result, client_manager, server_name,
                 )
                 result = kept
+            # Bucket the result count so the audit row stays compact:
+            # 0 / 1 / N  - matching the issue #49 spec.
+            if isinstance(result, list):
+                _result_count = "N" if len(result) > 1 else len(result)
+            elif result is None:
+                _result_count = 0
+            else:
+                _result_count = 1
+            _emit("allow", None, _result_count)
             return _format_result(_truncate_result(result, max_chars=response_max_chars), raw_json)
 
         except ToolError:
             # Already shaped for the LLM - let FastMCP mark isError=True.
+            # The audit row was emitted at the deny site above; nothing
+            # more to log here.
             raise
         except (ReadOnlyError, RateLimitError, ValueError) as e:
+            _emit("deny_read_only" if isinstance(e, ReadOnlyError) else "deny_other", str(e), None)
             raise ToolError(str(e))
         except Exception:
             logger.exception("Error calling %s on server '%s'", method_def.api_method, server_name)
+            _emit("error", "API call failed", None)
             raise ToolError(
                 f"API call failed for {method_def.api_method}. Check server logs for details."
             )
@@ -1872,6 +1981,7 @@ def _register_tools(
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="graph", tool_name="graph_render")
         if _auth_err:
+            _emit_ext_tool_audit("graph_render", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             graph_render, client_manager, srv,
@@ -1904,6 +2014,7 @@ def _register_tools(
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="anomaly_detect")
         if _auth_err:
+            _emit_ext_tool_audit("anomaly_detect", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             anomaly_detect, client_manager, srv,
@@ -1936,6 +2047,7 @@ def _register_tools(
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="capacity_forecast")
         if _auth_err:
+            _emit_ext_tool_audit("capacity_forecast", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             capacity_forecast, client_manager, srv,
@@ -1985,6 +2097,7 @@ def _register_tools(
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="item", tool_name="item_threshold_search")
         if _auth_err:
+            _emit_ext_tool_audit("item_threshold_search", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             item_threshold_search, client_manager, srv,
@@ -2040,6 +2153,7 @@ def _register_tools(
         srv = client_manager.resolve_server(server or client_manager.default_server)
         _auth_err = check_token_authorization(srv, tool_prefix="problem", tool_name="problem_active_get")
         if _auth_err:
+            _emit_ext_tool_audit("problem_active_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             problem_active_get, client_manager, srv,
@@ -2078,6 +2192,7 @@ def _register_tools(
             "host", "hostinterface", "problem", "trigger", "item",
         ])
         if _auth_err:
+            _emit_ext_tool_audit("host_status_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             host_status_get, client_manager, srv,
@@ -2109,6 +2224,7 @@ def _register_tools(
             "hostgroup", "host", "problem", "trigger",
         ])
         if _auth_err:
+            _emit_ext_tool_audit("hostgroup_overview_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             hostgroup_overview_get, client_manager, srv,
@@ -2140,6 +2256,7 @@ def _register_tools(
             "host", "hostgroup", "item", "trigger", "template", "problem",
         ])
         if _auth_err:
+            _emit_ext_tool_audit("infrastructure_summary_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             infrastructure_summary_get, client_manager, srv, top_n=top_n,
@@ -2172,6 +2289,7 @@ def _register_tools(
             "item", "history", "host",
         ])
         if _auth_err:
+            _emit_ext_tool_audit("item_history_summary_get", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
             item_history_summary_get, client_manager, srv,
@@ -2218,6 +2336,7 @@ def _register_tools(
                 srv = client_manager.resolve_server(server or client_manager.default_server)
                 _auth_err = check_token_authorization(srv, tool_prefix="host", tool_name="report_generate")
                 if _auth_err:
+                    _emit_ext_tool_audit("report_generate", locals(), "deny_scope", _auth_err, None)
                     raise ToolError(_auth_err)
 
                 valid_types = tuple(_REPORT_TEMPLATES.keys())
@@ -2341,6 +2460,7 @@ def _register_tools(
         _prefix = action.split(".")[0].lower() if "." in action else ""
         _auth_err = check_token_authorization(srv, tool_prefix=_prefix, tool_name="action_confirm", is_write=True)
         if _auth_err:
+            _emit_ext_tool_audit("action_confirm", locals(), "deny_scope", _auth_err, None)
             raise ToolError(_auth_err)
 
         try:
@@ -2684,6 +2804,8 @@ def run_server(
                 auth_code_ttl_seconds=config.oauth.auth_code_ttl_seconds,
                 access_token_ttl_seconds=config.oauth.access_token_ttl_seconds,
                 refresh_token_ttl_seconds=config.oauth.refresh_token_ttl_seconds,
+                dcr_profile=config.oauth.dcr_profile,
+                dcr_conservative_access_ttl_seconds=config.oauth.dcr_conservative_access_ttl_seconds,
             )
             auth_kwargs["auth_server_provider"] = oauth_provider
             auth_kwargs["auth"] = AuthSettings(
@@ -3104,13 +3226,18 @@ def run_server(
             # honor the first entry of X-Forwarded-For (the original client);
             # otherwise the raw TCP peer is used so an untrusted client
             # cannot impersonate an arbitrary IP via XFF.
-            from zabbix_mcp.token_store import current_client_ip as _cip_var, current_token_info as _cti_var
+            from zabbix_mcp.token_store import (
+                current_client_ip as _cip_var,
+                current_token_info as _cti_var,
+                current_session_id as _csid_var,
+            )
             _inner_app = asgi_app
             _trusted_proxies = set(config.server.trusted_proxies or [])
 
             async def _client_ip_middleware(scope, receive, send):
                 _cti_var.set(None)
                 peer = None
+                session_id = None
                 if scope["type"] in ("http", "websocket"):
                     client = scope.get("client")
                     if client:
@@ -3122,12 +3249,26 @@ def run_server(
                                 first = xff.split(",")[0].strip()
                                 if first:
                                     peer = first
+                    # Capture MCP session ID (streamable-HTTP framing) so
+                    # the per-tool audit log (issue #49 Phase 1) can
+                    # correlate every tool.invoke row with one OAuth
+                    # session. Header name is case-insensitive per ASGI
+                    # spec; the MCP transport sends ``mcp-session-id``.
+                    headers = dict(scope.get("headers", []))
+                    sid_bytes = headers.get(b"mcp-session-id") or headers.get(b"Mcp-Session-Id")
+                    if sid_bytes:
+                        try:
+                            session_id = sid_bytes.decode().strip() or None
+                        except Exception:
+                            session_id = None
                 _cip_var.set(peer)
+                _csid_var.set(session_id)
                 try:
                     await _inner_app(scope, receive, send)
                 finally:
                     _cti_var.set(None)
                     _cip_var.set(None)
+                    _csid_var.set(None)
             asgi_app = _client_ip_middleware
 
             # Apply IP allowlist middleware if configured

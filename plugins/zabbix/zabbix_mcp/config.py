@@ -192,6 +192,24 @@ class OAuthConfig:
     auth_code_ttl_seconds: int = 600         # 10 min  (OAuth 2.1 §4.1.3)
     access_token_ttl_seconds: int = 3600     # 1 hour
     refresh_token_ttl_seconds: int = 30 * 24 * 3600  # 30 days, rotated
+    # DCR profile (issue #49 Track B). ``conservative`` is the v1.31
+    # default - a freshly-registered client gets a tighter posture out
+    # of the box: refuse wildcard / pattern redirect URIs at /register
+    # (only string-equal matches at /authorize), refuse ``scope=*`` in
+    # the registration request (a client must enumerate the groups it
+    # wants; wildcard can still be granted by the operator at consent),
+    # and apply a 1800-second access-token TTL ceiling instead of the
+    # global default. ``permissive`` is the legacy v1.30 behaviour and
+    # exists so an operator running a niche internal client that
+    # genuinely needs wildcards can opt back in. Per-client overrides
+    # in ``[oauth_clients.<id>]`` always win over the profile default.
+    dcr_profile: str = "conservative"
+    # Override applied at /register when ``dcr_profile == 'conservative'``
+    # if no explicit per-client TTL is set. 30 minutes is short enough
+    # to limit the blast radius of a leaked access token while staying
+    # comfortable for an interactive AI session that triggers the
+    # rotate-via-refresh path on a slow tool call.
+    dcr_conservative_access_ttl_seconds: int = 1800
 
 
 @dataclass(frozen=True)
@@ -375,6 +393,18 @@ def _validate_tool_prefix(value: object) -> str:
             f"Example: tool_prefix = \"zabbix\""
         )
     return s
+
+
+def _validate_dcr_profile(value: object) -> str:
+    """Coerce / validate ``[oauth].dcr_profile``. Default ``conservative``."""
+    if value is None or value == "":
+        return "conservative"
+    s = str(value).strip().lower()
+    if s in ("conservative", "permissive"):
+        return s
+    raise ConfigError(
+        f"[oauth].dcr_profile must be 'conservative' or 'permissive', got {value!r}"
+    )
 
 
 def _validate_public_url(value: str, tls_cert_file: object) -> str:
@@ -666,6 +696,8 @@ def load_config(path: str | Path) -> AppConfig:
         auth_code_ttl_seconds=int(oauth_raw.get("auth_code_ttl_seconds", 600) or 600),
         access_token_ttl_seconds=int(oauth_raw.get("access_token_ttl_seconds", 3600) or 3600),
         refresh_token_ttl_seconds=int(oauth_raw.get("refresh_token_ttl_seconds", 30 * 24 * 3600) or 30 * 24 * 3600),
+        dcr_profile=_validate_dcr_profile(oauth_raw.get("dcr_profile", "conservative")),
+        dcr_conservative_access_ttl_seconds=int(oauth_raw.get("dcr_conservative_access_ttl_seconds", 1800) or 1800),
     )
 
     # Optional [plugins.<id>] blocks - the contract is locked in v1.31

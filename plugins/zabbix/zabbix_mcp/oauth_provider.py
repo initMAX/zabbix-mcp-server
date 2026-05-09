@@ -71,6 +71,7 @@ from mcp.server.auth.provider import (
     AuthorizationParams,
     OAuthAuthorizationServerProvider,
     RefreshToken,
+    RegistrationError,
     TokenError,
     construct_redirect_uri,
 )
@@ -180,6 +181,8 @@ class ZmcpOAuthProvider:
         auth_code_ttl_seconds: int = _AUTH_CODE_TTL_SECONDS,
         access_token_ttl_seconds: int = _ACCESS_TOKEN_TTL_SECONDS,
         refresh_token_ttl_seconds: int = _REFRESH_TOKEN_TTL_SECONDS,
+        dcr_profile: str = "conservative",
+        dcr_conservative_access_ttl_seconds: int = 1800,
     ) -> None:
         self._public_url = public_url.rstrip("/")
         self._token_store = token_store
@@ -188,6 +191,9 @@ class ZmcpOAuthProvider:
         self._auth_code_ttl = max(60, int(auth_code_ttl_seconds))
         self._access_token_ttl = max(60, int(access_token_ttl_seconds))
         self._refresh_token_ttl = max(self._access_token_ttl, int(refresh_token_ttl_seconds))
+        # Issue #49 Track B - DCR conservative profile.
+        self._dcr_profile = str(dcr_profile or "conservative").lower()
+        self._dcr_conservative_access_ttl = max(60, int(dcr_conservative_access_ttl_seconds))
 
         # client_id -> OAuthClientInformationFull
         self._clients: dict[str, OAuthClientInformationFull] = {}
@@ -306,6 +312,41 @@ class ZmcpOAuthProvider:
         return self._clients.get(client_id)
 
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
+        # Issue #49 Track B: conservative DCR profile enforcement. When
+        # the operator left ``[oauth].dcr_profile = "conservative"``
+        # (default), refuse a registration that asks for shapes that
+        # are easy to abuse:
+        #   - wildcard / pattern redirect URIs (only string-equal
+        #     match is honoured at /authorize, but rejecting at
+        #     registration gives a clearer error)
+        #   - ``scope = "*"`` in the registration request (the
+        #     wildcard can still be granted by the operator at
+        #     consent, just not auto-granted at registration)
+        # The opt-in legacy ``permissive`` profile skips these
+        # checks for back-compat with v1.30 dynamic clients.
+        if getattr(self, "_dcr_profile", "conservative") == "conservative":
+            for uri in (client_info.redirect_uris or []):
+                u = str(uri)
+                if "*" in u or "?" in u:
+                    raise RegistrationError(
+                        error="invalid_redirect_uri",
+                        error_description=(
+                            f"Wildcard / pattern redirect URIs are refused under "
+                            f"the conservative DCR profile. Submit one or more "
+                            f"exact-match URIs instead. Got: {u!r}"
+                        ),
+                    )
+            if client_info.scope and "*" in str(client_info.scope).split():
+                raise RegistrationError(
+                    error="invalid_client_metadata",
+                    error_description=(
+                        "Wildcard scope ('*') cannot be requested at /register "
+                        "under the conservative DCR profile. Enumerate the tool "
+                        "groups the client needs (e.g. 'monitoring alerts'); a "
+                        "wildcard can still be granted by the operator at the "
+                        "consent screen."
+                    ),
+                )
         # Mint client_id if the client did not pre-supply one (RFC 7591 §3.2.1).
         if not client_info.client_id:
             client_info.client_id = _new_secret(16)

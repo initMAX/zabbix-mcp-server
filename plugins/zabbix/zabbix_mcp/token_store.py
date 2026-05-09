@@ -40,6 +40,10 @@ logger = logging.getLogger("zabbix_mcp.token_store")
 current_token_info: contextvars.ContextVar[Any] = contextvars.ContextVar("current_token_info", default=None)
 # Context variable to hold client IP for token IP allowlist checks
 current_client_ip: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_client_ip", default=None)
+# Context variable to hold the MCP-Session-Id from streamable-HTTP framing,
+# captured by the request middleware so the tool-level audit log can
+# correlate per-call rows with one OAuth session (issue #49 Phase 1).
+current_session_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_session_id", default=None)
 
 
 # Single source of truth for the v1.31 scope parser - shared with
