@@ -343,7 +343,10 @@ a:hover {
     transform: rotate(90deg);
 }
 
-/* Children list - hidden when collapsed, revealed when .is-open. */
+/* Children list - hidden when collapsed, revealed when .is-open.
+   When open, paint a slightly darker inset and a thin left accent
+   so the operator sees these rows as a sub-section of the parent
+   module rather than top-level nav. */
 .nav-module-children {
     list-style: none;
     padding: 0;
@@ -354,16 +357,30 @@ a:hover {
 }
 .nav-module.is-open .nav-module-children {
     max-height: 400px;
+    background: rgba(0, 0, 0, 0.20);
+    border-left: 2px solid rgba(99, 102, 241, 0.45);
+    margin-left: 24px;
+    padding: 4px 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
 }
 
 /* Sub-items under a module - indented, smaller font, no own icon
-   (parent already shows the module's icon). */
+   (parent already shows the module's icon). The parent .nav-module-
+   children already provides the indent + accent, so the sub-item
+   only needs a tighter padding-left to compensate. */
 .nav-sub-item {
-    padding-left: 50px;
+    padding-left: 28px;
     font-size: 0.86rem;
     color: #94a3b8;
 }
 .nav-sub-item:hover {
+    color: #f1f5f9;
+    background: rgba(99, 102, 241, 0.10);
+}
+.nav-sub-item.active {
+    background: rgba(99, 102, 241, 0.18);
     color: #f1f5f9;
 }
 
