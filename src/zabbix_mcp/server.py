@@ -2753,11 +2753,16 @@ def run_server(
         host=host,
         port=port,
         instructions=(
-            "initMAX MCP Server provides full access to the Zabbix monitoring API. "
-            "Use the tools to query hosts, problems, triggers, items, and all other "
-            "Zabbix objects. Most 'get' tools support filtering via 'filter', 'search', "
-            "and 'limit' parameters. Write operations (create/update/delete) are only "
-            "allowed on servers not configured as read_only."
+            "initMAX MCP Server is a plugin-based MCP host. By default it ships with "
+            "the Zabbix integration enabled and exposes the full Zabbix monitoring "
+            "API: use the tools to query hosts, problems, triggers, items, and all "
+            "other Zabbix objects. Most 'get' tools support filtering via 'filter', "
+            "'search', and 'limit' parameters. Write operations (create/update/delete) "
+            "are only allowed on servers not configured as read_only. The server can "
+            "be extended with additional MCP integrations (iDoklad, WordPress, "
+            "FastSpring, ...) installed as plugins from the initmax-mcp catalog, in "
+            "which case more tools appear alongside the Zabbix ones with their own "
+            "per-plugin prefix (e.g. idoklad__invoice_create, wordpress__post_update)."
         ),
         website_url="https://github.com/initMAX/zabbix-mcp-server",
         icons=_load_server_icons(),
