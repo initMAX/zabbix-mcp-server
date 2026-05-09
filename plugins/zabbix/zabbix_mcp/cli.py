@@ -32,9 +32,20 @@ logger = logging.getLogger("zabbix_mcp")
 
 
 def main() -> None:
+    # Subcommand routing for audit utilities (issue #49 acceptance
+    # criterion). Detected before argparse so existing 'serve'-style
+    # invocations (--config X) still work without a leading subcommand.
+    if len(sys.argv) > 1 and sys.argv[1] == "audit":
+        from zabbix_mcp.cli_audit import main as audit_main
+        sys.exit(audit_main(sys.argv[2:]))
+
     parser = argparse.ArgumentParser(
         prog="zabbix-mcp-server",
-        description="MCP server for the complete Zabbix API",
+        description=(
+            "MCP server for the complete Zabbix API. "
+            "Run with --config to start the server. "
+            "Use 'zabbix-mcp-server audit --help' for the audit log utilities."
+        ),
     )
     parser.add_argument(
         "--config",
