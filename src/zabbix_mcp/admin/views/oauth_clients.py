@@ -252,7 +252,7 @@ async def oauth_client_scope_update(request: Request) -> Response:
 
     write_audit(
         action="oauth_client.scope_update",
-        user=session.username,
+        user=session.user,
         target_type="oauth_client",
         target_id=client_id,
         details={"new_scope": " ".join(scopes)},
@@ -384,7 +384,7 @@ async def oauth_client_settings_update(request: Request) -> Response:
 
     write_audit(
         action="oauth_client.settings_update",
-        user=session.username,
+        user=session.user,
         target_type="oauth_client",
         target_id=client_id,
         details={
@@ -511,7 +511,7 @@ async def oauth_enable(request: Request) -> Response:
 
     write_audit(
         "oauth.enable",
-        user=session.username,
+        user=session.user,
         details={"public_url": public_url, "dynamic_registration_enabled": dynamic_reg},
         ip=request.client.host if request.client else "unknown",
     )
@@ -583,7 +583,7 @@ async def oauth_client_revoke(request: Request) -> Response:
 
     write_audit(
         action="oauth_client.revoke",
-        user=session.username,
+        user=session.user,
         target_type="oauth_client",
         target_id=client_id,
         details={"access_tokens": revoked_at, "refresh_tokens": revoked_rt},
