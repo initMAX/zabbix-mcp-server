@@ -431,7 +431,7 @@
                     <div class="form-hint" style="margin: 6px 0 8px 0;">
                         Audit logging is required by most compliance frameworks. Type <code>DISABLE</code> below to confirm.
                     </div>
-                    <input type="text" name="disable_confirm" placeholder="Type DISABLE to confirm" autocomplete="off" style="text-transform: uppercase;">
+                    <input type="text" name="disable_confirm" class="form-input" placeholder="Type DISABLE to confirm" autocomplete="off" style="text-transform: uppercase;">
                 </div>
             </div>
         </div>
@@ -475,9 +475,9 @@
                 <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix-style time period: 31d / 90d / 1y / 6h. Files older than this window are deleted by housekeeping. 0 disables time-based purge (size-based rotation still applies).">&#x1F6C8;</span>
             </div>
             <div>
-                <input type="text" name="data_storage_period"
+                <input type="text" name="data_storage_period" class="form-input"
                        value="{{ settings.audit_data_storage_period | default('31d') }}"
-                       size="10" placeholder="31d" pattern="^\d+[smhdwMy]?$" required>
+                       placeholder="31d" pattern="^\d+[smhdwMy]?$" required>
                 <div class="form-hint">Default <code>31d</code>. Use Zabbix time-period syntax: <code>s</code>/<code>m</code>/<code>h</code>/<code>d</code>/<code>w</code>/<code>M</code>/<code>y</code>. Set <code>0</code> to keep all archives indefinitely.</div>
             </div>
         </div>
@@ -610,9 +610,9 @@ function resetAuditDefaults() {
                 <span class="tooltip-icon" tabindex="0" data-tooltip="DNS name or IP of the SIEM / syslog endpoint. Examples: siem.corp.local, splunk-hf.internal, 10.0.0.5.">&#x1F6C8;</span>
             </div>
             <div>
-                <input type="text" name="host"
+                <input type="text" name="host" class="form-input"
                        value="{{ settings.audit_forward_host | default('') }}"
-                       placeholder="siem.corp.local" size="40">
+                       placeholder="siem.corp.local">
                 <div class="form-hint">Required when forwarding is enabled. Resolved fresh on every reconnect.</div>
             </div>
         </div>
@@ -666,9 +666,9 @@ function resetAuditDefaults() {
                 <span class="tooltip-icon" tabindex="0" data-tooltip="Optional path to a PEM trust bundle for validating the SIEM's TLS certificate. Empty = use the system CA store. Only honoured when the protocol is *_tls.">&#x1F6C8;</span>
             </div>
             <div>
-                <input type="text" name="ca_cert"
+                <input type="text" name="ca_cert" class="form-input"
                        value="{{ settings.audit_forward_ca_cert | default('') }}"
-                       placeholder="/etc/zabbix-mcp/tls/siem-ca.pem" size="50">
+                       placeholder="/etc/zabbix-mcp/tls/siem-ca.pem">
                 <div class="form-hint">Leave empty to use the system trust store (<code>ssl.create_default_context()</code>). Required when the SIEM uses a private CA.</div>
             </div>
         </div>
