@@ -361,7 +361,11 @@ a:hover {
     background: rgba(0, 0, 0, 0.20);
     border-top: 1px solid rgba(99, 102, 241, 0.25);
     border-bottom: 1px solid rgba(99, 102, 241, 0.25);
-    padding: 4px 0;
+    /* No vertical padding - the sub-item padding (9px top/bottom) is
+       what the operator hovers over, so any container-level padding
+       leaves an unhoverable strip at the top + bottom that breaks the
+       full-row highlight. */
+    padding: 0;
 }
 .nav-module-children li {
     display: block;
