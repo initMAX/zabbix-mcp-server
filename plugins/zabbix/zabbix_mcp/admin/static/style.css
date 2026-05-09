@@ -344,9 +344,10 @@ a:hover {
 }
 
 /* Children list - hidden when collapsed, revealed when .is-open.
-   When open, paint a slightly darker inset and a thin left accent
+   When open, paint a darker inset across the full sidebar width
    so the operator sees these rows as a sub-section of the parent
-   module rather than top-level nav. */
+   module rather than top-level nav. The accent border sits on the
+   container so the entire sub-section reads as one nested block. */
 .nav-module-children {
     list-style: none;
     padding: 0;
@@ -358,30 +359,37 @@ a:hover {
 .nav-module.is-open .nav-module-children {
     max-height: 400px;
     background: rgba(0, 0, 0, 0.20);
-    border-left: 2px solid rgba(99, 102, 241, 0.45);
-    margin-left: 24px;
+    border-top: 1px solid rgba(99, 102, 241, 0.25);
+    border-bottom: 1px solid rgba(99, 102, 241, 0.25);
     padding: 4px 0;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: var(--radius-md);
-    border-bottom-right-radius: var(--radius-md);
+}
+.nav-module-children li {
+    display: block;
+    margin: 0;
 }
 
-/* Sub-items under a module - indented, smaller font, no own icon
-   (parent already shows the module's icon). The parent .nav-module-
-   children already provides the indent + accent, so the sub-item
-   only needs a tighter padding-left to compensate. */
+/* Sub-items under a module - deep indent (no own icon, parent shows
+   it), smaller font. Hover / active states paint the FULL row width
+   so a click target lights up cleanly when the operator passes over
+   it. */
 .nav-sub-item {
-    padding-left: 28px;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 9px 20px 9px 52px;
     font-size: 0.86rem;
     color: #94a3b8;
+    border-left: 3px solid transparent;
 }
 .nav-sub-item:hover {
     color: #f1f5f9;
-    background: rgba(99, 102, 241, 0.10);
+    background: rgba(99, 102, 241, 0.18);
 }
 .nav-sub-item.active {
-    background: rgba(99, 102, 241, 0.18);
+    background: rgba(99, 102, 241, 0.25);
     color: #f1f5f9;
+    border-left-color: rgba(99, 102, 241, 0.85);
 }
 
 .sidebar-footer {
