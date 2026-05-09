@@ -55,10 +55,12 @@
                 <td><code>v{{ version }}</code></td>
                 <td><span class="badge badge-success">Enabled</span></td>
                 <td>
-                    <a href="/servers" class="btn btn-sm btn-secondary">Configure servers</a>
-                    <a href="/templates" class="btn btn-sm btn-secondary">Templates</a>
-                    <button type="button" class="btn btn-sm btn-danger" disabled
-                            title="Disable / uninstall is coming soon - the plugin loader is in development. Today the Zabbix module is bundled and required.">Disable</button>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <a href="/servers" class="btn btn-sm btn-ghost">Configure servers</a>
+                        <a href="/templates" class="btn btn-sm btn-ghost">Templates</a>
+                        <button type="button" class="btn btn-sm btn-ghost" disabled
+                                title="Disable / uninstall is coming soon - the plugin loader is in development. Today the Zabbix module is bundled and required.">Disable</button>
+                    </div>
                 </td>
             </tr>
         </tbody>
