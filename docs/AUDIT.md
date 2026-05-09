@@ -1,0 +1,309 @@
+# Audit log
+
+The Zabbix MCP server writes two audit streams: an operator-facing log
+and a redacted client-facing log. Both are JSON Lines files. This
+document is the contract for the schema, redaction rules, and the
+sensitive-key denylist.
+
+The audit log is **the** evidence trail for incident review - it
+answers "who called what, with what scope, what happened, and what
+came back". Every tool invocation, every OAuth event, every admin
+portal action lands in `audit.log`. This is issue [#49](https://github.com/initMAX/zabbix-mcp-server/issues/49)
+hardening territory.
+
+## File layout
+
+```
+/var/log/zabbix-mcp/
+├── audit.log              # operator stream (full context)
+├── audit.log.1            # rotated backup (50 MB threshold)
+├── audit.log.2            # second rotation generation
+├── client-audit.log       # redacted client stream
+├── client-audit.log.1
+└── client-audit.log.2
+```
+
+Both files are JSON Lines. Each line is a single complete JSON
+object. Append-only writes; rotation is triggered at 50 MB and
+preserves the last two rotations (`.1`, `.2`).
+
+## Operator stream (`audit.log`)
+
+Every line is one of two row types: an **admin/OAuth event** or a
+**tool invocation**. The schema differs slightly by row type because
+admin events carry `target_type` / `target_id` while tool invocations
+carry `oauth_subject` / `mapped_zabbix_user` etc.
+
+### Tool invocation row (issue #49 Phase 1)
+
+```json
+{
+  "timestamp": "2026-05-09 21:43:17",
+  "action": "tool.invoke",
+  "oauth_subject": "token:CI Pipeline",
+  "mapped_zabbix_user": "Admin",
+  "mcp_session_id": "f4f1d6e2-2b8c-...",
+  "tool_name": "host_get",
+  "scopes": ["plugin:zabbix.read"],
+  "policy_decision": "allow",
+  "denial_reason": null,
+  "target": {"hostids": ["10084"]},
+  "filters": {"output": "extend"},
+  "result_count": 1,
+  "ip": "192.168.10.42"
+}
+```
+
+Fields:
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | Server-clock UTC, `YYYY-MM-DD HH:MM:SS`. |
+| `action` | Always `"tool.invoke"` for tool rows. |
+| `oauth_subject` | `token:<name>` for legacy bearer tokens, `oauth:<client_id>:<user>` for OAuth-bound calls, `anonymous` when no token in context. |
+| `mapped_zabbix_user` | Operator-set Zabbix user (`[tokens.<id>] zbx_user = "Admin"`). `null` when not configured. Lets a reviewer correlate with the Zabbix-side auditlog. |
+| `mcp_session_id` | MCP streamable-HTTP session id (from `mcp-session-id` header). Correlates a sequence of calls inside one client session. |
+| `tool_name` | Canonical tool name (e.g. `host_get`, `problem_active_get`, `zabbix_raw_api_call`). The `[server].tool_prefix` is stripped before logging. |
+| `scopes` | Granted scopes from the bearer token (`["plugin:zabbix.read"]`, `["monitoring", "alerts"]`, `["*"]`, ...). |
+| `policy_decision` | One of `allow`, `deny_scope`, `deny_read_only`, `deny_token_invalid`, `deny_token_expired`, `deny_server`, `deny_ip`, `deny_other`, `error`. |
+| `denial_reason` | Operator-readable cause when `policy_decision != "allow"`. `null` on allow. |
+| `target` | Bounded resource references the call targeted: `hostid`, `hostids`, `groupid`, `itemid`, `triggerid`, `eventid`, ... See [Bounded `target` keys](#bounded-target-keys). |
+| `filters` | Bounded filter flags: `severities`, `monitored`, `active_only`, `recent`, `output`, `limit`, `period`, ... See [Bounded `filters` keys](#bounded-filters-keys). |
+| `result_count` | `0`, `1`, or `"N"` for >1 (numeric for the small cases, string `"N"` for many). `null` on deny + when the cardinality cannot be inferred. |
+| `ip` | Client IP captured by the ASGI middleware (respects `[server].trusted_proxies` for `X-Forwarded-For`). |
+
+### Admin / OAuth event row
+
+```json
+{
+  "timestamp": "2026-05-09 21:42:01",
+  "action": "consent_granted",
+  "user": "admin",
+  "target_type": "oauth_client",
+  "target_id": "f4f1...",
+  "details": {
+    "scope": "plugin:zabbix.read",
+    "redirect_uri": "https://chatgpt.com/aip/g-...",
+    "client_id_short": "f4f1"
+  },
+  "ip": "192.168.10.42"
+}
+```
+
+Action types include `login_success`, `login_failed`, `logout`,
+`token_create`, `token_revoke`, `oauth_client.revoke`, `consent_granted`,
+`token_family_revoked`, `settings_change`, `server_create`, plus more
+- see [`audit_writer.py`](../plugins/zabbix/zabbix_mcp/admin/audit_writer.py)
+call sites.
+
+The `details` payload routes through the redactor (see
+[Redaction rules](#redaction-rules)) so credentials never land here.
+
+## Client stream (`client-audit.log`)
+
+A redacted-twice copy of every `tool.invoke` row. The client stream
+exists so an operator can hand the file to the connected AI client
+(Claude Desktop, ChatGPT, an automation script) for self-review
+without exposing operator-internal details (full denial reasons,
+bound IP, mapped Zabbix user).
+
+```json
+{
+  "timestamp": "2026-05-09 21:43:17",
+  "tool": "host_get",
+  "decision": "allow",
+  "denial_bucket": null,
+  "result_count": 1,
+  "target": {"hostids": ["10084"]}
+}
+```
+
+Fields:
+
+| Field | Meaning |
+|---|---|
+| `timestamp` | Same as operator row. |
+| `tool` | Canonical tool name. |
+| `decision` | Same as `policy_decision` on operator row. |
+| `denial_bucket` | High-level category - `scope`, `read_only`, `auth`, `server`, `other` - or `null` on allow. **Does not** carry the operator-readable `denial_reason`. |
+| `result_count` | Same bucketing as operator row. |
+| `target` | Same bounded resource references as operator row. |
+
+The client stream **deliberately omits**: `oauth_subject`,
+`mapped_zabbix_user`, `mcp_session_id`, full `denial_reason`,
+`scopes`, `ip`, `filters`. Those are operator-side context.
+
+## In-memory ring buffer (`audit_self_get` tool)
+
+In addition to the file logs, the server keeps a per-subject
+in-memory ring buffer of the last 100 client-audit rows. The
+`audit_self_get` MCP tool reads from this buffer so a client can
+fetch its own recent activity without the operator handing over the
+file.
+
+- Bounded at 100 entries per subject.
+- Reset on server restart (no persistence).
+- Cross-client isolation enforced by subject key - each token sees
+  only its own ring.
+- Returns newest-first.
+
+A client asking for longer history asks the operator to share
+`client-audit.log` directly.
+
+## Bounded `target` keys
+
+Per issue #49 reviewer feedback (@musaabhasan): every audit row
+schema is **fixed and bounded**. The `target` object only ever
+carries resource references that are non-sensitive Zabbix object
+handles. Anything else (passwords, user macros, command arguments,
+custom inventory) is dropped at the extractor before the row is
+emitted - even on a denied request.
+
+Recognised target keys (from [`audit_extractors.py`](../plugins/zabbix/zabbix_mcp/audit_extractors.py)):
+
+```
+hostid, hostids, host, groupids, groupid, templateids, templateid,
+hostinterfaceid, hostinterfaceids, interfaceid, interfaceids,
+itemid, itemids, triggerid, triggerids, graphid, graphids,
+discoveryruleid, discoveryruleids, ruleid, ruleids,
+itemprototypeid, triggerprototypeid, graphprototypeid, hostprototypeid,
+eventid, eventids, problemid, problemids, actionid, actionids,
+userid, userids, roleid, usrgrpid, usrgrpids,
+user_tokenid, tokenid, tokenids, mfaid,
+sysmapid, sysmapids, dashboardid, dashboardids, templatedashboardid,
+templategroupid, templategroupids,
+maintenanceid, maintenanceids, proxyid, proxyids, proxygroupid,
+scriptid, scriptids, mediatypeid, mediatypeids,
+iconmapid, imageid, regexpid, valuemapid,
+connectorid, correlationid, slaid,
+reportid, reportids,
+server
+```
+
+For `zabbix_raw_api_call`, the API method name is surfaced as
+`api_method` so a grep can answer "who called `host.create` via the
+raw escape hatch?".
+
+## Bounded `filters` keys
+
+```
+severities, severity, status, active_only, monitored, recent,
+filter, search, searchByAny, searchWildcardsEnabled,
+limit, countOutput, output, sortField, sortOrder,
+period, time_from, time_till, history, trends,
+with_items, with_triggers, with_graphs, with_httptests
+```
+
+These describe **what the caller asked for**, not what they sent.
+Severity floors, time windows, status flags, search patterns - all
+non-secret, all review-relevant.
+
+## Redaction rules
+
+Every audit-bound payload routes through [`audit_redactor.py`](../plugins/zabbix/zabbix_mcp/admin/audit_redactor.py)
+at the `write_audit` / `write_tool_audit` boundary. Adding a new
+sensitive field type is one edit there, not a sweep through call
+sites.
+
+Three layers:
+
+1. **Key denylist** (case-insensitive, substring match). Replaces the
+   value with `[REDACTED]`. Drops:
+   - `password`, `passwd`, `secret`, `api_key`, `apikey`
+   - `code_verifier`, `verifier`, `pkce`
+   - `refresh_token`, `access_token`, `auth_token`, `raw_token`, `bearer`
+   - `private_key`, `privkey`, `frontend_password`
+   - `zbx_session`, `session_cookie`, `cookie`, `csrf`
+   - `mfa_code`, `totp`, `otp_code`, `totp_secret`
+   - `signature`, `nonce`
+   - `tls_psk`, `psk_identity`
+   - `snmp_community`, `community`
+   - `bind_password`, `smtp_password`, `smtp_secret`
+   - `webhook_secret`, `webhook_token`
+   - `connect_string`, `connection_string`, `dsn`
+
+2. **Hash-key allowlist**: a few keys legitimately carry SHA-256
+   digests, not raw secrets. Their values are kept but truncated to
+   the first 16 chars for correlation. Allowed: `token_hash`,
+   `password_hash`, `client_secret_hash`, `secret_hash`,
+   `oauth_token_hash`, `refresh_token_hash`.
+
+3. **Long-string truncation**: any string >512 chars is truncated
+   with `... [truncated, N more chars]`. Keeps the audit log
+   readable when an LLM accidentally pastes a large blob.
+
+The redactor is **defensive** - unknown keys pass through
+unchanged. The denylist is the only source of truth for what gets
+dropped, checked against case-insensitive substring of the lower-cased
+key name to catch typos and camelCase variants (`apiKey`, `API_KEY`,
+`api_key`).
+
+## Defence in depth: extractor + redactor
+
+The audit pipeline applies redaction at **two** boundaries:
+
+```
+tool kwargs
+    │
+    ▼
+audit_extractors.extract()      ◄── drops anything not in TARGET_KEYS / FILTER_KEYS
+    │   (target, filters)
+    ▼
+write_tool_audit()
+    │
+    ▼
+redact()                        ◄── second-pass denylist on what survived extraction
+    │
+    ▼
+operator audit row
+    │
+    ▼
+client_entry (re-built)
+    │
+    ▼
+redact()                        ◄── third-pass on the client-side row
+    │
+    ▼
+client audit row
+```
+
+This means a kwarg like `password` on a hypothetical `host_create`
+call gets dropped twice: once because it is not in the TARGET / FILTER
+key set (extractor), and once because the redactor's denylist would
+strip it even if it had been in the key set. Adding a new
+secret-bearing field name to the denylist takes a single edit and is
+defence-in-depth even if a future extractor change accidentally
+includes the key.
+
+## Negative-test contract
+
+Issue #49 ships with negative tests in [`tests/test_audit_negatives.py`](../tests/test_audit_negatives.py)
+covering the audit guarantees:
+
+1. **Scope deny gets logged.** A `monitoring`-scope token calling
+   `event_acknowledge` produces an audit row with
+   `policy_decision = "deny_scope"`.
+2. **Severity-bypass is recorded.** A call to raw `problem_get` with
+   `severities=[0,1]` is logged with `filters.severities = [0, 1]`
+   so the reviewer sees what was actually requested.
+3. **Expired tokens fail closed.** An expired bearer returns 401 with
+   `WWW-Authenticate: Bearer error="invalid_token"`; the audit row
+   carries `policy_decision = "deny_token_invalid"`.
+4. **Correlation key holds.** Two calls in the same MCP session share
+   the same `oauth_subject` and `mcp_session_id`.
+5. **Denied requests do not leak args.** A denied tool call's audit
+   row carries `target.<resource_id>` but **not** the raw kwargs -
+   the extractor drops everything not in TARGET / FILTER keys, and the
+   redactor's denylist provides defence-in-depth.
+
+## See also
+
+- [SECURITY.md](../SECURITY.md) for the broader threat model and
+  the OAuth + token-auth posture.
+- [OAUTH.md](OAUTH.md) for the OAuth 2.1 flow specifics.
+- [`audit_writer.py`](../plugins/zabbix/zabbix_mcp/admin/audit_writer.py)
+  + [`audit_redactor.py`](../plugins/zabbix/zabbix_mcp/admin/audit_redactor.py)
+  + [`audit_extractors.py`](../plugins/zabbix/zabbix_mcp/audit_extractors.py)
+  for the implementation.
+- [ROLES.md](ROLES.md) for who can read the audit log via the admin
+  portal.
