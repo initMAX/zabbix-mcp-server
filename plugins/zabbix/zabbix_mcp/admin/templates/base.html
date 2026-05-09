@@ -155,6 +155,15 @@
         </div>
         {% endif %}
 
+        {% if audit_disabled_banner %}
+        <div class="alert alert-danger" style="padding:12px 16px; margin-bottom:20px; border-radius:var(--radius-md); background:rgba(220,38,38,0.1); border:1px solid var(--color-danger, #c0392b); color:var(--color-danger, #c0392b); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <span>&#x1F6A8; <strong>Audit logging is disabled.</strong> Tool invocations and admin actions are not being recorded. Required by ISO 27001 / SOC 2 / NIS2 compliance frameworks.</span>
+            {% if current_user_role == 'admin' %}
+            <a href="/settings#audit" class="btn btn-danger btn-sm" style="white-space:nowrap;">Re-enable</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
         {% if public_url_missing %}
         <div class="alert alert-warning" style="padding:12px 16px; margin-bottom:20px; border-radius:var(--radius-md); background:rgba(245,158,11,0.1); border:1px solid var(--color-warning); color:var(--color-warning); display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
             <span style="flex:1;">

@@ -176,6 +176,59 @@ class _SecurityHeadersMiddleware:
         await self.app(scope, receive, _wrapped_send)
 
 
+class _AuditorRoleMiddleware:
+    """Restrict ``auditor`` role sessions to the audit log surface.
+
+    Separation of duties: the auditor role exists so a compliance / SOC
+    reviewer can read the audit log without seeing token prefixes,
+    OAuth client metadata, server configuration, or any other admin-
+    sensitive surface. Anyone logged in as ``auditor`` who navigates
+    to a non-audit page is bounced back to ``/audit`` (303).
+
+    Allowlist of paths the auditor may reach lives on
+    :class:`AdminApp` (``_AUDITOR_ALLOWED_PATH_PREFIXES``).
+    """
+
+    def __init__(self, app: Starlette) -> None:
+        self.app = app
+        self.state = app.state
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "") or ""
+        admin_app = getattr(self.state, "admin_app", None)
+        if admin_app is None:
+            await self.app(scope, receive, send)
+            return
+        # Cookie sniff so we do not pay the validate_session() cost on
+        # the unauthenticated path - the inner auth check below will
+        # redirect them to /login anyway.
+        headers = dict(scope.get("headers", []))
+        cookie = headers.get(b"cookie", b"").decode()
+        session_token = ""
+        for part in cookie.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "admin_session":
+                session_token = v
+                break
+        if not session_token:
+            await self.app(scope, receive, send)
+            return
+        session = admin_app.sessions.validate_session(session_token)
+        if session is None or session.role != "auditor":
+            await self.app(scope, receive, send)
+            return
+        if admin_app.is_auditor_allowed_path(path):
+            await self.app(scope, receive, send)
+            return
+        # Auditor reaching a non-audit URL: bounce to /audit.
+        from starlette.responses import RedirectResponse
+        response = RedirectResponse("/audit", status_code=303)
+        await response(scope, receive, send)
+
+
 class _CsrfMiddleware:
     """ASGI middleware: validate CSRF token on unsafe methods.
 
@@ -358,6 +411,24 @@ class AdminApp:
             autoescape=True,
         )
 
+        # Apply audit-log knobs from config so the Settings -> Audit log
+        # toggles take effect on boot. start_housekeeping() spawns the
+        # daily-rotation + retention-purge daemon (idempotent).
+        try:
+            from zabbix_mcp.admin import audit_writer as _aw
+            _audit_cfg = self.config.audit
+            _aw.configure(
+                enabled=_audit_cfg.enabled,
+                log_system_actions=_audit_cfg.log_system_actions,
+                housekeeping_enabled=_audit_cfg.housekeeping_enabled,
+                retention_seconds=_audit_cfg.data_storage_period_seconds,
+                max_file_size_bytes=_audit_cfg.max_file_size_bytes,
+            )
+            if _audit_cfg.housekeeping_enabled:
+                _aw.start_housekeeping()
+        except Exception:
+            logger.exception("Failed to apply audit config at boot")
+
         # Build Starlette app
         self.app = self._build_app()
 
@@ -507,7 +578,8 @@ class AdminApp:
         #      circuit doesn't strip them - the wrapped send hook
         #      runs after the inner app produces the response).
         tls_on = bool(getattr(self.config.server, "tls_cert_file", None))
-        csrf_app = _CsrfMiddleware(app)
+        auditor_app = _AuditorRoleMiddleware(app)
+        csrf_app = _CsrfMiddleware(auditor_app)
         rate_app = _PostRateLimitMiddleware(csrf_app)
         return _SecurityHeadersMiddleware(rate_app, tls_enabled=tls_on)
 
@@ -542,6 +614,18 @@ class AdminApp:
         if ctx["public_url_missing"]:
             scheme = "https" if srv.tls_cert_file else "http"
             ctx["public_url_missing_advertised"] = f"{scheme}://{srv.host}:{srv.port}/"
+
+        # Audit-disabled banner. Read from runtime state (not stale
+        # config) so an operator who just disabled audit sees the
+        # warning on the very next page render. Suppressed for
+        # auditor-role sessions because /audit is the only path they
+        # can reach and they cannot turn it back on anyway.
+        try:
+            from zabbix_mcp.admin.audit_writer import get_runtime_state as _aw_state_fn
+            _aw_state = _aw_state_fn()
+            ctx["audit_disabled_banner"] = not _aw_state["enabled"]
+        except Exception:
+            ctx["audit_disabled_banner"] = False
 
         # Session user
         session = self._get_session(request)
@@ -594,6 +678,26 @@ class AdminApp:
         if not session:
             return None
         return session
+
+    # Routes the ``auditor`` role is allowed to reach. Anything else
+    # redirects them to /audit (separation of duties: an auditor reads
+    # the audit log, the auditor does not see token prefixes / OAuth
+    # client metadata / settings / Zabbix server config).
+    _AUDITOR_ALLOWED_PATH_PREFIXES = (
+        "/audit",      # audit log viewer + export
+        "/api/check-updates",  # readonly
+        "/static/",    # CSS, JS, images
+        "/login",
+        "/logout",
+        "/admin/health",
+        "/mcp-status",
+    )
+
+    def is_auditor_allowed_path(self, path: str) -> bool:
+        """Return True when an auditor-role session may reach ``path``."""
+        if path == "/" or path == "":
+            return True
+        return any(path.startswith(p) for p in self._AUDITOR_ALLOWED_PATH_PREFIXES)
 
     async def _admin_health(self, request: Request) -> Response:
         """Health check endpoint — no auth required."""

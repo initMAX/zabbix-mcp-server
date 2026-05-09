@@ -392,6 +392,258 @@
     </form>
 </div>
 
+<!-- Section 5b: Audit log (issue #49 follow-up - Zabbix-style admin panel) -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F4DC; Audit log</h2>
+    <div class="form-hint" style="margin-bottom:12px;">
+        Mirrors the Zabbix admin <em>Audit log</em> panel. The master toggle is honoured at every audit write site;
+        sub-toggles control what counts as an audit event and whether the server runs its own retention purge.
+        Compliance frameworks (ISO 27001, SOC 2, NIS2) require an audit trail - turn off only with confirmation.
+    </div>
+    {% if not settings.audit_enabled %}
+    <div class="alert alert-danger" style="margin-bottom:14px;">
+        &#x26A0;&#xFE0F; <strong>Audit logging is currently DISABLED.</strong>
+        Tool invocations and admin actions are not being recorded.
+        Re-enable below to resume the audit trail.
+    </div>
+    {% endif %}
+    <form method="post" action="/settings/audit" id="audit-settings-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
+        <div class="settings-row">
+            <div class="settings-label">
+                Enable audit logging
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Master switch for both audit.log (admin events + tool invocations) and client-audit.log (redacted client stream). When off, the audit_self_get MCP tool also stops returning entries. The toggle change itself is always recorded so a reviewer can see when audit was disabled.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="enabled" value="true" id="audit-enabled-toggle"
+                               {% if settings.audit_enabled %}checked{% endif %}
+                               onchange="onAuditMasterToggle()">
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Audit logging is enabled
+                </label>
+                <div class="form-hint">Required by ISO 27001, SOC 2, NIS2 and similar frameworks. Disabling is itself audited.</div>
+                <div id="audit-disable-confirm" style="display:none; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--color-danger, #c0392b); background: var(--color-danger-light, #fdecea); border-radius: var(--radius-md);">
+                    <strong style="color: var(--color-danger, #c0392b);">&#x26A0;&#xFE0F; Confirm audit disable</strong>
+                    <div class="form-hint" style="margin: 6px 0 8px 0;">
+                        Audit logging is required by most compliance frameworks. Type <code>DISABLE</code> below to confirm.
+                    </div>
+                    <input type="text" name="disable_confirm" placeholder="Type DISABLE to confirm" autocomplete="off" style="text-transform: uppercase;">
+                </div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Log system actions
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Includes automated MCP server events: retention purge, forwarder reconnect, config reload, background housekeeping. Off by default to keep the operator log focused on user-driven actions; flip on for forensics or to chase a flaky background subsystem.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="log_system_actions" value="true"
+                               {% if settings.audit_log_system_actions %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Include automated server events in the audit log
+                </label>
+                <div class="form-hint">Adds rows for housekeeping cycles, retention purges, and forwarder reconnects. Off by default to keep the log focused on user-driven actions.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Enable internal housekeeping
+                <span class="tooltip-icon" tabindex="0" data-tooltip="When enabled, MCP automatically rotates the audit log files daily and purges archives older than the data storage period. Disable only if you have an external rsyslog / Fluentd / cron job handling rotation - the size-based rotation still applies.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="housekeeping_enabled" value="true"
+                               {% if settings.audit_housekeeping_enabled %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Server rotates and purges audit logs automatically
+                </label>
+                <div class="form-hint">Daily rotation to <code>audit.log.YYYY-MM-DD.gz</code> + age-based purge. Disable if external log shipper handles this.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                <span style="color: var(--color-danger, #c0392b);">*</span> Data storage period
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix-style time period: 31d / 90d / 1y / 6h. Files older than this window are deleted by housekeeping. 0 disables time-based purge (size-based rotation still applies).">&#x1F6C8;</span>
+            </div>
+            <div>
+                <input type="text" name="data_storage_period"
+                       value="{{ settings.audit_data_storage_period | default('31d') }}"
+                       size="10" placeholder="31d" pattern="^\d+[smhdwMy]?$" required>
+                <div class="form-hint">Default <code>31d</code>. Use Zabbix time-period syntax: <code>s</code>/<code>m</code>/<code>h</code>/<code>d</code>/<code>w</code>/<code>M</code>/<code>y</code>. Set <code>0</code> to keep all archives indefinitely.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Max file size (MB)
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Per-file rotation threshold. When the live audit.log grows past this, it is archived under today's date and a new live file starts. Default 50 MB.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <div class="number-input-group">
+                    <button type="button" class="num-btn num-minus">&minus;</button>
+                    <input type="number" name="max_file_size_mb" value="{{ settings.audit_max_file_size_mb | default(50) }}" min="1" max="4096">
+                    <button type="button" class="num-btn num-plus">+</button>
+                </div>
+                <div class="form-hint">Rotation threshold per file in megabytes. 50 MB is the v1.30 default.</div>
+            </div>
+        </div>
+        {% if current_user_role != 'viewer' %}
+        <div style="margin-top:16px; display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary btn-sm">Update</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="resetAuditDefaults()">Reset defaults</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<script>
+// Surface the disable-confirm input when the master toggle is unchecked.
+function onAuditMasterToggle() {
+    var box = document.getElementById('audit-enabled-toggle');
+    var confirm = document.getElementById('audit-disable-confirm');
+    if (!box || !confirm) return;
+    confirm.style.display = box.checked ? 'none' : 'block';
+}
+function resetAuditDefaults() {
+    var form = document.getElementById('audit-settings-form');
+    if (!form) return;
+    form.querySelector('[name=enabled]').checked = true;
+    form.querySelector('[name=log_system_actions]').checked = false;
+    form.querySelector('[name=housekeeping_enabled]').checked = true;
+    form.querySelector('[name=data_storage_period]').value = '31d';
+    form.querySelector('[name=max_file_size_mb]').value = 50;
+    onAuditMasterToggle();
+}
+</script>
+
+<!-- Section 5c: External SIEM / syslog forwarding -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F4E1; External SIEM / syslog forwarding</h2>
+    <div class="form-hint" style="margin-bottom:12px;">
+        Optional. When enabled, every audit row is also shipped to an external SOC / SIEM
+        (Splunk, Sentinel, QRadar, ELK, Graylog, Wazuh, ...). The local audit log files
+        remain the primary source of truth - a forwarder drop / reconnect never affects them.
+        The runtime forwarder daemon ships in a follow-up commit; this form persists the
+        configuration so it is ready when the daemon lands.
+    </div>
+    <form method="post" action="/settings/audit_forward" id="audit-forward-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
+        <div class="settings-row">
+            <div class="settings-label">
+                Enable forwarding
+                <span class="tooltip-icon" tabindex="0" data-tooltip="When enabled, the audit forwarder daemon dials the configured destination and ships each audit row in the chosen format. Off by default so a fresh install does not start dialing arbitrary network endpoints.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="enabled" value="true"
+                               {% if settings.audit_forward_enabled %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Forward audit rows to an external destination
+                </label>
+                <div class="form-hint">Local audit log keeps working regardless of forwarder state. Failed sends are queued + retried with exponential backoff.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Destination host
+                <span class="tooltip-icon" tabindex="0" data-tooltip="DNS name or IP of the SIEM / syslog endpoint. Examples: siem.corp.local, splunk-hf.internal, 10.0.0.5.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <input type="text" name="host"
+                       value="{{ settings.audit_forward_host | default('') }}"
+                       placeholder="siem.corp.local" size="40">
+                <div class="form-hint">Required when forwarding is enabled. Resolved fresh on every reconnect.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Port
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Standard syslog ports: 514 (UDP), 514 (TCP), 6514 (TLS). SIEM-specific HEC / CEF receivers may differ - check the SOC team's onboarding doc.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <div class="number-input-group">
+                    <button type="button" class="num-btn num-minus">&minus;</button>
+                    <input type="number" name="port" value="{{ settings.audit_forward_port | default(514) }}" min="1" max="65535">
+                    <button type="button" class="num-btn num-plus">+</button>
+                </div>
+                <div class="form-hint">Defaults: 514 (UDP/TCP syslog), 6514 (TLS syslog).</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Format / protocol
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Wire format + transport in one selection. Most SIEMs accept multiple formats; pick the one your SOC team already has parsers for. RFC5424 over UDP is the standard syslog default; CEF (Splunk, ArcSight) and LEEF (QRadar) are SIEM-native; JSON over TCP/TLS is for ELK / Graylog HTTP receivers.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <select name="protocol" class="form-select">
+                    <optgroup label="RFC 5424 (standard syslog)">
+                        <option value="rfc5424_udp" {% if settings.audit_forward_protocol == 'rfc5424_udp' %}selected{% endif %}>RFC 5424 / UDP</option>
+                        <option value="rfc5424_tcp" {% if settings.audit_forward_protocol == 'rfc5424_tcp' %}selected{% endif %}>RFC 5424 / TCP</option>
+                        <option value="rfc5424_tls" {% if settings.audit_forward_protocol == 'rfc5424_tls' %}selected{% endif %}>RFC 5424 / TLS</option>
+                    </optgroup>
+                    <optgroup label="CEF (Splunk, ArcSight, Sentinel)">
+                        <option value="cef_udp" {% if settings.audit_forward_protocol == 'cef_udp' %}selected{% endif %}>CEF / UDP</option>
+                        <option value="cef_tcp" {% if settings.audit_forward_protocol == 'cef_tcp' %}selected{% endif %}>CEF / TCP</option>
+                        <option value="cef_tls" {% if settings.audit_forward_protocol == 'cef_tls' %}selected{% endif %}>CEF / TLS</option>
+                    </optgroup>
+                    <optgroup label="LEEF (QRadar)">
+                        <option value="leef_udp" {% if settings.audit_forward_protocol == 'leef_udp' %}selected{% endif %}>LEEF / UDP</option>
+                        <option value="leef_tcp" {% if settings.audit_forward_protocol == 'leef_tcp' %}selected{% endif %}>LEEF / TCP</option>
+                        <option value="leef_tls" {% if settings.audit_forward_protocol == 'leef_tls' %}selected{% endif %}>LEEF / TLS</option>
+                    </optgroup>
+                    <optgroup label="JSON (ELK, Graylog, generic HTTP receivers)">
+                        <option value="json_tcp" {% if settings.audit_forward_protocol == 'json_tcp' %}selected{% endif %}>JSON / TCP</option>
+                        <option value="json_tls" {% if settings.audit_forward_protocol == 'json_tls' %}selected{% endif %}>JSON / TLS</option>
+                    </optgroup>
+                </select>
+                <div class="form-hint">UDP is fire-and-forget (lossy under load). TCP delivers in order. TLS is TCP with mutual cert validation - prefer for cross-WAN destinations.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                CA certificate (PEM)
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Optional path to a PEM trust bundle for validating the SIEM's TLS certificate. Empty = use the system CA store. Only honoured when the protocol is *_tls.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <input type="text" name="ca_cert"
+                       value="{{ settings.audit_forward_ca_cert | default('') }}"
+                       placeholder="/etc/zabbix-mcp/tls/siem-ca.pem" size="50">
+                <div class="form-hint">Leave empty to use the system trust store (<code>ssl.create_default_context()</code>). Required when the SIEM uses a private CA.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">
+                Queue size
+                <span class="tooltip-icon" tabindex="0" data-tooltip="Bounded in-memory ring between the audit write path and the forwarder thread. When full, the OLDEST queued row is dropped (record-side backpressure) and a single forwarder.queue_full self-event is emitted at most once per minute. Default 10,000 = ~5-10 MB at typical row sizes.">&#x1F6C8;</span>
+            </div>
+            <div>
+                <div class="number-input-group">
+                    <button type="button" class="num-btn num-minus">&minus;</button>
+                    <input type="number" name="queue_size" value="{{ settings.audit_forward_queue_size | default(10000) }}" min="100" max="1000000">
+                    <button type="button" class="num-btn num-plus">+</button>
+                </div>
+                <div class="form-hint">In-memory queue between the audit write path and the forwarder thread. Default 10,000.</div>
+            </div>
+        </div>
+        {% if current_user_role != 'viewer' %}
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save forwarding settings</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
 <!-- Section 6: AI Template Generation -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x2728; AI Template Generation</h2>

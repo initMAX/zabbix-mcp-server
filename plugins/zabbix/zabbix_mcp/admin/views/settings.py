@@ -27,7 +27,7 @@ RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file"
 LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools"}
 
 # Boolean fields — checkbox present = True, absent = False
-BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled"}
+BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_system_actions", "housekeeping_enabled"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -67,6 +67,22 @@ SECTION_CONFIG = {
     "admin_ai": {
         "toml_section": "admin.ai",
         "allowed_keys": {"enabled", "provider", "api_key", "model", "api_base", "timeout", "max_tokens"},
+        "min_role": "admin",
+    },
+    # [audit] - the four user-visible knobs from the Settings -> Audit
+    # log panel. Mirror the Zabbix admin-panel UX 1:1 (same field
+    # names, same defaults, same Reset defaults semantics).
+    "audit": {
+        "toml_section": "audit",
+        "allowed_keys": {"enabled", "log_system_actions", "housekeeping_enabled", "data_storage_period", "max_file_size_mb"},
+        "min_role": "admin",
+    },
+    # [audit.forward] - external SIEM / syslog forwarder. Optional.
+    # The settings page persists the destination + protocol config;
+    # the runtime forwarder daemon lands in a follow-up commit.
+    "audit_forward": {
+        "toml_section": "audit.forward",
+        "allowed_keys": {"enabled", "host", "port", "protocol", "ca_cert", "queue_size"},
         "min_role": "admin",
     },
 }
@@ -239,6 +255,40 @@ async def settings_view(request: Request) -> Response:
             settings["ai_api_key_configured"] = bool(ai_cfg.get("api_key"))
             settings["ai_timeout"] = int(ai_cfg.get("timeout") or 180)
             settings["ai_max_tokens"] = int(ai_cfg.get("max_tokens") or 8000)
+
+            # [audit] section. Surface the four user-visible knobs +
+            # the rotation size, sourced from runtime state so the form
+            # reflects what the audit writer is actually applying right
+            # now (not stale config.toml content if the operator just
+            # toggled something).
+            try:
+                from zabbix_mcp.admin.audit_writer import get_runtime_state
+                _aw_state = get_runtime_state()
+            except Exception:
+                _aw_state = {
+                    "enabled": True, "log_system_actions": False,
+                    "housekeeping_enabled": True, "retention_seconds": 31 * 86400,
+                    "max_file_size_bytes": 50 * 1024 * 1024,
+                }
+            audit_cfg = dict(doc.get("audit", {})) if isinstance(doc.get("audit"), dict) else {}
+            settings["audit_enabled"] = bool(_aw_state["enabled"])
+            settings["audit_log_system_actions"] = bool(_aw_state["log_system_actions"])
+            settings["audit_housekeeping_enabled"] = bool(_aw_state["housekeeping_enabled"])
+            settings["audit_data_storage_period"] = (
+                str(audit_cfg.get("data_storage_period") or "31d")
+            )
+            settings["audit_max_file_size_mb"] = int(_aw_state["max_file_size_bytes"]) // (1024 * 1024)
+
+            # [audit.forward] - external forwarder destination. Read
+            # straight from the doc; the runtime forwarder daemon
+            # picks these values up at next reload.
+            forward_cfg = dict(audit_cfg.get("forward", {})) if isinstance(audit_cfg.get("forward"), dict) else {}
+            settings["audit_forward_enabled"] = bool(forward_cfg.get("enabled", False))
+            settings["audit_forward_host"] = str(forward_cfg.get("host") or "")
+            settings["audit_forward_port"] = int(forward_cfg.get("port") or 514)
+            settings["audit_forward_protocol"] = str(forward_cfg.get("protocol") or "rfc5424_udp")
+            settings["audit_forward_ca_cert"] = str(forward_cfg.get("ca_cert") or "")
+            settings["audit_forward_queue_size"] = int(forward_cfg.get("queue_size") or 10000)
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 
@@ -299,6 +349,99 @@ async def settings_update(request: Request) -> Response:
             except Exception as exc:
                 return admin_app.flash_redirect(
                     "/settings", f"Public URL is invalid: {exc}", "danger"
+                )
+
+    # [audit.forward] pre-save validation: protocol enum + port range
+    # + queue size bounds.
+    if section == "audit_forward":
+        valid_protocols = {
+            "rfc5424_udp", "rfc5424_tcp", "rfc5424_tls",
+            "cef_udp", "cef_tcp", "cef_tls",
+            "leef_udp", "leef_tcp", "leef_tls",
+            "json_tcp", "json_tls",
+        }
+        protocol_raw = str(form.get("protocol", "") or "").strip().lower()
+        if protocol_raw and protocol_raw not in valid_protocols:
+            return admin_app.flash_redirect(
+                "/settings",
+                f"Forwarder protocol must be one of {sorted(valid_protocols)}",
+                "danger",
+            )
+        port_raw = str(form.get("port", "") or "").strip()
+        if port_raw:
+            if not port_raw.isdigit():
+                return admin_app.flash_redirect(
+                    "/settings", "Forwarder port must be a positive integer.", "danger",
+                )
+            n = int(port_raw)
+            if n < 1 or n > 65535:
+                return admin_app.flash_redirect(
+                    "/settings", "Forwarder port must be between 1 and 65535.", "danger",
+                )
+        queue_raw = str(form.get("queue_size", "") or "").strip()
+        if queue_raw:
+            if not queue_raw.isdigit():
+                return admin_app.flash_redirect(
+                    "/settings", "Queue size must be a positive integer.", "danger",
+                )
+            n = int(queue_raw)
+            if n < 100 or n > 1000000:
+                return admin_app.flash_redirect(
+                    "/settings", "Queue size must be between 100 and 1,000,000.", "danger",
+                )
+        # If the operator enables forwarding, host is mandatory -
+        # otherwise the daemon would dial nothing and silently fail.
+        if "enabled" in form:
+            host_raw = str(form.get("host", "") or "").strip()
+            if not host_raw:
+                return admin_app.flash_redirect(
+                    "/settings",
+                    "Forwarder host is required when forwarding is enabled.",
+                    "danger",
+                )
+
+    # [audit] section pre-save validation: parse the Zabbix-style time
+    # period so the operator gets a clean error instead of a startup
+    # ConfigError on the next reload.
+    if section == "audit":
+        period_raw = str(form.get("data_storage_period", "") or "").strip()
+        if period_raw:
+            try:
+                from zabbix_mcp.config import parse_time_period
+                parse_time_period(period_raw, default_unit="d")
+            except Exception as exc:
+                return admin_app.flash_redirect(
+                    "/settings", f"Data storage period: {exc}", "danger"
+                )
+        size_raw = str(form.get("max_file_size_mb", "") or "").strip()
+        if size_raw:
+            if not size_raw.isdigit():
+                return admin_app.flash_redirect(
+                    "/settings",
+                    "Max file size must be a positive integer (MB).",
+                    "danger",
+                )
+            n = int(size_raw)
+            if n < 1 or n > 4096:
+                return admin_app.flash_redirect(
+                    "/settings",
+                    "Max file size must be between 1 and 4096 MB.",
+                    "danger",
+                )
+        # Disabling audit is a compliance-relevant event. Require an
+        # explicit confirm checkbox so an accidental click does not
+        # silently turn the audit off.
+        master_box = "enabled" in form
+        currently_on = bool(admin_app.config.audit.enabled)
+        if currently_on and not master_box:
+            confirm = str(form.get("disable_confirm", "") or "").strip().upper()
+            if confirm != "DISABLE":
+                return admin_app.flash_redirect(
+                    "/settings",
+                    "To disable audit logging, type DISABLE in the confirmation field. "
+                    "Audit logging is required by ISO 27001, SOC 2, NIS2 and similar "
+                    "compliance frameworks; this action is itself audited.",
+                    "danger",
                 )
 
     try:
@@ -422,6 +565,43 @@ async def settings_update(request: Request) -> Response:
         from zabbix_mcp.admin.audit_writer import write_audit
         client_ip = request.client.host if request.client else ""
         write_audit("settings_update", user=session.user, target_type="settings", target_id=section, ip=client_ip)
+
+        # [audit] section: apply runtime knobs without restart and
+        # record a dedicated audit.toggle row when the master switch
+        # flipped. The toggle row uses an action name that bypasses
+        # the master gate so a "disable audit" event is always
+        # recorded - see audit_writer._ALWAYS_AUDIT_ACTIONS.
+        if section == "audit":
+            from zabbix_mcp.admin import audit_writer as _aw
+            from zabbix_mcp.config import parse_time_period
+            try:
+                period_raw_saved = str(config_section.get("data_storage_period", "31d"))
+                size_mb_saved = int(config_section.get("max_file_size_mb", 50))
+                new_state = {
+                    "enabled": bool(config_section.get("enabled", True)),
+                    "log_system_actions": bool(config_section.get("log_system_actions", False)),
+                    "housekeeping_enabled": bool(config_section.get("housekeeping_enabled", True)),
+                    "retention_seconds": parse_time_period(period_raw_saved, default_unit="d"),
+                    "max_file_size_bytes": size_mb_saved * 1024 * 1024,
+                }
+                old_state = _aw.get_runtime_state()
+                _aw.configure(**new_state)
+                if new_state["housekeeping_enabled"]:
+                    _aw.start_housekeeping()
+                if old_state["enabled"] != new_state["enabled"]:
+                    _aw.write_audit(
+                        "audit.toggle",
+                        user=session.user,
+                        target_type="audit",
+                        target_id="enabled",
+                        details={
+                            "from": old_state["enabled"],
+                            "to": new_state["enabled"],
+                        },
+                        ip=client_ip,
+                    )
+            except Exception:
+                logger.exception("Failed to apply audit runtime config after settings save")
 
         if needs_restart:
             admin_app.restart_needed = True

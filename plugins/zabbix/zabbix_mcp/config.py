@@ -213,6 +213,90 @@ class OAuthConfig:
 
 
 @dataclass(frozen=True)
+class AuditForwardConfig:
+    """External SIEM / syslog forwarding for the audit log.
+
+    The local audit log files are the primary source of truth - when
+    forwarding is enabled, audit rows are *also* shipped to the
+    configured destination. A drop / reconnect on the wire never
+    affects the local log; the forwarder maintains an in-memory queue
+    and re-tries on its own schedule.
+
+    Five knobs:
+
+    * ``enabled`` - master toggle for the forwarder. Off by default
+      so a fresh install does not start dialing arbitrary network
+      destinations.
+    * ``host`` / ``port`` - SIEM / syslog endpoint.
+    * ``protocol`` - one of ``tcp``, ``udp``, ``tls``. TLS is TCP
+      with an optional ``ca_cert`` for server cert validation.
+    * ``format`` - wire format: ``rfc5424`` (default), ``cef``,
+      ``leef``, ``json``. Most SIEMs accept multiple formats; pick
+      the one the operator's SOC has parsers for.
+    * ``ca_cert`` - path to a PEM trust bundle for TLS. Empty falls
+      back to system trust store (``ssl.create_default_context``).
+    * ``queue_size`` - bounded in-memory queue between the audit
+      write path and the forwarder thread. When full, the OLDEST
+      queued row is dropped (record-side backpressure) and a single
+      ``forwarder.queue_full`` self-event is emitted at most once
+      per minute so the operator sees the SOC is lagging.
+    """
+
+    enabled: bool = False
+    host: str = ""
+    port: int = 514
+    protocol: str = "rfc5424_udp"  # rfc5424_udp / rfc5424_tcp / rfc5424_tls / cef_udp / cef_tcp / cef_tls / leef_udp / leef_tcp / leef_tls / json_tcp / json_tls
+    ca_cert: str = ""              # path to PEM, empty = system trust
+    queue_size: int = 10000
+
+
+@dataclass(frozen=True)
+class AuditConfig:
+    """Audit log behaviour - inspired by Zabbix's "Audit log" admin panel.
+
+    Five knobs:
+
+    * ``enabled`` - master kill switch. When False, NO audit row is
+      written to either ``audit.log`` or ``client-audit.log`` and the
+      ``audit_self_get`` ring buffer stops accepting pushes. The toggle
+      itself is **always** audited (even when transitioning to
+      disabled) so a compliance reviewer can see that audit logging
+      was turned off and by whom. The admin portal renders a persistent
+      banner while audit is disabled.
+    * ``log_system_actions`` - whether automated MCP server events
+      (retention purge, forwarder reconnect, config reload, background
+      housekeeping cycles) land in the audit log. Default off so the
+      operator log stays focused on user-driven actions; flip on for
+      forensics or to chase a flaky background subsystem.
+    * ``housekeeping_enabled`` - whether the MCP server itself rotates
+      and purges the audit log files. Default on. Disable when an
+      external rsyslog / Fluentd / cron job manages rotation.
+    * ``data_storage_period`` - retention window in seconds. Parsed
+      from a Zabbix-style time-period string (``31d``, ``90d``,
+      ``1y``, ...) at config load. Files older than the window are
+      deleted by the housekeeping cycle. ``0`` disables time-based
+      purge (size-based rotation still applies).
+    * ``max_file_size_bytes`` - rotation threshold per file. Older
+      files are gzipped and dated. Default 50 MB matches the v1.30
+      shape so an upgrade is a no-op for existing logs.
+
+    The four user-visible knobs map 1:1 to the Zabbix admin UI's Audit
+    log panel - same field names, same defaults, same Reset defaults
+    semantics.
+    """
+
+    enabled: bool = True
+    log_system_actions: bool = False
+    housekeeping_enabled: bool = True
+    # Stored as seconds for runtime simplicity; the original Zabbix-style
+    # string ("31d") is preserved on the config document so /settings
+    # round-trips it without normalising user input.
+    data_storage_period_seconds: int = 31 * 86400
+    data_storage_period_raw: str = "31d"
+    max_file_size_bytes: int = 50 * 1024 * 1024
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Top-level application configuration."""
 
@@ -220,6 +304,8 @@ class AppConfig:
     zabbix_servers: dict[str, ZabbixServerConfig] = field(default_factory=dict)
     admin_ai: AdminAIConfig = field(default_factory=AdminAIConfig)
     oauth: OAuthConfig = field(default_factory=OAuthConfig)
+    audit: AuditConfig = field(default_factory=AuditConfig)
+    audit_forward: AuditForwardConfig = field(default_factory=AuditForwardConfig)
 
     @property
     def default_server(self) -> str | None:
@@ -405,6 +491,51 @@ def _validate_dcr_profile(value: object) -> str:
     raise ConfigError(
         f"[oauth].dcr_profile must be 'conservative' or 'permissive', got {value!r}"
     )
+
+
+# Zabbix-style time period units. Lowercase ``m`` is minutes, uppercase
+# ``M`` is months - matching the Zabbix server's own convention so an
+# operator who already speaks Zabbix time periods does not have to
+# learn a second grammar.
+_TIME_PERIOD_UNITS: dict[str, int] = {
+    "s": 1,
+    "m": 60,
+    "h": 3600,
+    "d": 86400,
+    "w": 7 * 86400,
+    "M": 30 * 86400,
+    "y": 365 * 86400,
+}
+_TIME_PERIOD_RE = re.compile(r"^\s*(\d+)\s*([smhdwMy]?)\s*$")
+
+
+def parse_time_period(value: object, *, default_unit: str = "s") -> int:
+    """Parse a Zabbix-style time period (``31d``, ``1y``, ``90d``, ``2h``) into seconds.
+
+    Accepts integer-as-string (``"3600"``) or unit-suffixed (``"31d"``).
+    Returns ``0`` for the empty string and for the literal value ``"0"``,
+    matching the Zabbix housekeeping-disabled convention.
+
+    The unit alphabet follows the Zabbix server: ``s``/``m``/``h``/``d``/
+    ``w``/``M``/``y``. Lowercase ``m`` is minutes, uppercase ``M`` is
+    months. Anything else raises :class:`ConfigError` so a typo
+    surfaces at boot rather than silently coming back as a wrong
+    duration.
+    """
+    if value is None:
+        return 0
+    s = str(value).strip()
+    if s == "" or s == "0":
+        return 0
+    m = _TIME_PERIOD_RE.match(s)
+    if not m:
+        raise ConfigError(
+            f"Invalid time period {value!r}: expected '<digits>[smhdwMy]' "
+            "(e.g. '31d', '90d', '1y', '6h'); see Zabbix time-period grammar."
+        )
+    n = int(m.group(1))
+    unit = m.group(2) or default_unit
+    return n * _TIME_PERIOD_UNITS[unit]
 
 
 def _validate_public_url(value: str, tls_cert_file: object) -> str:
@@ -700,6 +831,76 @@ def load_config(path: str | Path) -> AppConfig:
         dcr_conservative_access_ttl_seconds=int(oauth_raw.get("dcr_conservative_access_ttl_seconds", 1800) or 1800),
     )
 
+    # [audit] section - Zabbix-style admin panel knobs (issue #49 follow-up).
+    audit_raw = raw.get("audit", {}) or {}
+    audit_period_raw = audit_raw.get("data_storage_period", "31d")
+    audit_period_str = str(audit_period_raw).strip() if audit_period_raw is not None else "31d"
+    if audit_period_str == "":
+        audit_period_str = "31d"
+    audit_period_seconds = parse_time_period(audit_period_str, default_unit="d")
+    audit_max_size_mb_raw = audit_raw.get("max_file_size_mb", 50)
+    try:
+        audit_max_size_mb = int(audit_max_size_mb_raw)
+    except (TypeError, ValueError):
+        raise ConfigError(
+            f"[audit].max_file_size_mb must be an integer (MB), got {audit_max_size_mb_raw!r}"
+        ) from None
+    if audit_max_size_mb < 1:
+        raise ConfigError("[audit].max_file_size_mb must be >= 1")
+    audit_cfg = AuditConfig(
+        enabled=bool(audit_raw.get("enabled", True)),
+        log_system_actions=bool(audit_raw.get("log_system_actions", False)),
+        housekeeping_enabled=bool(audit_raw.get("housekeeping_enabled", True)),
+        data_storage_period_seconds=audit_period_seconds,
+        data_storage_period_raw=audit_period_str,
+        max_file_size_bytes=audit_max_size_mb * 1024 * 1024,
+    )
+
+    # [audit.forward] - external SIEM / syslog destination. Off by
+    # default so a fresh install does not start dialing arbitrary
+    # network endpoints.
+    forward_raw = (audit_raw.get("forward") or {}) if isinstance(audit_raw.get("forward"), dict) else {}
+    valid_protocols = {
+        "rfc5424_udp", "rfc5424_tcp", "rfc5424_tls",
+        "cef_udp", "cef_tcp", "cef_tls",
+        "leef_udp", "leef_tcp", "leef_tls",
+        "json_tcp", "json_tls",
+    }
+    forward_protocol = str(forward_raw.get("protocol", "rfc5424_udp") or "rfc5424_udp").strip().lower()
+    if forward_protocol not in valid_protocols:
+        raise ConfigError(
+            f"[audit.forward].protocol must be one of {sorted(valid_protocols)}, "
+            f"got {forward_protocol!r}"
+        )
+    forward_port_raw = forward_raw.get("port", 514)
+    try:
+        forward_port = int(forward_port_raw)
+    except (TypeError, ValueError):
+        raise ConfigError(
+            f"[audit.forward].port must be an integer, got {forward_port_raw!r}"
+        ) from None
+    if forward_port < 1 or forward_port > 65535:
+        raise ConfigError("[audit.forward].port must be between 1 and 65535")
+    forward_queue_raw = forward_raw.get("queue_size", 10000)
+    try:
+        forward_queue = int(forward_queue_raw)
+    except (TypeError, ValueError):
+        raise ConfigError(
+            f"[audit.forward].queue_size must be an integer, got {forward_queue_raw!r}"
+        ) from None
+    if forward_queue < 100 or forward_queue > 1000000:
+        raise ConfigError(
+            "[audit.forward].queue_size must be between 100 and 1,000,000"
+        )
+    audit_forward_cfg = AuditForwardConfig(
+        enabled=bool(forward_raw.get("enabled", False)),
+        host=str(forward_raw.get("host", "") or "").strip(),
+        port=forward_port,
+        protocol=forward_protocol,
+        ca_cert=str(forward_raw.get("ca_cert", "") or "").strip(),
+        queue_size=forward_queue,
+    )
+
     # Optional [plugins.<id>] blocks - the contract is locked in v1.31
     # but the plugin loader itself ships in a follow-up release (issue
     # #47). Eager operators may have already added plugin entries to
@@ -756,5 +957,6 @@ def load_config(path: str | Path) -> AppConfig:
 
     return AppConfig(
         server=server_config, zabbix_servers=zabbix_servers,
-        admin_ai=admin_ai, oauth=oauth_cfg,
+        admin_ai=admin_ai, oauth=oauth_cfg, audit=audit_cfg,
+        audit_forward=audit_forward_cfg,
     )
