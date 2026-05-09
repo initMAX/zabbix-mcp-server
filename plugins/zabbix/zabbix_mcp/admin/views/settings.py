@@ -577,6 +577,18 @@ async def settings_update(request: Request) -> Response:
         client_ip = request.client.host if request.client else ""
         write_audit("settings_update", user=session.user, target_type="settings", target_id=section, ip=client_ip)
 
+        # [admin] section: apply update-check toggle at runtime so the
+        # operator does not have to restart the server to flip the
+        # "Notify me when a newer version is released" switch. The
+        # checker exposes start(enabled=...) which is idempotent and
+        # safe to call multiple times.
+        if section == "admin":
+            try:
+                from zabbix_mcp.admin.update_check import get_checker
+                get_checker().start(enabled=bool(config_section.get("update_check_enabled", True)))
+            except Exception:
+                logger.exception("Failed to apply update-check toggle after settings save")
+
         # [audit.forward] section: re-configure the running forwarder
         # daemon without restart. configure() is idempotent and the
         # worker thread re-reads its destination on the next loop.
