@@ -7,5 +7,5 @@
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
   <rect x="2" y="2" width="20" height="20" rx="4" fill="#D40000"/>
-  <path d="M7 7h10v2.5L10.2 17H17v2H7v-2.5L13.8 9H7V7z" fill="#FFFFFF"/>
+  <path d="M7 6h10v2.4l-7 7.2h7V18H7v-2.4l7-7.2H7z" fill="#FFFFFF"/>
 </svg>

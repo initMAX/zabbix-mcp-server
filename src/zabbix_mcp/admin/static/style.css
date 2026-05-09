@@ -318,15 +318,22 @@ a:hover {
     flex: 1;
 }
 .nav-module-status {
-    color: var(--color-success, #16a34a);
-    font-size: 1.4rem;
-    line-height: 0;
-    padding-bottom: 2px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-success, #16a34a);
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.18);
+    flex-shrink: 0;
+    /* Hide bullet character used as fallback - we render the dot via background */
+    text-indent: -9999px;
+    overflow: hidden;
 }
 .nav-module-chevron {
-    color: #64748b;
-    font-size: 0.7rem;
+    color: #94a3b8;
+    font-size: 0.95rem;
+    line-height: 1;
     transition: transform var(--transition-fast);
+    flex-shrink: 0;
 }
 .nav-module.is-open .nav-module-chevron {
     transform: rotate(90deg);
