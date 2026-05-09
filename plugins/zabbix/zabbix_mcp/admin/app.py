@@ -429,6 +429,26 @@ class AdminApp:
         except Exception:
             logger.exception("Failed to apply audit config at boot")
 
+        # Wire up the SIEM / syslog forwarder. The daemon is always
+        # started; when [audit.forward].enabled is false the worker
+        # idle-loops without dialing anywhere. This way an operator who
+        # flips the toggle from off to on at runtime does not have to
+        # restart the server.
+        try:
+            from zabbix_mcp.admin import audit_forwarder as _afw
+            _fwd_cfg = self.config.audit_forward
+            _afw.configure(
+                enabled=_fwd_cfg.enabled,
+                host=_fwd_cfg.host,
+                port=_fwd_cfg.port,
+                protocol=_fwd_cfg.protocol,
+                ca_cert=_fwd_cfg.ca_cert,
+                queue_size=_fwd_cfg.queue_size,
+            )
+            _afw.start()
+        except Exception:
+            logger.exception("Failed to start audit forwarder at boot")
+
         # Build Starlette app
         self.app = self._build_app()
 

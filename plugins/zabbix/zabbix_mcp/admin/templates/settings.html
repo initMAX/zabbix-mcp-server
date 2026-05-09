@@ -531,9 +531,59 @@ function resetAuditDefaults() {
         Optional. When enabled, every audit row is also shipped to an external SOC / SIEM
         (Splunk, Sentinel, QRadar, ELK, Graylog, Wazuh, ...). The local audit log files
         remain the primary source of truth - a forwarder drop / reconnect never affects them.
-        The runtime forwarder daemon ships in a follow-up commit; this form persists the
-        configuration so it is ready when the daemon lands.
     </div>
+    {% if settings.audit_forward_status %}
+    {% set _fwd = settings.audit_forward_status %}
+    <div style="margin-bottom: 14px; padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-input);">
+        <strong style="display:block; margin-bottom:6px;">Forwarder status</strong>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px 24px; font-size: 0.85rem;">
+            <div>
+                <span style="color: var(--text-muted);">Connection:</span>
+                {% if _fwd.connection_state == 'connected' %}
+                    <span style="color: var(--color-success, #16a34a); font-weight: 600;">&#x25CF; connected</span>
+                {% elif _fwd.connection_state == 'connecting' %}
+                    <span style="color: var(--color-warning, #f59e0b); font-weight: 600;">&#x25CF; connecting</span>
+                {% elif _fwd.connection_state == 'disconnected' %}
+                    <span style="color: var(--color-danger, #c0392b); font-weight: 600;">&#x25CF; disconnected</span>
+                {% else %}
+                    <span style="color: var(--text-muted); font-weight: 600;">&#x25CB; stopped</span>
+                {% endif %}
+            </div>
+            <div>
+                <span style="color: var(--text-muted);">Queue:</span>
+                <strong>{{ _fwd.queue_depth | default(0) }} / {{ _fwd.queue_size | default(10000) }}</strong>
+            </div>
+            <div>
+                <span style="color: var(--text-muted);">Sent:</span>
+                <strong>{{ _fwd.messages_sent | default(0) }}</strong>
+            </div>
+            {% if _fwd.messages_failed %}
+            <div>
+                <span style="color: var(--text-muted);">Failed:</span>
+                <strong style="color: var(--color-danger, #c0392b);">{{ _fwd.messages_failed }}</strong>
+            </div>
+            {% endif %}
+            {% if _fwd.messages_dropped_queue_full %}
+            <div>
+                <span style="color: var(--text-muted);">Queue overflow drops:</span>
+                <strong style="color: var(--color-danger, #c0392b);">{{ _fwd.messages_dropped_queue_full }}</strong>
+            </div>
+            {% endif %}
+            {% if _fwd.last_success_at %}
+            <div>
+                <span style="color: var(--text-muted);">Last success:</span>
+                <strong>{{ _fwd.last_success_at }}</strong>
+            </div>
+            {% endif %}
+        </div>
+        {% if _fwd.last_error %}
+        <div style="margin-top:8px; padding: 6px 10px; background: rgba(220,38,38,0.08); border-left: 3px solid var(--color-danger, #c0392b); font-size: 0.82rem; color: var(--color-danger, #c0392b);">
+            <strong>Last error:</strong> {{ _fwd.last_error }}
+            {% if _fwd.last_error_at %}<span style="color: var(--text-muted);"> ({{ _fwd.last_error_at }})</span>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
     <form method="post" action="/settings/audit_forward" id="audit-forward-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">

@@ -132,6 +132,19 @@ def _is_system_action(action: str) -> bool:
     return any(action.startswith(p) for p in _SYSTEM_ACTION_PREFIXES)
 
 
+def _enqueue_forward(entry: dict) -> None:
+    """Best-effort hand-off to the SIEM forwarder. Silent on any failure.
+
+    Imported lazily so a build that strips audit_forwarder.py (or an
+    older venv missing the module) still boots.
+    """
+    try:
+        from zabbix_mcp.admin import audit_forwarder
+        audit_forwarder.enqueue(entry)
+    except Exception:
+        pass
+
+
 def _should_emit(action: str) -> bool:
     """Apply the audit master + system-action gates."""
     if action in _ALWAYS_AUDIT_ACTIONS:
@@ -438,6 +451,9 @@ def write_audit(
     except Exception as e:
         import logging
         logging.getLogger("zabbix_mcp.admin").warning("Failed to write audit log: %s", e)
+    # Best-effort SIEM / syslog ship after the local-log write succeeded
+    # (or failed - the forwarder is independent).
+    _enqueue_forward(entry)
 
 
 def write_tool_audit(
@@ -509,6 +525,10 @@ def write_tool_audit(
     except Exception as e:
         import logging
         logging.getLogger("zabbix_mcp.admin").warning("Failed to write tool audit: %s", e)
+    # Best-effort SIEM / syslog ship of the operator-side row. The
+    # client-stream copy is intentionally not forwarded (it carries
+    # less context and is for the AI client's self-review only).
+    _enqueue_forward(operator_entry)
 
     if also_client:
         client_entry = {

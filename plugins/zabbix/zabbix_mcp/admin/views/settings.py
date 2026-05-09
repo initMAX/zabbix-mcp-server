@@ -289,6 +289,17 @@ async def settings_view(request: Request) -> Response:
             settings["audit_forward_protocol"] = str(forward_cfg.get("protocol") or "rfc5424_udp")
             settings["audit_forward_ca_cert"] = str(forward_cfg.get("ca_cert") or "")
             settings["audit_forward_queue_size"] = int(forward_cfg.get("queue_size") or 10000)
+            try:
+                from zabbix_mcp.admin import audit_forwarder as _afw
+                _fwd_state = _afw.get_runtime_state()
+            except Exception:
+                _fwd_state = {
+                    "connection_state": "stopped", "queue_depth": 0,
+                    "messages_sent": 0, "messages_failed": 0,
+                    "messages_dropped_queue_full": 0,
+                    "last_success_at": None, "last_error": "",
+                }
+            settings["audit_forward_status"] = _fwd_state
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 
@@ -565,6 +576,24 @@ async def settings_update(request: Request) -> Response:
         from zabbix_mcp.admin.audit_writer import write_audit
         client_ip = request.client.host if request.client else ""
         write_audit("settings_update", user=session.user, target_type="settings", target_id=section, ip=client_ip)
+
+        # [audit.forward] section: re-configure the running forwarder
+        # daemon without restart. configure() is idempotent and the
+        # worker thread re-reads its destination on the next loop.
+        if section == "audit_forward":
+            try:
+                from zabbix_mcp.admin import audit_forwarder as _afw
+                _afw.configure(
+                    enabled=bool(config_section.get("enabled", False)),
+                    host=str(config_section.get("host", "") or ""),
+                    port=int(config_section.get("port", 514) or 514),
+                    protocol=str(config_section.get("protocol", "rfc5424_udp") or "rfc5424_udp"),
+                    ca_cert=str(config_section.get("ca_cert", "") or ""),
+                    queue_size=int(config_section.get("queue_size", 10000) or 10000),
+                )
+                _afw.start()
+            except Exception:
+                logger.exception("Failed to apply audit forwarder config after settings save")
 
         # [audit] section: apply runtime knobs without restart and
         # record a dedicated audit.toggle row when the master switch
