@@ -69,11 +69,12 @@
         {% endif %}
 
         <div class="form-group">
-            <label class="form-label" for="role">Role <span class="tooltip-icon" tabindex="0" data-tooltip="Admin: full access (users, settings, all writes). Operator: tokens + report templates + view servers. Viewer: read-only browsing of audit log and token list.">&#x1F6C8;</span></label>
+            <label class="form-label" for="role">Role <span class="tooltip-icon" tabindex="0" data-tooltip="Admin: full access (users, settings, all writes). Operator: tokens + report templates + view servers. Viewer: read-only browsing of audit log and token list. Auditor: SOC/compliance role scoped to the audit log surface only - non-/audit URLs redirect to /audit.">&#x1F6C8;</span></label>
             <select id="role" name="role" class="form-select" required>
-                <option value="viewer" {% if edit_role == 'viewer' or form_role == 'viewer' %}selected{% endif %}>Viewer — Read-only access</option>
-                <option value="operator" {% if edit_role == 'operator' or form_role == 'operator' %}selected{% endif %}>Operator — Manage tokens and templates</option>
-                <option value="admin" {% if edit_role == 'admin' or form_role == 'admin' or not edit_mode %}selected{% endif %}>Admin — Full access</option>
+                <option value="viewer" {% if edit_role == 'viewer' or form_role == 'viewer' %}selected{% endif %}>Viewer - Read-only access</option>
+                <option value="auditor" {% if edit_role == 'auditor' or form_role == 'auditor' %}selected{% endif %}>Auditor - Audit log only (issue #49)</option>
+                <option value="operator" {% if edit_role == 'operator' or form_role == 'operator' %}selected{% endif %}>Operator - Manage tokens and templates</option>
+                <option value="admin" {% if edit_role == 'admin' or form_role == 'admin' or not edit_mode %}selected{% endif %}>Admin - Full access</option>
             </select>
             <div class="form-hint">Determines what actions the user can perform in the admin portal.</div>
         </div>

@@ -122,7 +122,7 @@ async def user_create(request: Request) -> Response:
             "error": "Password must contain at least one digit.",
         })
 
-    if role not in ("admin", "operator", "viewer"):
+    if role not in ("admin", "operator", "viewer", "auditor"):
         role = "viewer"
 
     # Check if user exists
@@ -248,7 +248,7 @@ async def user_detail(request: Request) -> Response:
             if new_password:
                 user_section["password_hash"] = hash_password(new_password)
 
-            if new_role in ("admin", "operator", "viewer"):
+            if new_role in ("admin", "operator", "viewer", "auditor"):
                 user_section["role"] = new_role
 
             save_config_document(admin_app.config_path, doc)
