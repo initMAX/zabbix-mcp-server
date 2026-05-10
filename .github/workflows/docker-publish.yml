@@ -7,10 +7,12 @@
 #      ghcr.io/initmax/zabbix-mcp-server:<inputs.tag> for ad-hoc
 #      preview / testing builds.
 #
-# The image is single-arch linux/amd64 today. Adding arm64 is a
-# matter of changing the `platforms` line plus enabling QEMU; tracked
-# under the v1.32 backlog because the Dockerfile install path needs
-# verification on arm64 first.
+# Multi-arch image: linux/amd64 + linux/arm64. arm64 build runs under
+# QEMU emulation on the GitHub-hosted amd64 runner - slower than a
+# native arm64 builder but acceptable for the small wheel install
+# the Dockerfile does. Operators on Apple Silicon Macs (M-series) and
+# arm64 cloud instances (AWS Graviton, Oracle Ampere, ...) can pull
+# without an emulation tax at runtime.
 
 name: Build and publish Docker image
 
@@ -36,6 +38,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up QEMU (for arm64 builds on amd64 runner)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -74,7 +81,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
