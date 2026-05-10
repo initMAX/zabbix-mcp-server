@@ -787,7 +787,8 @@ class AdminApp:
                 return Response("unauthorized", status_code=401, media_type="text/plain")
         try:
             from zabbix_mcp.admin import metrics
-            body = metrics.render_with_provider(self.oauth_provider)
+            body = metrics.render_with_provider(self.oauth_provider,
+                                                config_path=self.config_path)
         except Exception as exc:
             logger.exception("metrics render failed")
             return Response(f"# metrics render failed: {exc}\n",

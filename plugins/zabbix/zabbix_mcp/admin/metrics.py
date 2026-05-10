@@ -196,6 +196,12 @@ _HELP_TEXTS: dict[str, str] = {
         "Cumulative dated archives produced by the housekeeping daemon.",
     "mcp_audit_housekeeping_purged_total":
         "Cumulative archive files purged by the housekeeping daemon.",
+    "mcp_zabbix_api_calls_total":
+        "Zabbix API calls grouped by server, method, and outcome (ok / error).",
+    "mcp_zabbix_api_latency_seconds":
+        "Per-call wall-clock latency of Zabbix API requests, seconds.",
+    "mcp_oauth_registered_clients_total":
+        "Number of [oauth_clients.X] entries registered in config.",
 }
 
 
@@ -235,6 +241,21 @@ def record_tool_invocation(tool: str, decision: str, duration_seconds: float | N
 def record_audit_row(category: str) -> None:
     """Hook from audit_writer._should_emit (after the gate passes)."""
     _state.inc_counter("mcp_audit_rows_total", {"category": category})
+
+
+def record_zabbix_api_call(server: str, method: str, outcome: str, duration_seconds: float) -> None:
+    """Hook from ClientManager.call - per-Zabbix-server latency + counts.
+
+    Only the API method *family* (e.g. ``host.get`` / ``problem.get``)
+    is exposed as a label; per-server breakdown stays so the operator
+    can spot which Zabbix instance is slow. The full ``method`` is
+    intentionally kept as-is (no obj.method split) - that is the same
+    string SOC playbooks already grep for.
+    """
+    _state.inc_counter("mcp_zabbix_api_calls_total",
+                       {"server": server, "method": method, "outcome": outcome})
+    _state.observe("mcp_zabbix_api_latency_seconds", duration_seconds,
+                   {"server": server, "method": method})
 
 
 def record_housekeeping_cycle(archives_made: int, files_purged: int) -> None:
@@ -323,9 +344,42 @@ def collect_oauth_gauges(provider: Any) -> list[tuple[str, str, float, dict | No
     return out
 
 
-def render_with_provider(provider: Any) -> str:
-    """Render with a one-shot extra gauge provider for OAuth-side data."""
+def collect_oauth_client_count(config_path: str | None) -> list[tuple[str, str, float, dict | None]]:
+    """Read [oauth_clients.X] section count straight from config.toml.
+
+    Distinct from collect_oauth_gauges - that one counts in-memory
+    tokens; this one counts persistent client registrations. SREs
+    care about the difference: many clients but zero active tokens
+    means nobody used the registration; many tokens but few clients
+    means a small number of clients are very chatty.
+    """
+    out: list[tuple[str, str, float, dict | None]] = []
+    if not config_path:
+        return out
+    try:
+        from zabbix_mcp.admin.config_writer import load_config_document, TOMLKIT_AVAILABLE
+        if not TOMLKIT_AVAILABLE:
+            return out
+        doc = load_config_document(config_path)
+        clients = doc.get("oauth_clients", {}) or {}
+        if isinstance(clients, dict):
+            out.append(("mcp_oauth_registered_clients_total",
+                        _HELP_TEXTS["mcp_oauth_registered_clients_total"],
+                        float(len(clients)), None))
+    except Exception:
+        pass
+    return out
+
+
+def render_with_provider(provider: Any, config_path: str | None = None) -> str:
+    """Render with extra gauge providers for OAuth-side data.
+
+    ``provider`` feeds in-memory token counts; ``config_path`` lets
+    us also read the persistent [oauth_clients.X] count from
+    config.toml.
+    """
     base_gauges = _collect_gauges()
     oauth_gauges = collect_oauth_gauges(provider)
-    combined = base_gauges + oauth_gauges
+    client_gauges = collect_oauth_client_count(config_path)
+    combined = base_gauges + oauth_gauges + client_gauges
     return _state.render(gauge_provider=lambda: combined)

@@ -310,20 +310,38 @@ class ClientManager:
           every subsequent call until process restart - reported as
           "validation flaky / sometimes OK sometimes fails".
         """
-        import ssl
+        import ssl, time as _time
         self._rate_limiter.check()
         client = self._get_client(server)
+        # Wall-clock for the /metrics histogram + operational log.
+        # Wraps the whole call (incl. one retry on auth / connection
+        # error) so a "real" latency reflects the operator-visible
+        # wait, not just the inner _do_call hop.
+        _api_method = method
+        _api_started = _time.monotonic()
+        _api_outcome = "ok"
         try:
-            return self._do_call(client, method, params)
-        except ProcessingError as e:
-            error_msg = str(e).lower()
-            if "not authorised" in error_msg or "session" in error_msg or "re-login" in error_msg:
+            try:
+                return self._do_call(client, method, params)
+            except ProcessingError as e:
+                error_msg = str(e).lower()
+                if "not authorised" in error_msg or "session" in error_msg or "re-login" in error_msg:
+                    client = self._reconnect(server)
+                    return self._do_call(client, method, params)
+                raise
+            except (ConnectionError, TimeoutError, ssl.SSLError, OSError):
                 client = self._reconnect(server)
                 return self._do_call(client, method, params)
+        except Exception:
+            _api_outcome = "error"
             raise
-        except (ConnectionError, TimeoutError, ssl.SSLError, OSError):
-            client = self._reconnect(server)
-            return self._do_call(client, method, params)
+        finally:
+            _api_dur = _time.monotonic() - _api_started
+            try:
+                from zabbix_mcp.admin import metrics as _m
+                _m.record_zabbix_api_call(server, _api_method, _api_outcome, _api_dur)
+            except Exception:
+                pass
 
     # Strict format: "object.method" — only ASCII letters, single dot separator.
     _METHOD_RE = re.compile(r"^[a-zA-Z]+\.[a-zA-Z]+$")
