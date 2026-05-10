@@ -33,13 +33,43 @@ from starlette.responses import RedirectResponse, Response
 
 
 async def modules_list(request: Request) -> Response:
-    """GET /modules - list installed MCP modules + coming-soon roadmap."""
+    """GET /modules - list installed MCP modules + coming-soon roadmap.
+
+    Reads plugin manifests via :mod:`zabbix_mcp.plugin_loader` so the
+    page reflects the live plugin inventory rather than a hardcoded
+    list. Bundled and operator-installed plugins both show up.
+    """
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)
     if not session:
         return RedirectResponse("/login", status_code=303)
 
+    plugins: list[dict] = []
+    try:
+        from zabbix_mcp.plugin_loader import discover
+        for record in discover():
+            plugins.append({
+                "id": record.id,
+                "name": record.name,
+                "version": record.version,
+                "description": record.description,
+                "author": record.author,
+                "transport": record.transport,
+                "tool_prefix": record.tool_prefix,
+                "tool_groups": record.tool_groups,
+                "report_templates": record.report_templates,
+                "bundled": record.bundled,
+                "manifest_path": str(record.manifest_path),
+            })
+    except Exception as exc:
+        # Discovery failure must not 500 the modules page - the
+        # operator should still see SOMETHING so they can navigate
+        # back to a working admin view.
+        logger = __import__("logging").getLogger("zabbix_mcp.admin")
+        logger.exception("plugin discovery failed for /modules render: %s", exc)
+
     return admin_app.render("modules.html", request, {
         "active": "modules",
         "page_title": "MCP Modules",
+        "plugins": plugins,
     })
