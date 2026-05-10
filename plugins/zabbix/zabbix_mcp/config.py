@@ -213,6 +213,102 @@ class OAuthConfig:
 
 
 @dataclass(frozen=True)
+class AdminSamlConfig:
+    """SAML 2.0 single sign-on for the admin portal (issue #46).
+
+    Inspired by the initmax-portal staff SSO entity (``SamlProvider``)
+    so the operator config shape matches what people already document
+    for Azure AD / Okta / Keycloak / ADFS.
+
+    Single-provider for v1.32; multi-provider via ``[admin.saml.<id>]``
+    sub-tables ships in v1.33 once we have one production deployment
+    under our belt.
+
+    Operator wires up the IdP -> portal SSO loop in three steps:
+
+    1. Set ``[admin.saml].enabled = true`` and paste the IdP entity
+       id + SSO URL + signing certificate from the IdP metadata XML.
+    2. Tell the IdP that the portal lives at:
+         entityId / audience: ``<public_url>/saml/metadata``
+         ACS URL:             ``<public_url>/saml/acs``
+       (Both URLs are also exposed on the Settings -> SAML page as
+       copy buttons.)
+    3. Map the IdP attributes that carry email, first name, last
+       name (plus optional photo URL). Defaults are the standard
+       ``schemas.xmlsoap.org`` claim URIs that Azure AD + ADFS use
+       out of the box.
+    """
+
+    enabled: bool = False
+    display_name: str = "Sign in with SAML"
+    # IdP metadata
+    idp_entity_id: str = ""
+    idp_sso_url: str = ""
+    idp_slo_url: str = ""           # optional Single Logout endpoint
+    x509_certificate: str = ""      # PEM-armoured or raw base64
+    # SAML attribute mapping. Defaults match the schemas.xmlsoap.org
+    # URIs Azure AD / ADFS produce by default. Operators on Okta /
+    # Keycloak will typically override with ``email`` / ``given_name``
+    # / ``family_name`` short names.
+    email_attribute: str = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+    first_name_attribute: str = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
+    last_name_attribute: str = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"
+    photo_url_attribute: str = ""   # optional - claim carrying a photo URL
+    # Auto-provisioning: when a SAML login lands a user that does
+    # not exist in [admin.users.X], create it with this role. Empty =
+    # refuse the login (operator must pre-create the user).
+    default_role: str = "viewer"
+    # Optional Microsoft Graph credentials for fetching profile
+    # photos when the IdP attribute does not carry one inline.
+    # Empty = photo sync disabled. Required scope:
+    # ``User.Read.All`` (application permission, admin consent).
+    graph_client_id: str = ""
+    graph_client_secret: str = ""
+    graph_tenant_id: str = ""
+
+
+@dataclass(frozen=True)
+class AdminLdapConfig:
+    """LDAP / Active Directory bind authentication (issue #46).
+
+    Operator points the portal at an LDAP server + bind account; the
+    portal then verifies operator passwords against the directory
+    instead of (or alongside) the local scrypt store. Group
+    membership maps to an admin role.
+
+    Conservative defaults: TLS required, paged search, bind timeout
+    set short enough that an unreachable LDAP server does not lock
+    the operator out of the login form for minutes at a time.
+    """
+
+    enabled: bool = False
+    display_name: str = "Sign in with LDAP"
+    # Server. Format: ``ldaps://server.example.com:636`` for TLS,
+    # ``ldap://...`` for cleartext (StartTLS upgraded automatically
+    # when start_tls = true).
+    server: str = ""
+    start_tls: bool = True
+    timeout_seconds: int = 5
+    # Bind account used to search for users + group membership.
+    # Leave empty for anonymous bind (rare).
+    bind_dn: str = ""
+    bind_password: str = ""
+    # Where to look + how to find the user.
+    base_dn: str = ""
+    user_search_filter: str = "(&(objectClass=person)(sAMAccountName={username}))"
+    group_search_filter: str = "(member={user_dn})"
+    # Mapping: each member-of group DN -> admin role. Looked up in
+    # order so the first match wins (admin > operator > viewer >
+    # auditor by convention). Operators usually set 2-4 entries.
+    group_to_role: dict[str, str] = field(default_factory=dict)
+    # Default role when the bind succeeds but the user is in none
+    # of the mapped groups. Empty = refuse the login.
+    default_role: str = ""
+    # Optional TLS trust bundle for self-signed LDAP server certs.
+    ca_cert: str = ""
+
+
+@dataclass(frozen=True)
 class OperationalLogConfig:
     """Operational debug log (``/var/log/zabbix-mcp/mcp.log``).
 
@@ -365,6 +461,8 @@ class AppConfig:
     audit_forward: AuditForwardConfig = field(default_factory=AuditForwardConfig)
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
     operational_log: OperationalLogConfig = field(default_factory=OperationalLogConfig)
+    admin_saml: AdminSamlConfig = field(default_factory=AdminSamlConfig)
+    admin_ldap: AdminLdapConfig = field(default_factory=AdminLdapConfig)
 
     @property
     def default_server(self) -> str | None:
@@ -998,6 +1096,78 @@ def load_config(path: str | Path) -> AppConfig:
         path=str(ops_raw.get("path", "/var/log/zabbix-mcp/mcp.log") or "/var/log/zabbix-mcp/mcp.log"),
     )
 
+    # [admin.saml] - SAML SSO for the admin portal (issue #46).
+    saml_raw: dict = {}
+    if isinstance(admin_raw.get("saml"), dict):
+        saml_raw = dict(admin_raw["saml"])
+    saml_default_role = str(saml_raw.get("default_role", "viewer") or "viewer").strip().lower()
+    if saml_default_role and saml_default_role not in ("admin", "operator", "viewer", "auditor"):
+        raise ConfigError(
+            f"[admin.saml].default_role must be admin / operator / viewer / "
+            f"auditor (or empty), got {saml_default_role!r}"
+        )
+    admin_saml_cfg = AdminSamlConfig(
+        enabled=bool(saml_raw.get("enabled", False)),
+        display_name=str(saml_raw.get("display_name", "Sign in with SAML") or "Sign in with SAML"),
+        idp_entity_id=str(saml_raw.get("idp_entity_id", "") or "").strip(),
+        idp_sso_url=str(saml_raw.get("idp_sso_url", "") or "").strip(),
+        idp_slo_url=str(saml_raw.get("idp_slo_url", "") or "").strip(),
+        x509_certificate=str(saml_raw.get("x509_certificate", "") or "").strip(),
+        email_attribute=str(saml_raw.get("email_attribute", "") or "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"),
+        first_name_attribute=str(saml_raw.get("first_name_attribute", "") or "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"),
+        last_name_attribute=str(saml_raw.get("last_name_attribute", "") or "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname"),
+        photo_url_attribute=str(saml_raw.get("photo_url_attribute", "") or "").strip(),
+        default_role=saml_default_role,
+        graph_client_id=str(saml_raw.get("graph_client_id", "") or "").strip(),
+        graph_client_secret=str(saml_raw.get("graph_client_secret", "") or "").strip(),
+        graph_tenant_id=str(saml_raw.get("graph_tenant_id", "") or "").strip(),
+    )
+
+    # [admin.ldap] - LDAP / AD bind authentication (issue #46).
+    ldap_raw: dict = {}
+    if isinstance(admin_raw.get("ldap"), dict):
+        ldap_raw = dict(admin_raw["ldap"])
+    ldap_default_role = str(ldap_raw.get("default_role", "") or "").strip().lower()
+    if ldap_default_role and ldap_default_role not in ("admin", "operator", "viewer", "auditor"):
+        raise ConfigError(
+            f"[admin.ldap].default_role must be admin / operator / viewer / "
+            f"auditor (or empty), got {ldap_default_role!r}"
+        )
+    group_to_role_raw = ldap_raw.get("group_to_role", {}) or {}
+    if not isinstance(group_to_role_raw, dict):
+        group_to_role_raw = {}
+    group_to_role: dict[str, str] = {}
+    for dn, role in group_to_role_raw.items():
+        role_s = str(role or "").strip().lower()
+        if role_s not in ("admin", "operator", "viewer", "auditor"):
+            raise ConfigError(
+                f"[admin.ldap].group_to_role[{dn!r}] must be admin / operator / "
+                f"viewer / auditor, got {role!r}"
+            )
+        group_to_role[str(dn)] = role_s
+    ldap_timeout = ldap_raw.get("timeout_seconds", 5)
+    try:
+        ldap_timeout = int(ldap_timeout)
+    except (TypeError, ValueError):
+        raise ConfigError(
+            f"[admin.ldap].timeout_seconds must be an integer, got {ldap_timeout!r}"
+        ) from None
+    admin_ldap_cfg = AdminLdapConfig(
+        enabled=bool(ldap_raw.get("enabled", False)),
+        display_name=str(ldap_raw.get("display_name", "Sign in with LDAP") or "Sign in with LDAP"),
+        server=str(ldap_raw.get("server", "") or "").strip(),
+        start_tls=bool(ldap_raw.get("start_tls", True)),
+        timeout_seconds=ldap_timeout,
+        bind_dn=str(ldap_raw.get("bind_dn", "") or "").strip(),
+        bind_password=str(ldap_raw.get("bind_password", "") or ""),
+        base_dn=str(ldap_raw.get("base_dn", "") or "").strip(),
+        user_search_filter=str(ldap_raw.get("user_search_filter", "") or "(&(objectClass=person)(sAMAccountName={username}))"),
+        group_search_filter=str(ldap_raw.get("group_search_filter", "") or "(member={user_dn})"),
+        group_to_role=group_to_role,
+        default_role=ldap_default_role,
+        ca_cert=str(ldap_raw.get("ca_cert", "") or "").strip(),
+    )
+
     # Optional [plugins.<id>] blocks - the contract is locked in v1.31
     # but the plugin loader itself ships in a follow-up release (issue
     # #47). Eager operators may have already added plugin entries to
@@ -1058,4 +1228,6 @@ def load_config(path: str | Path) -> AppConfig:
         audit_forward=audit_forward_cfg,
         metrics=metrics_cfg,
         operational_log=ops_cfg,
+        admin_saml=admin_saml_cfg,
+        admin_ldap=admin_ldap_cfg,
     )
