@@ -43,6 +43,25 @@
                     <button type="submit" class="btn btn-primary w-full btn-lg">Login</button>
                 </div>
             </form>
+            {% if saml_enabled or ldap_enabled %}
+            <div style="margin: 22px 0 8px 0; display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 0.85rem;">
+                <span style="flex: 1; height: 1px; background: var(--border-color);"></span>
+                <span>or</span>
+                <span style="flex: 1; height: 1px; background: var(--border-color);"></span>
+            </div>
+            {% if saml_enabled %}
+            <div class="form-group">
+                <a href="/saml/login" class="btn btn-ghost w-full btn-lg" style="text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    &#x1F510; {{ saml_display_name | default('Sign in with SAML') }}
+                </a>
+            </div>
+            {% endif %}
+            {% if ldap_enabled %}
+            <div class="form-hint" style="text-align: center; margin-top: 6px;">
+                LDAP / AD authentication is enabled - use your directory username + password in the form above.
+            </div>
+            {% endif %}
+            {% endif %}
         </div>
         <div class="login-footer">
             <a href="https://www.initmax.com" target="_blank" style="color:inherit; text-decoration:none;">&copy; {{ year }} initMAX s.r.o.</a>

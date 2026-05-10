@@ -566,6 +566,9 @@ class AdminApp:
             Route("/api/check-updates", self._check_updates, methods=["POST"]),
             Route("/login", self._login, methods=["GET", "POST"]),
             Route("/logout", self._logout, methods=["POST"]),
+            Route("/saml/login", self._saml_login, methods=["GET"]),
+            Route("/saml/acs", self._saml_acs, methods=["POST"]),
+            Route("/saml/metadata", self._saml_metadata, methods=["GET"]),
             Route("/", dashboard),
             Route("/wizard", wizard_view, methods=["GET"]),
             Route("/modules", modules_list, methods=["GET"]),
@@ -680,6 +683,21 @@ class AdminApp:
             ctx["audit_disabled_banner"] = not _aw_state["enabled"]
         except Exception:
             ctx["audit_disabled_banner"] = False
+
+        # Login surface gates (issue #46): login.html renders SAML +
+        # LDAP buttons when the operator wires up
+        # [admin.saml] / [admin.ldap]. Default off.
+        try:
+            saml_cfg = getattr(self.config, "admin_saml", None)
+            ctx["saml_enabled"] = bool(getattr(saml_cfg, "enabled", False))
+            ctx["saml_display_name"] = getattr(saml_cfg, "display_name", "Sign in with SAML")
+        except Exception:
+            ctx["saml_enabled"] = False
+        try:
+            ldap_cfg = getattr(self.config, "admin_ldap", None)
+            ctx["ldap_enabled"] = bool(getattr(ldap_cfg, "enabled", False))
+        except Exception:
+            ctx["ldap_enabled"] = False
 
         # Session user
         session = self._get_session(request)
@@ -1119,3 +1137,155 @@ class AdminApp:
         response = RedirectResponse("/login", status_code=303)
         response.delete_cookie("admin_session")
         return response
+
+    # ------------------------------------------------------------------
+    # SAML SSO endpoints (issue #46)
+    # ------------------------------------------------------------------
+    # In-memory cache of pending AuthnRequest IDs so the ACS step can
+    # verify InResponseTo. Bounded by housekeeping cull on every read.
+    _saml_pending: dict[str, float] = {}
+    _SAML_PENDING_TTL = 600  # 10 minutes - mirror [oauth].auth_code_ttl_seconds
+
+    def _saml_resolved_public_url(self, request: Request) -> str:
+        cfg_pub = getattr(self.config.server, "public_url", "") or ""
+        if cfg_pub:
+            return cfg_pub.rstrip("/")
+        # Fall back to the request scheme + host.
+        scheme = request.url.scheme
+        host = request.headers.get("host") or request.url.netloc
+        return f"{scheme}://{host}"
+
+    async def _saml_login(self, request: Request) -> Response:
+        """GET /saml/login - initiate SAML AuthnRequest."""
+        cfg = getattr(self.config, "admin_saml", None)
+        if cfg is None or not cfg.enabled:
+            return Response("SAML disabled in config", status_code=404, media_type="text/plain")
+        try:
+            from zabbix_mcp.admin import saml_auth
+            redirect, request_id = saml_auth.build_authn_redirect(
+                cfg, self._saml_resolved_public_url(request), request,
+                relay_state=request.query_params.get("return_to", "/"),
+            )
+        except RuntimeError as e:
+            return Response(f"SAML init failed: {e}", status_code=500, media_type="text/plain")
+        except Exception:
+            logger.exception("SAML authn init failed")
+            return Response("SAML init crashed - see server logs", status_code=500, media_type="text/plain")
+        # Stash request_id with TTL cull.
+        import time as _time
+        now = _time.time()
+        # GC
+        for rid in list(self._saml_pending):
+            if self._saml_pending[rid] + self._SAML_PENDING_TTL < now:
+                self._saml_pending.pop(rid, None)
+        if request_id:
+            self._saml_pending[request_id] = now
+        return RedirectResponse(redirect, status_code=302)
+
+    async def _saml_acs(self, request: Request) -> Response:
+        """POST /saml/acs - consume SAML response, create session."""
+        cfg = getattr(self.config, "admin_saml", None)
+        if cfg is None or not cfg.enabled:
+            return Response("SAML disabled in config", status_code=404, media_type="text/plain")
+        form = await request.form()
+        post_data = {k: form.get(k) for k in form}
+        client_ip = request.client.host if request.client else "unknown"
+        try:
+            from zabbix_mcp.admin import saml_auth
+            # Pop the InResponseTo id if we have it; if the IdP sent
+            # one we did not issue, that's a replay / forged response.
+            in_response_to = None
+            try:
+                import base64
+                samlresp_b64 = post_data.get("SAMLResponse", "")
+                if samlresp_b64:
+                    decoded = base64.b64decode(samlresp_b64).decode("utf-8", errors="replace")
+                    import re
+                    m = re.search(r'InResponseTo="([^"]+)"', decoded)
+                    if m:
+                        in_response_to = m.group(1)
+            except Exception:
+                in_response_to = None
+            if in_response_to:
+                if in_response_to not in self._saml_pending:
+                    write_audit("login_failure", user="(saml)", ip=client_ip,
+                                details={"reason": "InResponseTo unknown - replay or stale"})
+                    return self.render("login.html", request, {
+                        "error": "SAML response did not match a pending AuthnRequest.",
+                    }, status_code=401)
+                self._saml_pending.pop(in_response_to, None)
+            result = saml_auth.consume_acs(
+                cfg, self._saml_resolved_public_url(request), request,
+                post_data=post_data, request_id=in_response_to,
+            )
+        except Exception:
+            logger.exception("SAML ACS failed")
+            return self.render("login.html", request, {
+                "error": "SAML response could not be processed.",
+            }, status_code=500)
+        if not result.ok:
+            logger.warning("SAML login refused: %s", result.reason)
+            write_audit("login_failure", user=result.name_id or "(saml)", ip=client_ip,
+                        details={"reason": result.reason[:200]})
+            return self.render("login.html", request, {
+                "error": "SAML authentication failed - check the IdP logs.",
+            }, status_code=401)
+        # Auto-provision a session-only user. We do NOT write back to
+        # config.toml here - SAML identities are session-scoped, the
+        # operator can promote them by re-creating in [admin.users.X]
+        # if they want persistent local data (avatar, alternate role).
+        if not result.role:
+            return self.render("login.html", request, {
+                "error": "SAML user not in any mapped role (default_role not set).",
+            }, status_code=403)
+        username = result.email or result.name_id
+        if not username:
+            return self.render("login.html", request, {
+                "error": "SAML response did not carry an email or NameID.",
+            }, status_code=403)
+        # Rotate any prior session cookie defensively.
+        old_token = request.cookies.get("admin_session")
+        if old_token:
+            self.sessions.destroy_session(old_token)
+        session_token = self.sessions.create_session(username, result.role, client_ip)
+        logger.info("SAML login: user '%s' as role '%s' (NameID %s)",
+                    username, result.role, result.name_id)
+        write_audit("login_success", user=username,
+                    details={"role": result.role, "auth": "saml",
+                             "name_id": result.name_id[:64],
+                             "email": result.email[:120]},
+                    ip=client_ip)
+        # Operational log: full SAML attribute set for debugging.
+        try:
+            from zabbix_mcp.admin import operational_log
+            operational_log.write_event(
+                "auth.saml_login",
+                user=username, role=result.role, name_id=result.name_id,
+                attribute_keys=list((result.attributes or {}).keys()),
+                ip=client_ip,
+            )
+        except Exception:
+            pass
+        relay = post_data.get("RelayState", "/") or "/"
+        if not relay.startswith("/"):
+            relay = "/"
+        response = RedirectResponse(relay, status_code=303)
+        response.set_cookie(
+            "admin_session", session_token,
+            httponly=True, samesite="strict",
+            secure=bool(getattr(self.config.server, "tls_cert_file", None)),
+        )
+        return response
+
+    async def _saml_metadata(self, request: Request) -> Response:
+        """GET /saml/metadata - SP metadata XML."""
+        cfg = getattr(self.config, "admin_saml", None)
+        if cfg is None or not cfg.enabled:
+            return Response("SAML disabled in config", status_code=404, media_type="text/plain")
+        try:
+            from zabbix_mcp.admin import saml_auth
+            xml = saml_auth.metadata_xml(cfg, self._saml_resolved_public_url(request), request)
+        except Exception:
+            logger.exception("SAML metadata render failed")
+            return Response("metadata render failed", status_code=500, media_type="text/plain")
+        return Response(xml, media_type="application/samlmetadata+xml")
