@@ -46,6 +46,16 @@
             <li><a href="/" class="nav-item {% if active == 'dashboard' %}active{% endif %}">
                 <span class="nav-icon">&#x1F4CA;</span> Dashboard</a></li>
 
+            {# Auditor role: scoped to the audit log + dashboard only.
+               Hide every other sidebar entry so the surface matches
+               what the role can actually reach (the auditor middleware
+               redirects non-allowed paths anyway, but a clean nav is
+               better UX than dead links that bounce). #}
+            {% if current_user_role == 'auditor' %}
+            <li><a href="/audit" class="nav-item {% if active == 'audit' %}active{% endif %}">
+                <span class="nav-icon">&#x1F4CB;</span> Audit Log</a></li>
+            {% else %}
+
             {# Section 1 - authentication & client onboarding (cross-plugin, applies to whatever modules are installed) #}
             <li class="nav-section-label">Authentication &amp; Clients</li>
             <li><a href="/tokens" class="nav-item {% if active == 'tokens' %}active{% endif %}">
@@ -95,6 +105,7 @@
                 <span class="nav-icon">&#x1F4CB;</span> Audit Log</a></li>
             <li><a href="/settings" class="nav-item {% if active == 'settings' %}active{% endif %}">
                 <span class="nav-icon">&#x2699;&#xFE0F;</span> Settings</a></li>
+            {% endif %}
         </ul>
         <div class="sidebar-footer">
             <span class="version">v{{ version }} &middot; <a href="https://github.com/initMAX/zabbix-mcp-server" target="_blank">Documentation</a></span>
