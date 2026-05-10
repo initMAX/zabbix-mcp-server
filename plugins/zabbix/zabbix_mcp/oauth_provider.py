@@ -394,6 +394,17 @@ class ZmcpOAuthProvider:
             )
         except Exception:
             logger.exception("Could not write oauth.client_register audit row")
+        try:
+            from zabbix_mcp.admin import operational_log
+            operational_log.oauth_event(
+                "client_register",
+                client_id=str(client_info.client_id or ""),
+                redirect_uris=list(client_info.redirect_uris or []),
+                token_endpoint_auth_method=client_info.token_endpoint_auth_method or "none",
+                scope=client_info.scope or "",
+            )
+        except Exception:
+            pass
 
     async def authorize(
         self,
@@ -403,6 +414,16 @@ class ZmcpOAuthProvider:
         """Hand the user-agent off to our login form; framework redirects them."""
         request_id = _new_secret(24)
         self.stash_pending(request_id, _PendingAuthorization(client, params, ttl_seconds=self._auth_code_ttl))
+        try:
+            from zabbix_mcp.admin import operational_log
+            operational_log.oauth_event(
+                "authorize_request",
+                client_id=str(client.client_id or ""),
+                request_id=request_id[:12],
+                scopes=list(params.scopes or []),
+            )
+        except Exception:
+            pass
         return f"{self._public_url}{self._login_path}?request_id={request_id}"
 
     async def load_authorization_code(
@@ -437,6 +458,18 @@ class ZmcpOAuthProvider:
         # via the same private-attribute trick we use for subject).
         access_ttl = self._client_access_ttl(client)
         refresh_ttl = self._client_refresh_ttl(client)
+        try:
+            from zabbix_mcp.admin import operational_log
+            operational_log.oauth_event(
+                "token_issue",
+                client_id=str(client.client_id or ""),
+                grant_type="authorization_code",
+                subject=str(subject),
+                scopes=list(authorization_code.scopes or []),
+                access_ttl=access_ttl, refresh_ttl=refresh_ttl,
+            )
+        except Exception:
+            pass
         return self._mint_token_pair(
             client_id=str(client.client_id or ""),
             scopes=list(authorization_code.scopes),
@@ -539,6 +572,17 @@ class ZmcpOAuthProvider:
                 if rt_str == refresh_token.token:
                     self._access_to_refresh.pop(at_str, None)
         new_scopes = list(scopes or refresh_token.scopes)
+        try:
+            from zabbix_mcp.admin import operational_log
+            operational_log.oauth_event(
+                "refresh",
+                client_id=str(client.client_id or ""),
+                subject=str(subject),
+                family_id=family[:12] if family else "",
+                scopes=new_scopes,
+            )
+        except Exception:
+            pass
         return self._mint_token_pair(
             client_id=refresh_token.client_id,
             scopes=new_scopes,

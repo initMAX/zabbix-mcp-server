@@ -237,11 +237,21 @@ def stop() -> None:
 
 def _set_connection_state(state: str, error: str | None = None) -> None:
     with _state_lock:
+        prev = _runtime_stats.get("connection_state")
         _runtime_stats["connection_state"] = state
         if error:
             _runtime_stats["last_error"] = error
             _runtime_stats["last_error_at"] = datetime.now(timezone.utc).isoformat()
             _recent_errors.append(error)
+    # Operational log on every state transition - SREs grep mcp.log
+    # for forwarder.* to spot SOC connectivity blips without watching
+    # /metrics live.
+    if prev != state:
+        try:
+            from zabbix_mcp.admin import operational_log
+            operational_log.forwarder_event(state, error=error or "")
+        except Exception:
+            pass
 
 
 def _record_success() -> None:
