@@ -454,6 +454,7 @@ class AdminApp:
                 housekeeping_enabled=_audit_cfg.housekeeping_enabled,
                 retention_seconds=_audit_cfg.data_storage_period_seconds,
                 max_file_size_bytes=_audit_cfg.max_file_size_bytes,
+                hmac_secret_path=_audit_cfg.hmac_secret_path,
             )
             if _audit_cfg.housekeeping_enabled:
                 _aw.start_housekeeping()

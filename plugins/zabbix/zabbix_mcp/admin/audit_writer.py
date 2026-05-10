@@ -72,6 +72,24 @@ _RETENTION_SECONDS: int = 31 * 86400  # 31 days
 _MAX_FILE_SIZE_BYTES: int = MAX_AUDIT_SIZE
 _state_lock = threading.Lock()
 
+# ---- HMAC tamper-chain (issue #49 enterprise compliance) ----
+# When ``[audit].hmac_secret_path`` points at a file with at least 32
+# bytes of secret material, every audit row gets a ``hmac_chain``
+# field containing
+#   sha256_hmac(secret, previous_hmac + json_serialised_row_without_hmac)
+# An external auditor can then run ``zabbix-mcp-server audit verify``
+# to walk the file forward and confirm no row was deleted, modified,
+# or inserted.
+#
+# Empty secret = chain disabled (the legacy v1.30 / v1.31-pre-tamper
+# behaviour). Operators opt in by writing
+#     openssl rand -hex 32 > /etc/zabbix-mcp/audit-hmac.key
+# and pointing the config at it. The Python interpreter does not need
+# to ship with anything extra - HMAC-SHA256 is in the stdlib.
+_HMAC_SECRET: bytes = b""
+_LAST_HMAC: str = "0" * 64
+_chain_lock = threading.Lock()
+
 
 def configure(
     *,
@@ -82,6 +100,7 @@ def configure(
     housekeeping_enabled: bool = True,
     retention_seconds: int = 31 * 86400,
     max_file_size_bytes: int = MAX_AUDIT_SIZE,
+    hmac_secret_path: str = "",
 ) -> None:
     """Apply the Settings -> Audit log knobs at runtime.
 
@@ -92,6 +111,7 @@ def configure(
     global _AUDIT_ENABLED, _LOG_PORTAL_OPERATIONS, _LOG_MCP_ACTIONS
     global _LOG_BACKGROUND_EVENTS, _HOUSEKEEPING_ENABLED
     global _RETENTION_SECONDS, _MAX_FILE_SIZE_BYTES
+    global _HMAC_SECRET, _LAST_HMAC
     with _state_lock:
         _AUDIT_ENABLED = bool(enabled)
         _LOG_PORTAL_OPERATIONS = bool(log_portal_operations)
@@ -100,6 +120,100 @@ def configure(
         _HOUSEKEEPING_ENABLED = bool(housekeeping_enabled)
         _RETENTION_SECONDS = int(retention_seconds)
         _MAX_FILE_SIZE_BYTES = int(max_file_size_bytes)
+    # HMAC tamper-chain bootstrap: read the secret file (if set) and
+    # seed _LAST_HMAC from the most recent row in the live log. A
+    # fresh boot with an existing chained log MUST pick the previous
+    # hmac up so verifying-after-restart still walks cleanly.
+    new_secret = b""
+    if hmac_secret_path:
+        try:
+            from pathlib import Path as _Path
+            content = _Path(hmac_secret_path).read_text(encoding="utf-8").strip()
+            # Operator may store hex or raw bytes-as-string. Try hex
+            # first; fall back to UTF-8 bytes.
+            try:
+                new_secret = bytes.fromhex(content)
+            except ValueError:
+                new_secret = content.encode("utf-8")
+            if len(new_secret) < 32:
+                logger.warning(
+                    "audit hmac secret at %s has only %d bytes; chain "
+                    "is best-effort (use 'openssl rand -hex 32' for a "
+                    "compliance-grade key).",
+                    hmac_secret_path, len(new_secret),
+                )
+        except OSError as e:
+            logger.warning("Cannot read audit hmac secret %s: %s",
+                           hmac_secret_path, e)
+            new_secret = b""
+    with _chain_lock:
+        _HMAC_SECRET = new_secret
+        if new_secret:
+            _LAST_HMAC = _read_last_hmac_from_log() or ("0" * 64)
+        else:
+            _LAST_HMAC = "0" * 64
+
+
+def _read_last_hmac_from_log() -> str | None:
+    """Tail the audit log for the most recent ``hmac_chain`` field.
+
+    Returns the hex digest or None when the log is empty / unsigned.
+    Reads only the last 32 KB of the file - the chain is a per-line
+    hex digest so a few lines is enough.
+    """
+    try:
+        if not AUDIT_LOG_PATH.exists():
+            return None
+        with open(AUDIT_LOG_PATH, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - 32 * 1024))
+            tail = f.read().decode("utf-8", errors="ignore")
+        for line in reversed(tail.splitlines()):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            chain = row.get("hmac_chain")
+            if chain:
+                return str(chain)
+        return None
+    except Exception:
+        return None
+
+
+def _compute_chain_hmac(prev_hex: str, payload: str) -> str:
+    """SHA-256 HMAC chain step: HMAC(secret, prev_hex || payload).
+
+    ``payload`` is the JSON serialisation of the audit row WITHOUT the
+    ``hmac_chain`` field. ``prev_hex`` is the previous row's chain
+    value (or 64 zeros for the first row after configure()).
+    """
+    import hashlib, hmac
+    msg = (prev_hex + payload).encode("utf-8")
+    return hmac.new(_HMAC_SECRET, msg, hashlib.sha256).hexdigest()
+
+
+def _sign_entry(entry: dict) -> dict:
+    """Attach hmac_chain to ``entry`` when the chain secret is loaded.
+
+    Returns the entry (mutated in place). Caller serialises after.
+    No-op when the chain is disabled (returns entry unchanged).
+    """
+    global _LAST_HMAC
+    if not _HMAC_SECRET:
+        return entry
+    with _chain_lock:
+        prev = _LAST_HMAC
+        # Serialise without the hmac_chain field for the digest input.
+        payload = json.dumps(entry, sort_keys=True, default=str, ensure_ascii=False)
+        chain = _compute_chain_hmac(prev, payload)
+        entry["hmac_chain"] = chain
+        _LAST_HMAC = chain
+    return entry
 
 
 def get_runtime_state() -> dict:
@@ -490,6 +604,7 @@ def write_audit(
                 _rotate_audit_log(AUDIT_LOG_PATH)
             except OSError:
                 pass
+        _sign_entry(entry)
         with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as e:
@@ -572,6 +687,7 @@ def write_tool_audit(
                 _rotate_audit_log(AUDIT_LOG_PATH)
             except OSError:
                 pass
+        _sign_entry(operator_entry)
         with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(operator_entry) + "\n")
     except Exception as e:

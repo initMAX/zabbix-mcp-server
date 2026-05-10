@@ -343,6 +343,14 @@ class AuditConfig:
     data_storage_period_seconds: int = 31 * 86400
     data_storage_period_raw: str = "31d"
     max_file_size_bytes: int = 50 * 1024 * 1024
+    # HMAC tamper-chain secret file path. Empty = chain disabled
+    # (default). When set, every audit row gets a ``hmac_chain``
+    # field so an external auditor can run ``zabbix-mcp-server audit
+    # verify`` to confirm no row was deleted, modified, or inserted.
+    # Operator creates the file with
+    #   openssl rand -hex 32 > /etc/zabbix-mcp/audit-hmac.key
+    # File mode should be 0400 root:zabbix-mcp.
+    hmac_secret_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -915,6 +923,7 @@ def load_config(path: str | Path) -> AppConfig:
         data_storage_period_seconds=audit_period_seconds,
         data_storage_period_raw=audit_period_str,
         max_file_size_bytes=audit_max_size_mb * 1024 * 1024,
+        hmac_secret_path=str(audit_raw.get("hmac_secret_path", "") or "").strip(),
     )
 
     # [audit.forward] - external SIEM / syslog destination. Off by

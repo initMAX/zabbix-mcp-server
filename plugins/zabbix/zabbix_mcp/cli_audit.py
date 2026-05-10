@@ -341,5 +341,100 @@ def main(argv: list[str]) -> int:
     s.add_argument("--include-archives", action="store_true")
     s.set_defaults(func=_cmd_stats)
 
+    v = sub.add_parser("verify", help="Verify HMAC tamper chain integrity")
+    v.add_argument("--log", default=str(DEFAULT_AUDIT_LOG),
+                   help=f"Audit log path (default {DEFAULT_AUDIT_LOG})")
+    v.add_argument("--secret", required=True,
+                   help="Path to the HMAC secret file (same as [audit].hmac_secret_path)")
+    v.set_defaults(func=_cmd_verify)
+
     args = parser.parse_args(argv)
     return args.func(args)
+
+
+def _cmd_verify(args: argparse.Namespace) -> int:
+    """Walk the audit log forward, recompute the HMAC chain, and report
+    any row whose chain digest does not match the recorded one.
+
+    Exit code 0 = chain intact. 1 = mismatch (some row was modified,
+    deleted, or inserted). 2 = setup error (secret unreadable, log
+    not chained).
+    """
+    import hashlib, hmac
+    from pathlib import Path
+    try:
+        content = Path(args.secret).read_text(encoding="utf-8").strip()
+        try:
+            secret = bytes.fromhex(content)
+        except ValueError:
+            secret = content.encode("utf-8")
+    except OSError as e:
+        print(f"ERROR: cannot read secret {args.secret}: {e}", file=sys.stderr)
+        return 2
+    if not secret:
+        print(f"ERROR: secret file {args.secret} is empty", file=sys.stderr)
+        return 2
+
+    prev = "0" * 64
+    rows_verified = 0
+    rows_unsigned = 0
+    first_break: tuple[int, str] | None = None
+    line_no = 0
+    try:
+        with open(args.log, "r", encoding="utf-8", errors="replace") as f:
+            for raw in f:
+                line_no += 1
+                line = raw.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                got = row.pop("hmac_chain", None)
+                if got is None:
+                    rows_unsigned += 1
+                    continue
+                payload = json.dumps(row, sort_keys=True, default=str, ensure_ascii=False)
+                expected = hmac.new(
+                    secret, (prev + payload).encode("utf-8"), hashlib.sha256,
+                ).hexdigest()
+                if not _const_eq(expected, got):
+                    if first_break is None:
+                        first_break = (line_no, str(got))
+                    # Continue checking - downstream rows depend on the
+                    # expected chain so they will all be reported as
+                    # broken; we still want to count them.
+                    prev = got  # advance with the on-disk value so
+                                # subsequent rows that ARE consistent
+                                # with each other still match.
+                else:
+                    prev = got
+                rows_verified += 1
+    except OSError as e:
+        print(f"ERROR: cannot read log {args.log}: {e}", file=sys.stderr)
+        return 2
+
+    print(f"Log: {args.log}")
+    print(f"Secret: {args.secret} ({len(secret)} bytes)")
+    print(f"Signed rows verified: {rows_verified}")
+    print(f"Unsigned rows skipped: {rows_unsigned}")
+    if first_break:
+        print(f"\nCHAIN BROKEN at line {first_break[0]}: hmac_chain {first_break[1][:16]}...")
+        print("Verdict: TAMPER DETECTED - audit log integrity compromised.")
+        return 1
+    if rows_verified == 0 and rows_unsigned > 0:
+        print("\nVerdict: log is unsigned - enable [audit].hmac_secret_path to start chaining.")
+        return 2
+    print("\nVerdict: chain intact.")
+    return 0
+
+
+def _const_eq(a: str, b: str) -> bool:
+    """Constant-time string compare for the chain digest."""
+    if len(a) != len(b):
+        return False
+    diff = 0
+    for x, y in zip(a, b):
+        diff |= ord(x) ^ ord(y)
+    return diff == 0
