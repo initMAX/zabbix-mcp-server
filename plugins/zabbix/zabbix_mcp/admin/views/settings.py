@@ -27,7 +27,11 @@ RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file"
 LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools", "trusted_proxies", "default_scopes"}
 
 # Boolean fields — checkbox present = True, absent = False
-BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_portal_operations", "log_mcp_actions", "log_background_events", "housekeeping_enabled", "dynamic_registration_enabled"}
+BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "log_portal_operations", "log_mcp_actions", "log_background_events", "housekeeping_enabled", "dynamic_registration_enabled", "start_tls"}
+
+# Secret fields - blank form value means "keep existing" rather than
+# "clear". Mirrors api_key handling for [admin.ai].
+SECRET_KEEP_EMPTY_EXTRA = {"bind_password", "graph_client_secret", "x509_certificate"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -108,12 +112,35 @@ SECTION_CONFIG = {
         "allowed_keys": {"trusted_proxies"},
         "min_role": "admin",
     },
+    # [admin.saml] - SAML SSO config editor (issue #46).
+    "admin_saml": {
+        "toml_section": "admin.saml",
+        "allowed_keys": {
+            "enabled", "display_name", "idp_entity_id", "idp_sso_url",
+            "idp_slo_url", "x509_certificate",
+            "email_attribute", "first_name_attribute", "last_name_attribute",
+            "photo_url_attribute", "default_role",
+            "graph_client_id", "graph_client_secret", "graph_tenant_id",
+        },
+        "min_role": "admin",
+    },
+    # [admin.ldap] - LDAP / AD config editor (issue #46).
+    "admin_ldap": {
+        "toml_section": "admin.ldap",
+        "allowed_keys": {
+            "enabled", "display_name", "server", "start_tls", "timeout_seconds",
+            "bind_dn", "bind_password", "base_dn",
+            "user_search_filter", "group_search_filter", "default_role",
+            "ca_cert",
+        },
+        "min_role": "admin",
+    },
 }
 
 # Keys that must not be cleared when the submitted value is empty.
 # The settings UI sends "" for api_key when the operator does not want
 # to rotate the stored secret; treat that as "keep current value".
-SECRET_KEEP_EMPTY = {"api_key"}
+SECRET_KEEP_EMPTY = {"api_key"} | SECRET_KEEP_EMPTY_EXTRA
 
 
 def _normalize_ip_entry(entry: str) -> str:
@@ -356,6 +383,38 @@ async def settings_view(request: Request) -> Response:
             if isinstance(tp, str):
                 tp = [tp]
             settings["trusted_proxies"] = list(tp) if tp else []
+
+            # [admin.saml] - SAML SSO config editor (issue #46).
+            saml_cfg = dict(admin_cfg.get("saml", {})) if isinstance(admin_cfg.get("saml"), dict) else {}
+            settings["saml_enabled"] = bool(saml_cfg.get("enabled", False))
+            settings["saml_display_name"] = str(saml_cfg.get("display_name", "Sign in with SAML") or "Sign in with SAML")
+            settings["saml_idp_entity_id"] = str(saml_cfg.get("idp_entity_id", "") or "")
+            settings["saml_idp_sso_url"] = str(saml_cfg.get("idp_sso_url", "") or "")
+            settings["saml_idp_slo_url"] = str(saml_cfg.get("idp_slo_url", "") or "")
+            settings["saml_x509_certificate_configured"] = bool(saml_cfg.get("x509_certificate"))
+            settings["saml_email_attribute"] = str(saml_cfg.get("email_attribute") or "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")
+            settings["saml_first_name_attribute"] = str(saml_cfg.get("first_name_attribute") or "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname")
+            settings["saml_last_name_attribute"] = str(saml_cfg.get("last_name_attribute") or "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname")
+            settings["saml_photo_url_attribute"] = str(saml_cfg.get("photo_url_attribute", "") or "")
+            settings["saml_default_role"] = str(saml_cfg.get("default_role", "viewer") or "viewer")
+            settings["saml_graph_client_id"] = str(saml_cfg.get("graph_client_id", "") or "")
+            settings["saml_graph_client_secret_configured"] = bool(saml_cfg.get("graph_client_secret"))
+            settings["saml_graph_tenant_id"] = str(saml_cfg.get("graph_tenant_id", "") or "")
+
+            # [admin.ldap] - LDAP / AD config editor (issue #46).
+            ldap_cfg = dict(admin_cfg.get("ldap", {})) if isinstance(admin_cfg.get("ldap"), dict) else {}
+            settings["ldap_enabled"] = bool(ldap_cfg.get("enabled", False))
+            settings["ldap_display_name"] = str(ldap_cfg.get("display_name", "Sign in with LDAP") or "Sign in with LDAP")
+            settings["ldap_server"] = str(ldap_cfg.get("server", "") or "")
+            settings["ldap_start_tls"] = bool(ldap_cfg.get("start_tls", True))
+            settings["ldap_timeout_seconds"] = int(ldap_cfg.get("timeout_seconds") or 5)
+            settings["ldap_bind_dn"] = str(ldap_cfg.get("bind_dn", "") or "")
+            settings["ldap_bind_password_configured"] = bool(ldap_cfg.get("bind_password"))
+            settings["ldap_base_dn"] = str(ldap_cfg.get("base_dn", "") or "")
+            settings["ldap_user_search_filter"] = str(ldap_cfg.get("user_search_filter") or "(&(objectClass=person)(sAMAccountName={username}))")
+            settings["ldap_group_search_filter"] = str(ldap_cfg.get("group_search_filter") or "(member={user_dn})")
+            settings["ldap_default_role"] = str(ldap_cfg.get("default_role", "") or "")
+            settings["ldap_ca_cert"] = str(ldap_cfg.get("ca_cert", "") or "")
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 

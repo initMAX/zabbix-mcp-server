@@ -896,6 +896,214 @@ function resetAuditDefaults() {
     </form>
 </div>
 
+<!-- Section 5f: SAML 2.0 SSO (issue #46) -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F510; SAML 2.0 SSO</h2>
+    <div class="form-hint" style="margin-bottom:12px;">
+        Single sign-on against an external IdP (Azure AD, Okta, Keycloak, ADFS, ...). When enabled,
+        the login page surfaces a 'Sign in with SAML' button. SP metadata is at
+        <code>{{ public_url | default('') }}/saml/metadata</code> - paste that URL into the IdP wizard
+        and it will pre-populate the EntityID + ACS URL.
+    </div>
+    <form method="post" action="/settings/admin_saml" id="saml-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
+        <div class="settings-row">
+            <div class="settings-label">Enabled <span class="tooltip-icon" tabindex="0" data-tooltip="Master toggle. When on, the login page exposes the SAML button. /saml/* endpoints return 404 when off.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="enabled" value="true" {% if settings.saml_enabled %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    SAML 2.0 SSO is enabled
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Display name <span class="tooltip-icon" tabindex="0" data-tooltip="Label on the 'Sign in with SAML' button. e.g. 'Sign in with Azure AD'.">&#x1F6C8;</span></div>
+            <div><input type="text" name="display_name" class="form-input" value="{{ settings.saml_display_name | default('Sign in with SAML') }}" placeholder="Sign in with SAML"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">IdP Entity ID <span class="tooltip-icon" tabindex="0" data-tooltip="From the IdP metadata XML (e.g. https://sts.windows.net/{tenant}/).">&#x1F6C8;</span></div>
+            <div><input type="text" name="idp_entity_id" class="form-input" value="{{ settings.saml_idp_entity_id | default('') }}" placeholder="https://sts.windows.net/{tenant}/"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">IdP SSO URL <span class="tooltip-icon" tabindex="0" data-tooltip="HTTP-Redirect SSO endpoint from IdP metadata.">&#x1F6C8;</span></div>
+            <div><input type="text" name="idp_sso_url" class="form-input" value="{{ settings.saml_idp_sso_url | default('') }}" placeholder="https://login.microsoftonline.com/{tenant}/saml2"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">IdP SLO URL <span class="tooltip-icon" tabindex="0" data-tooltip="Optional Single Logout endpoint.">&#x1F6C8;</span></div>
+            <div><input type="text" name="idp_slo_url" class="form-input" value="{{ settings.saml_idp_slo_url | default('') }}" placeholder="(optional)"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">x509 certificate <span class="tooltip-icon" tabindex="0" data-tooltip="IdP signing cert (PEM or raw base64). Required for assertion signature validation.">&#x1F6C8;</span></div>
+            <div>
+                <textarea name="x509_certificate" class="form-input" rows="4" style="font-family: monospace; font-size: 0.78rem;" placeholder="-----BEGIN CERTIFICATE-----&#10;MIIDxTCCAq2gAwIBAgIQ...&#10;-----END CERTIFICATE-----"></textarea>
+                {% if settings.saml_x509_certificate_configured %}
+                <div class="form-hint"><span class="badge badge-success">Certificate configured</span> - leave blank to keep, paste a new PEM to rotate.</div>
+                {% else %}
+                <div class="form-hint">Paste IdP signing cert in PEM or raw base64.</div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Email attribute</div>
+            <div><input type="text" name="email_attribute" class="form-input" value="{{ settings.saml_email_attribute | default('http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress') }}"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">First name attribute</div>
+            <div><input type="text" name="first_name_attribute" class="form-input" value="{{ settings.saml_first_name_attribute | default('http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname') }}"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Last name attribute</div>
+            <div><input type="text" name="last_name_attribute" class="form-input" value="{{ settings.saml_last_name_attribute | default('http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname') }}"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Photo URL attribute (optional)</div>
+            <div><input type="text" name="photo_url_attribute" class="form-input" value="{{ settings.saml_photo_url_attribute | default('') }}" placeholder="(optional - claim carrying a photo URL)"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Default role <span class="tooltip-icon" tabindex="0" data-tooltip="Role given to a SAML-authenticated user that does not have a [admin.users.X] entry.">&#x1F6C8;</span></div>
+            <div>
+                <select name="default_role" class="form-select">
+                    <option value="viewer" {% if settings.saml_default_role == 'viewer' or not settings.saml_default_role %}selected{% endif %}>Viewer</option>
+                    <option value="auditor" {% if settings.saml_default_role == 'auditor' %}selected{% endif %}>Auditor (audit log only)</option>
+                    <option value="operator" {% if settings.saml_default_role == 'operator' %}selected{% endif %}>Operator</option>
+                    <option value="admin" {% if settings.saml_default_role == 'admin' %}selected{% endif %}>Admin</option>
+                </select>
+            </div>
+        </div>
+        <div style="margin-top:14px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--bg-input);">
+            <strong style="font-size: 0.88rem;">Microsoft Graph profile photo sync (optional)</strong>
+            <div class="form-hint" style="margin-top: 4px;">When set, the portal fetches user photos via Graph (<code>User.Read.All</code> application permission, admin consent required). Photos appear in the audit log avatar slot.</div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Graph tenant ID</div>
+            <div><input type="text" name="graph_tenant_id" class="form-input" value="{{ settings.saml_graph_tenant_id | default('') }}" placeholder="(optional)"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Graph client ID</div>
+            <div><input type="text" name="graph_client_id" class="form-input" value="{{ settings.saml_graph_client_id | default('') }}" placeholder="(optional)"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Graph client secret</div>
+            <div>
+                <input type="password" name="graph_client_secret" class="form-input" placeholder="{% if settings.saml_graph_client_secret_configured %}(configured - leave blank to keep){% else %}(optional){% endif %}" autocomplete="new-password">
+            </div>
+        </div>
+        {% if current_user_role != 'viewer' %}
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save SAML settings</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Section 5g: LDAP / Active Directory (issue #46) -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F4DA; LDAP / Active Directory</h2>
+    <div class="form-hint" style="margin-bottom:12px;">
+        Bind authentication against an LDAP / AD directory. When enabled, the username + password
+        login form falls back to LDAP if local-scrypt rejects the credentials. Local-first ordering
+        ensures a directory outage cannot lock the local admin out.
+    </div>
+    <form method="post" action="/settings/admin_ldap" id="ldap-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
+        <div class="settings-row">
+            <div class="settings-label">Enabled</div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="enabled" value="true" {% if settings.ldap_enabled %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    LDAP / AD authentication is enabled
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Server <span class="tooltip-icon" tabindex="0" data-tooltip="ldap:// or ldaps:// + host + port. ldaps://server:636 for TLS at bind, ldap://server:389 + StartTLS for upgrade.">&#x1F6C8;</span></div>
+            <div><input type="text" name="server" class="form-input" value="{{ settings.ldap_server | default('') }}" placeholder="ldaps://ad.example.local:636"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">StartTLS</div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="start_tls" value="true" {% if settings.ldap_start_tls %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Upgrade cleartext bind to TLS via StartTLS (recommended when not using ldaps://)
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Bind DN <span class="tooltip-icon" tabindex="0" data-tooltip="Service account that searches for users + group membership. Leave empty for anonymous bind (rare).">&#x1F6C8;</span></div>
+            <div><input type="text" name="bind_dn" class="form-input" value="{{ settings.ldap_bind_dn | default('') }}" placeholder="CN=zabbix-mcp,OU=Service Accounts,DC=example,DC=local"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Bind password</div>
+            <div><input type="password" name="bind_password" class="form-input" placeholder="{% if settings.ldap_bind_password_configured %}(configured - leave blank to keep){% else %}(set a password){% endif %}" autocomplete="new-password"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Base DN</div>
+            <div><input type="text" name="base_dn" class="form-input" value="{{ settings.ldap_base_dn | default('') }}" placeholder="DC=example,DC=local"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">User search filter <span class="tooltip-icon" tabindex="0" data-tooltip="LDAP filter with {username} placeholder. AD: (&(objectClass=person)(sAMAccountName={username})). OpenLDAP: (&(objectClass=inetOrgPerson)(uid={username})).">&#x1F6C8;</span></div>
+            <div><input type="text" name="user_search_filter" class="form-input" value="{{ settings.ldap_user_search_filter | default('(&(objectClass=person)(sAMAccountName={username}))') }}"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Group search filter <span class="tooltip-icon" tabindex="0" data-tooltip="LDAP filter with {user_dn} placeholder. AD: (member={user_dn}). OpenLDAP with memberUid: (&(objectClass=posixGroup)(memberUid={username})).">&#x1F6C8;</span></div>
+            <div><input type="text" name="group_search_filter" class="form-input" value="{{ settings.ldap_group_search_filter | default('(member={user_dn})') }}"></div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Default role</div>
+            <div>
+                <select name="default_role" class="form-select">
+                    <option value="" {% if not settings.ldap_default_role %}selected{% endif %}>(refuse if not in mapped group)</option>
+                    <option value="viewer" {% if settings.ldap_default_role == 'viewer' %}selected{% endif %}>Viewer</option>
+                    <option value="auditor" {% if settings.ldap_default_role == 'auditor' %}selected{% endif %}>Auditor (audit log only)</option>
+                    <option value="operator" {% if settings.ldap_default_role == 'operator' %}selected{% endif %}>Operator</option>
+                    <option value="admin" {% if settings.ldap_default_role == 'admin' %}selected{% endif %}>Admin</option>
+                </select>
+                <div class="form-hint">Used when the user binds OK but is in none of the [admin.ldap.group_to_role] mapped groups. Empty = refuse the login.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Timeout (s)</div>
+            <div>
+                <div class="number-input-group">
+                    <button type="button" class="num-btn num-minus">&minus;</button>
+                    <input type="number" name="timeout_seconds" value="{{ settings.ldap_timeout_seconds | default(5) }}" min="1" max="60">
+                    <button type="button" class="num-btn num-plus">+</button>
+                </div>
+                <div class="form-hint">Bind / search timeout. 5 sec keeps the login form snappy if the directory is unreachable.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">CA certificate (PEM)</div>
+            <div>
+                <input type="text" name="ca_cert" class="form-input" value="{{ settings.ldap_ca_cert | default('') }}" placeholder="/etc/zabbix-mcp/ldap-ca.pem">
+                <div class="form-hint">Optional - PEM path to trust the LDAP server's TLS cert when the server is signed by a private CA.</div>
+            </div>
+        </div>
+        <div class="form-hint" style="margin-top: 10px;">
+            <strong>Group -> role mapping</strong> is edited directly in <code>config.toml</code> under <code>[admin.ldap.group_to_role]</code> for v1.32. Example:
+            <pre style="background: var(--bg-input); padding: 6px 10px; border-radius: var(--radius-md); margin-top: 4px; font-size: 0.78rem;">[admin.ldap.group_to_role]
+"CN=zbx-admin,OU=Groups,DC=example,DC=local" = "admin"
+"CN=zbx-ops,OU=Groups,DC=example,DC=local"   = "operator"</pre>
+        </div>
+        {% if current_user_role != 'viewer' %}
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save LDAP settings</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
 <!-- Section 6: AI Template Generation -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x2728; AI Template Generation</h2>
