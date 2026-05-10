@@ -430,6 +430,16 @@ class AdminApp:
             autoescape=True,
         )
 
+        # Operational log file - service lifecycle + debug events.
+        # Configured before audit so a config-load failure ends up in
+        # the ops log too.
+        try:
+            from zabbix_mcp.admin import operational_log as _ops
+            _ops_cfg = self.config.operational_log
+            _ops.configure(enabled=_ops_cfg.enabled, path=_ops_cfg.path)
+        except Exception:
+            logger.exception("Failed to apply operational log config at boot")
+
         # Apply audit-log knobs from config so the Settings -> Audit log
         # toggles take effect on boot. start_housekeeping() spawns the
         # daily-rotation + retention-purge daemon (idempotent).

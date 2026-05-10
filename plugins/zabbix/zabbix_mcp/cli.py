@@ -149,4 +149,19 @@ def main() -> None:
     logger.info("Transport: %s | Listening on: %s:%d", transport, host, port)
     logger.info("Zabbix servers: %s", server_names)
 
+    # Operational log: record service start with the resolved binding.
+    # Best-effort - the import lives here (not at module top) so a
+    # build that strips the module still boots.
+    try:
+        import os
+        from zabbix_mcp.admin import operational_log
+        ops_cfg = config.operational_log
+        operational_log.configure(enabled=ops_cfg.enabled, path=ops_cfg.path)
+        operational_log.service_start(
+            version=__version__, transport=transport,
+            host=host, port=port, pid=os.getpid(),
+        )
+    except Exception:
+        logger.debug("operational_log not available", exc_info=True)
+
     run_server(config, transport=transport, host=host, port=port)

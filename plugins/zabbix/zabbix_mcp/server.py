@@ -1651,6 +1651,7 @@ def _make_tool_handler(
         _audit_session = current_session_id.get()
         _audit_ip = current_client_ip.get() or ""
         _audit_emitted = False
+        _call_started = time.monotonic()
 
         def _emit(policy: str, reason: str | None, count: int | str | None) -> None:
             nonlocal _audit_emitted
@@ -1677,6 +1678,23 @@ def _make_tool_handler(
                         pass
             except Exception:
                 logger.exception("Failed to emit tool audit row for %s", method_def.tool_name)
+            # Operational log + /metrics histogram observe latency on
+            # every exit. Best-effort - never affects the request path.
+            _duration = time.monotonic() - _call_started
+            try:
+                from zabbix_mcp.admin import operational_log
+                operational_log.tool_call(
+                    method_def.tool_name, _duration, policy,
+                    oauth_subject=_audit_subject if _audit_subject != "anonymous" else None,
+                    error=reason if policy == "error" else None,
+                )
+            except Exception:
+                pass
+            try:
+                from zabbix_mcp.admin import metrics
+                metrics.record_tool_invocation(method_def.tool_name, policy, _duration)
+            except Exception:
+                pass
             _audit_emitted = True
 
         # raw_json is a token-gated policy toggle - validate before doing

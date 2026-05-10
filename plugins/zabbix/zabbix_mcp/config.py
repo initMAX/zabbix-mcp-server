@@ -213,6 +213,20 @@ class OAuthConfig:
 
 
 @dataclass(frozen=True)
+class OperationalLogConfig:
+    """Operational debug log (``/var/log/zabbix-mcp/mcp.log``).
+
+    Separate from the compliance audit log; this is for SRE / ops /
+    debugging. Loose schema, captures service lifecycle + per-tool
+    timing + uncaught errors. Default on - small file footprint and
+    high value when troubleshooting.
+    """
+
+    enabled: bool = True
+    path: str = "/var/log/zabbix-mcp/mcp.log"
+
+
+@dataclass(frozen=True)
 class MetricsConfig:
     """Prometheus /metrics endpoint settings.
 
@@ -342,6 +356,7 @@ class AppConfig:
     audit: AuditConfig = field(default_factory=AuditConfig)
     audit_forward: AuditForwardConfig = field(default_factory=AuditForwardConfig)
     metrics: MetricsConfig = field(default_factory=MetricsConfig)
+    operational_log: OperationalLogConfig = field(default_factory=OperationalLogConfig)
 
     @property
     def default_server(self) -> str | None:
@@ -967,6 +982,13 @@ def load_config(path: str | Path) -> AppConfig:
         bearer_token=str(metrics_raw.get("bearer_token", "") or "").strip(),
     )
 
+    # [operational_log] - service lifecycle + debug log file.
+    ops_raw = raw.get("operational_log", {}) or {}
+    ops_cfg = OperationalLogConfig(
+        enabled=bool(ops_raw.get("enabled", True)),
+        path=str(ops_raw.get("path", "/var/log/zabbix-mcp/mcp.log") or "/var/log/zabbix-mcp/mcp.log"),
+    )
+
     # Optional [plugins.<id>] blocks - the contract is locked in v1.31
     # but the plugin loader itself ships in a follow-up release (issue
     # #47). Eager operators may have already added plugin entries to
@@ -1026,4 +1048,5 @@ def load_config(path: str | Path) -> AppConfig:
         admin_ai=admin_ai, oauth=oauth_cfg, audit=audit_cfg,
         audit_forward=audit_forward_cfg,
         metrics=metrics_cfg,
+        operational_log=ops_cfg,
     )
