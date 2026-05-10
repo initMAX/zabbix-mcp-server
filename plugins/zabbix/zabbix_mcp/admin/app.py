@@ -1031,7 +1031,38 @@ class AdminApp:
                     pass
 
         user_data = admin_users.get(username)
-        if not user_data or not verify_password(password, user_data.get("password_hash", "")):
+        local_ok = bool(user_data) and verify_password(password, user_data.get("password_hash", ""))
+
+        # LDAP fallback when local auth says no. Order matters: local
+        # first so a directory outage cannot lock the local-only
+        # admin out. LDAP success populates user_data on the fly with
+        # the role from group_to_role / default_role.
+        ldap_ok = False
+        if not local_ok:
+            ldap_cfg = getattr(self.config, "admin_ldap", None)
+            if ldap_cfg is not None and getattr(ldap_cfg, "enabled", False):
+                try:
+                    from zabbix_mcp.admin.ldap_auth import authenticate as _ldap_auth
+                    result = _ldap_auth(ldap_cfg, username, password)
+                except Exception:
+                    logger.exception("LDAP auth raised")
+                    result = None
+                if result is not None and result.ok:
+                    ldap_ok = True
+                    user_data = {
+                        "role": result.role,
+                        "email": result.email,
+                        "full_name": result.full_name,
+                        "auth_source": "ldap",
+                        "ldap_dn": result.user_dn,
+                    }
+                    logger.info("LDAP login: user '%s' as role '%s' (DN %s)",
+                                username, result.role, result.user_dn)
+                elif result is not None:
+                    logger.warning("LDAP login refused for '%s': %s",
+                                   username, result.reason)
+
+        if not local_ok and not ldap_ok:
             self.rate_limiter.record_attempt(client_ip)
             logger.warning("Failed login attempt for user '%s' from %s", username, client_ip)
             write_audit("login_failure", user=username, ip=client_ip)
