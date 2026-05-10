@@ -559,6 +559,7 @@ class AdminApp:
 
         routes = [
             Route("/health", self._admin_health, methods=["GET"]),
+            Route("/health/full", self._admin_health_full, methods=["GET"]),
             Route("/metrics", self._metrics, methods=["GET"]),
             Route("/api/mcp-status", self._mcp_status, methods=["GET"]),
             Route("/api/server-status", self._server_status, methods=["GET"]),
@@ -755,6 +756,133 @@ class AdminApp:
     async def _admin_health(self, request: Request) -> Response:
         """Health check endpoint — no auth required."""
         return JSONResponse({"status": "ok", "portal": "admin", "version": __version__})
+
+    async def _admin_health_full(self, request: Request) -> Response:
+        """Aggregate health endpoint - reports per-subsystem status.
+
+        Returns ``{"status": "ok|degraded|critical", "checks": {...}}``
+        where ``checks`` carries one entry per subsystem (audit log
+        writeable, forwarder connection state, housekeeping daemon
+        alive, Zabbix server reachability, disk space). HTTP code:
+        200 on ok / degraded, 503 on critical.
+
+        No auth required - same surface as /health, suitable for
+        service-mesh probes / Zabbix HTTP-agent template / cron alert
+        scripts.
+        """
+        checks: dict[str, dict] = {}
+        worst = "ok"
+
+        def _bump(level: str) -> None:
+            nonlocal worst
+            order = {"ok": 0, "degraded": 1, "critical": 2}
+            if order[level] > order[worst]:
+                worst = level
+
+        # Audit log writeable.
+        try:
+            from zabbix_mcp.admin.audit_writer import AUDIT_LOG_PATH, get_runtime_state as _aw_state
+            s = _aw_state()
+            log_dir = AUDIT_LOG_PATH.parent
+            if not log_dir.exists():
+                checks["audit_log"] = {"status": "critical", "reason": f"{log_dir} missing"}
+                _bump("critical")
+            elif not s.get("enabled"):
+                checks["audit_log"] = {"status": "degraded", "reason": "audit logging disabled"}
+                _bump("degraded")
+            else:
+                checks["audit_log"] = {"status": "ok"}
+        except Exception as e:
+            checks["audit_log"] = {"status": "critical", "reason": str(e)}
+            _bump("critical")
+
+        # Audit forwarder.
+        try:
+            from zabbix_mcp.admin import audit_forwarder
+            f = audit_forwarder.get_runtime_state()
+            if not f.get("enabled"):
+                checks["forwarder"] = {"status": "ok", "reason": "disabled (no SIEM target)"}
+            else:
+                conn = f.get("connection_state")
+                if conn == "connected":
+                    checks["forwarder"] = {"status": "ok", "queue_depth": f.get("queue_depth"),
+                                           "messages_sent": f.get("messages_sent")}
+                elif conn == "connecting":
+                    checks["forwarder"] = {"status": "degraded", "reason": "connecting"}
+                    _bump("degraded")
+                else:
+                    checks["forwarder"] = {"status": "degraded",
+                                           "reason": f"state={conn}, last_error={f.get('last_error')}"}
+                    _bump("degraded")
+        except Exception as e:
+            checks["forwarder"] = {"status": "critical", "reason": str(e)}
+            _bump("critical")
+
+        # Housekeeping.
+        try:
+            from zabbix_mcp.admin.audit_writer import get_runtime_state as _aw_state, _housekeeping_thread
+            s = _aw_state()
+            if not s.get("housekeeping_enabled"):
+                checks["housekeeping"] = {"status": "ok", "reason": "disabled (external rotator)"}
+            elif _housekeeping_thread is None or not _housekeeping_thread.is_alive():
+                checks["housekeeping"] = {"status": "degraded", "reason": "daemon not running"}
+                _bump("degraded")
+            else:
+                checks["housekeeping"] = {"status": "ok"}
+        except Exception as e:
+            checks["housekeeping"] = {"status": "critical", "reason": str(e)}
+            _bump("critical")
+
+        # Zabbix servers.
+        zabbix_results: dict[str, str] = {}
+        try:
+            client_manager = getattr(self, "client_manager", None)
+            if client_manager is not None:
+                for name in client_manager.server_names:
+                    try:
+                        client_manager.check_connection(name)
+                        zabbix_results[name] = "ok"
+                    except Exception as e:
+                        zabbix_results[name] = f"unreachable: {e}"
+            if not zabbix_results:
+                checks["zabbix"] = {"status": "ok", "reason": "no servers configured"}
+            elif all(v == "ok" for v in zabbix_results.values()):
+                checks["zabbix"] = {"status": "ok", "servers": zabbix_results}
+            elif any(v == "ok" for v in zabbix_results.values()):
+                checks["zabbix"] = {"status": "degraded", "servers": zabbix_results}
+                _bump("degraded")
+            else:
+                checks["zabbix"] = {"status": "critical", "servers": zabbix_results}
+                _bump("critical")
+        except Exception as e:
+            checks["zabbix"] = {"status": "critical", "reason": str(e)}
+            _bump("critical")
+
+        # Disk space on the audit log volume - SREs care because the
+        # housekeeping rotation can't free a volume that is already
+        # full enough to refuse new file creation.
+        try:
+            import shutil
+            from zabbix_mcp.admin.audit_writer import AUDIT_LOG_PATH
+            usage = shutil.disk_usage(AUDIT_LOG_PATH.parent)
+            free_pct = (usage.free / usage.total) * 100 if usage.total else 0
+            if free_pct < 5:
+                checks["disk"] = {"status": "critical",
+                                  "free_pct": round(free_pct, 1),
+                                  "free_bytes": usage.free}
+                _bump("critical")
+            elif free_pct < 15:
+                checks["disk"] = {"status": "degraded", "free_pct": round(free_pct, 1)}
+                _bump("degraded")
+            else:
+                checks["disk"] = {"status": "ok", "free_pct": round(free_pct, 1)}
+        except Exception as e:
+            checks["disk"] = {"status": "degraded", "reason": str(e)}
+            _bump("degraded")
+
+        body = {"status": worst, "version": __version__, "checks": checks}
+        status_code = 503 if worst == "critical" else 200
+        return JSONResponse(body, status_code=status_code)
 
     async def _metrics(self, request: Request) -> Response:
         """Prometheus /metrics endpoint - no auth, IP-allowlisted by config.
