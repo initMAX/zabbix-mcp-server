@@ -48,5 +48,21 @@
     ],
     "min_host_version": "1.31",
     "bundled": true,
+    "report_templates": [
+        "availability",
+        "capacity_host",
+        "capacity_network",
+        "backup"
+    ],
+    "audit_target_keys": [
+        "hostid", "hostids", "groupid", "groupids", "templateid",
+        "itemid", "triggerid", "graphid", "eventid", "problemid",
+        "actionid", "userid", "roleid", "tokenid", "mfaid",
+        "sysmapid", "dashboardid", "templategroupid",
+        "maintenanceid", "proxyid", "proxygroupid",
+        "scriptid", "mediatypeid", "iconmapid", "imageid",
+        "regexpid", "valuemapid", "connectorid", "correlationid",
+        "slaid", "reportid"
+    ],
     "_comment": "This manifest describes the Zabbix module that ships bundled with the host. It is documentary in v1.31 - the host implements the Zabbix integration directly and does not load it through the plugin loader. The manifest is forward-compatible with the upcoming plugin loader (issue #47): once the loader ships and the bundled module is split into a separately-installable package, this same manifest moves into the package and the host loads it the same way it loads any other plugin. Plugin authors should read this file as the canonical example of a real-world plugin manifest. For a minimal hello-world manifest, see examples/example-plugin/plugin.json."
 }
