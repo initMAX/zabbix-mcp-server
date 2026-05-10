@@ -39,6 +39,9 @@ def _read_audit_entries(
     date_to: str | None = None,
     sort_by: str = "timestamp",
     sort_order: str = "desc",
+    tool_filter: str | None = None,
+    decision_filter: str | None = None,
+    subject_filter: str | None = None,
 ) -> tuple[list[dict], int]:
     """Read audit log entries with filtering, sorting, pagination.
 
@@ -46,6 +49,13 @@ def _read_audit_entries(
     UI uses to decide whether to show "Load more". Sort defaults to
     newest first because that's what an operator wants 95% of the
     time.
+
+    The three issue-#49-specific filters (tool / decision / subject)
+    target ``tool.invoke`` rows: when set they implicitly narrow the
+    result to per-tool audit entries, so the filter bar shows only the
+    rows an incident reviewer cares about. ``subject_filter`` is a
+    case-insensitive substring match against ``oauth_subject`` (or
+    ``user`` for admin events).
     """
     if not AUDIT_LOG_PATH.exists():
         return [], 0
@@ -61,6 +71,14 @@ def _read_audit_entries(
                     entry = json.loads(line)
                     if action_filter and entry.get("action", "") != action_filter:
                         continue
+                    if tool_filter and entry.get("tool_name", "") != tool_filter:
+                        continue
+                    if decision_filter and entry.get("policy_decision", "") != decision_filter:
+                        continue
+                    if subject_filter:
+                        subj = (entry.get("oauth_subject") or entry.get("user") or "").lower()
+                        if subject_filter.lower() not in subj:
+                            continue
                     if search and search.lower() not in json.dumps(entry).lower():
                         continue
                     if date_from and entry.get("timestamp", "") < date_from:
@@ -104,25 +122,39 @@ async def audit_view(request: Request) -> Response:
         sort_by = "timestamp"
     if sort_order not in ("asc", "desc"):
         sort_order = "desc"
+    tool_filter = request.query_params.get("tool")
+    decision_filter = request.query_params.get("decision")
+    subject_filter = request.query_params.get("subject")
 
     entries, total = _read_audit_entries(
         limit=limit, offset=offset,
         action_filter=action_filter, search=search,
         date_from=date_from, date_to=date_to,
         sort_by=sort_by, sort_order=sort_order,
+        tool_filter=tool_filter, decision_filter=decision_filter,
+        subject_filter=subject_filter,
     )
 
-    # Collect unique action types for filter dropdown
-    action_types = set()
+    # Collect unique action types + tool names for the filter dropdowns.
+    # One file scan instead of two (the previous duplicate read for
+    # action_types was wasteful on a busy log).
+    action_types: set[str] = set()
+    tool_names: set[str] = set()
+    decision_types: set[str] = set()
     if AUDIT_LOG_PATH.exists():
         try:
             with open(AUDIT_LOG_PATH, "r") as f:
                 for line in f:
                     try:
                         entry = json.loads(line.strip())
-                        action_types.add(entry.get("action", ""))
                     except (json.JSONDecodeError, KeyError):
-                        pass
+                        continue
+                    action_types.add(entry.get("action", ""))
+                    if entry.get("action") == "tool.invoke":
+                        if entry.get("tool_name"):
+                            tool_names.add(entry["tool_name"])
+                        if entry.get("policy_decision"):
+                            decision_types.add(entry["policy_decision"])
         except Exception:
             pass
 
@@ -137,12 +169,17 @@ async def audit_view(request: Request) -> Response:
         "sort_by": sort_by,
         "sort_order": sort_order,
         "action_types": sorted(action_types),
+        "tool_names": sorted(tool_names),
+        "decision_types": sorted(decision_types),
         "current_filter": action_filter,
         "filters": {
             "date_from": request.query_params.get("date_from", ""),
             "date_to": request.query_params.get("date_to", ""),
             "action": action_filter or "",
             "search": request.query_params.get("search", ""),
+            "tool": tool_filter or "",
+            "decision": decision_filter or "",
+            "subject": subject_filter or "",
         },
     }
     # When called via htmx (filter / sort change / load more), return

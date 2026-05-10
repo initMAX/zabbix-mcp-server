@@ -23,20 +23,20 @@
            hx-get="/audit"
            hx-trigger="change"
            hx-target="#audit-table"
-           hx-include="[name='date_to'], [name='action'], [name='search']"
+           hx-include="[name='date_to'], [name='action'], [name='search'], [name='tool'], [name='decision'], [name='subject']"
            hx-swap="innerHTML">
     <input type="text" id="filter-to" name="date_to" class="form-input flatpickr-date" placeholder="To"
            value="{{ filters.date_to | default('') }}"
            hx-get="/audit"
            hx-trigger="change"
            hx-target="#audit-table"
-           hx-include="[name='date_from'], [name='action'], [name='search']"
+           hx-include="[name='date_from'], [name='action'], [name='search'], [name='tool'], [name='decision'], [name='subject']"
            hx-swap="innerHTML">
     <select name="action" class="form-select"
             hx-get="/audit"
             hx-trigger="change"
             hx-target="#audit-table"
-            hx-include="[name='date_from'], [name='date_to'], [name='search']"
+            hx-include="[name='date_from'], [name='date_to'], [name='search'], [name='tool'], [name='decision'], [name='subject']"
             hx-swap="innerHTML">
         <option value="">All Actions</option>
         {% for action in action_types %}
@@ -48,7 +48,39 @@
            hx-get="/audit"
            hx-trigger="keyup changed delay:300ms"
            hx-target="#audit-table"
-           hx-include="[name='date_from'], [name='date_to'], [name='action']"
+           hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='tool'], [name='decision'], [name='subject']"
+           hx-swap="innerHTML">
+    <select name="tool" class="form-select"
+            title="Filter tool.invoke rows by tool name (issue #49)"
+            hx-get="/audit"
+            hx-trigger="change"
+            hx-target="#audit-table"
+            hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='search'], [name='decision'], [name='subject']"
+            hx-swap="innerHTML">
+        <option value="">All tools</option>
+        {% for t in tool_names %}
+        <option value="{{ t }}" {% if filters.tool == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+    </select>
+    <select name="decision" class="form-select"
+            title="Filter tool.invoke rows by policy decision (allow / deny_*)"
+            hx-get="/audit"
+            hx-trigger="change"
+            hx-target="#audit-table"
+            hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='search'], [name='tool'], [name='subject']"
+            hx-swap="innerHTML">
+        <option value="">All decisions</option>
+        {% for d in decision_types %}
+        <option value="{{ d }}" {% if filters.decision == d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="subject" class="form-input" placeholder="Subject (oauth_subject substring)"
+           value="{{ filters.subject | default('') }}"
+           title="Substring match on oauth_subject / user (e.g. token:CI, oauth:abc, alice)"
+           hx-get="/audit"
+           hx-trigger="keyup changed delay:300ms"
+           hx-target="#audit-table"
+           hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='search'], [name='tool'], [name='decision']"
            hx-swap="innerHTML">
 </div>
 
@@ -121,7 +153,7 @@
             hx-get="/audit?offset={{ offset }}&limit=50"
             hx-target="#audit-table"
             hx-swap="beforeend"
-            hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='search']">
+            hx-include="[name='date_from'], [name='date_to'], [name='action'], [name='search'], [name='tool'], [name='decision'], [name='subject']">
         Load more entries
     </button>
 </div>
@@ -151,7 +183,7 @@
 (function() {
     const thead = document.getElementById('audit-thead');
     if (!thead) return;
-    const filterSelector = "[name='date_from'], [name='date_to'], [name='action'], [name='search']";
+    const filterSelector = "[name='date_from'], [name='date_to'], [name='action'], [name='search'], [name='tool'], [name='decision'], [name='subject']";
 
     function dispatchSort(key) {
         const currentBy = thead.dataset.sortBy;

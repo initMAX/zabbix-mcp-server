@@ -18,23 +18,60 @@
 <tr>
     <td class="text-sm text-muted" style="white-space:nowrap;">{{ entry.timestamp }}</td>
     <td>
-        {% if entry.action.startswith('token.') %}
+        {% if entry.action == 'tool.invoke' %}
+        {%- if entry.policy_decision == 'allow' -%}
+        <span class="badge badge-success" title="Tool allowed">{{ entry.tool_name }}</span>
+        {%- elif entry.policy_decision and entry.policy_decision.startswith('deny_') -%}
+        <span class="badge badge-warning" title="Denied: {{ entry.policy_decision }}">{{ entry.tool_name }} <small>({{ entry.policy_decision }})</small></span>
+        {%- elif entry.policy_decision == 'error' -%}
+        <span class="badge badge-danger" title="Tool execution error">{{ entry.tool_name }} <small>(error)</small></span>
+        {%- else -%}
+        <span class="badge badge-muted">{{ entry.tool_name }}</span>
+        {%- endif -%}
+        {% elif entry.action.startswith('token.') %}
         <span class="badge badge-warning">{{ entry.action }}</span>
         {% elif entry.action.startswith('user.') %}
         <span class="badge badge-primary">{{ entry.action }}</span>
-        {% elif entry.action == 'login' %}
+        {% elif entry.action == 'login' or entry.action == 'login_success' %}
         <span class="badge badge-success">{{ entry.action }}</span>
+        {% elif entry.action == 'login_failed' or entry.action == 'login_failure' %}
+        <span class="badge badge-danger">{{ entry.action }}</span>
         {% elif entry.action == 'logout' %}
         <span class="badge badge-muted">{{ entry.action }}</span>
-        {% elif entry.action.startswith('settings.') %}
+        {% elif entry.action.startswith('settings') %}
         <span class="badge badge-danger">{{ entry.action }}</span>
+        {% elif entry.action.startswith('audit.') %}
+        <span class="badge badge-warning">{{ entry.action }}</span>
+        {% elif entry.action.startswith('housekeeping.') or entry.action.startswith('forwarder.') or entry.action.startswith('system.') %}
+        <span class="badge badge-muted" title="Background event">{{ entry.action }}</span>
         {% else %}
         <span class="badge badge-muted">{{ entry.action }}</span>
         {% endif %}
     </td>
-    <td>{{ entry.user }}</td>
-    <td class="text-sm cell-truncate" title="{% if entry.target_type %}{{ entry.target_type }}: {{ entry.target_id }}{% endif %}">{% if entry.target_type %}{{ entry.target_type }}: {{ entry.target_id }}{% endif %}</td>
-    <td class="text-sm text-muted cell-truncate" tabindex="0" data-tooltip="{{ entry.details }}" title="{{ entry.details }}">{{ entry.details }}</td>
+    <td>
+        {% if entry.action == 'tool.invoke' %}
+        <code class="text-sm">{{ entry.oauth_subject | default('') }}</code>
+        {% else %}
+        {{ entry.user | default('') }}
+        {% endif %}
+    </td>
+    <td class="text-sm cell-truncate">
+        {%- if entry.action == 'tool.invoke' -%}
+        {%- set _t = entry.target | default({}) -%}
+        {%- for k, v in _t.items() -%}
+        <span class="monospace text-sm">{{ k }}={{ v }}</span>{% if not loop.last %} {% endif %}
+        {%- endfor -%}
+        {%- else -%}
+        {%- if entry.target_type -%}{{ entry.target_type }}: {{ entry.target_id }}{%- endif -%}
+        {%- endif -%}
+    </td>
+    <td class="text-sm text-muted cell-truncate" tabindex="0">
+        {%- if entry.action == 'tool.invoke' -%}
+        {%- if entry.denial_reason -%}<span title="{{ entry.denial_reason }}">{{ entry.denial_reason }}</span>{% else %}<span title="result_count={{ entry.result_count }}">result_count={{ entry.result_count | default('-') }}</span>{%- endif -%}
+        {%- else -%}
+        <span title="{{ entry.details }}">{{ entry.details }}</span>
+        {%- endif -%}
+    </td>
     <td class="monospace text-sm">{{ entry.ip }}</td>
 </tr>
 {% endfor %}
