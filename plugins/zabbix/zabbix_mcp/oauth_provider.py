@@ -183,6 +183,7 @@ class ZmcpOAuthProvider:
         refresh_token_ttl_seconds: int = _REFRESH_TOKEN_TTL_SECONDS,
         dcr_profile: str = "conservative",
         dcr_conservative_access_ttl_seconds: int = 1800,
+        default_scopes: list[str] | None = None,
     ) -> None:
         self._public_url = public_url.rstrip("/")
         self._token_store = token_store
@@ -194,6 +195,7 @@ class ZmcpOAuthProvider:
         # Issue #49 Track B - DCR conservative profile.
         self._dcr_profile = str(dcr_profile or "conservative").lower()
         self._dcr_conservative_access_ttl = max(60, int(dcr_conservative_access_ttl_seconds))
+        self._default_scopes = list(default_scopes or [])
 
         # client_id -> OAuthClientInformationFull
         self._clients: dict[str, OAuthClientInformationFull] = {}
@@ -337,16 +339,35 @@ class ZmcpOAuthProvider:
                         ),
                     )
             if client_info.scope and "*" in str(client_info.scope).split():
-                raise RegistrationError(
-                    error="invalid_client_metadata",
-                    error_description=(
-                        "Wildcard scope ('*') cannot be requested at /register "
-                        "under the conservative DCR profile. Enumerate the tool "
-                        "groups the client needs (e.g. 'monitoring alerts'); a "
-                        "wildcard can still be granted by the operator at the "
-                        "consent screen."
-                    ),
+                # Mainstream MCP clients (claude.ai custom connectors,
+                # ChatGPT custom apps) post ``scope=*`` at /register
+                # because the connector wizard does not know the
+                # server's tool groups upfront - the operator picks
+                # the actual scope on the consent screen later in the
+                # flow. Refusing the registration outright (the
+                # previous v1.31 behaviour) was over-strict: it broke
+                # the legitimate out-of-box onboarding while the
+                # actual security boundary lives at /authorize +
+                # consent, not at /register.
+                #
+                # Conservative profile now SILENTLY drops the wildcard
+                # from the registration record and substitutes
+                # ``[oauth].default_scopes``. The operator still sees
+                # exactly what the client may request when the
+                # consent screen renders; nothing wildcard-shaped
+                # gets pre-granted at registration time.
+                fallback_scope = " ".join(
+                    s for s in (self._default_scopes or [])
+                    if s and s != "*"
+                ) or ""
+                logger.info(
+                    "DCR conservative: client %r requested scope='*'; "
+                    "wildcard dropped, registration recorded with scope=%r. "
+                    "Operator approves the actual grant on the consent screen.",
+                    client_info.client_name or "(unnamed)",
+                    fallback_scope or "(empty)",
                 )
+                client_info.scope = fallback_scope
         # Mint client_id if the client did not pre-supply one (RFC 7591 §3.2.1).
         if not client_info.client_id:
             client_info.client_id = _new_secret(16)

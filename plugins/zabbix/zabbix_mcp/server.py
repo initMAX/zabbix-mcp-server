@@ -3043,6 +3043,7 @@ def run_server(
                 refresh_token_ttl_seconds=config.oauth.refresh_token_ttl_seconds,
                 dcr_profile=config.oauth.dcr_profile,
                 dcr_conservative_access_ttl_seconds=config.oauth.dcr_conservative_access_ttl_seconds,
+                default_scopes=list(config.oauth.default_scopes or []),
             )
             auth_kwargs["auth_server_provider"] = oauth_provider
             auth_kwargs["auth"] = AuthSettings(
