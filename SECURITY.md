@@ -116,7 +116,8 @@ When `public_url`, `allowed_origins`, and `allowed_hosts` are all unset on a non
 
 | Version | Supported |
 |---|---|
-| 1.31 (latest) | Yes |
+| 1.32 (latest) | Yes |
+| 1.31 | Yes |
 | 1.30 | Yes |
 | 1.29 | Yes |
 | 1.28 | Yes |

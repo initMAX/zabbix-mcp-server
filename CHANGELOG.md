@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.32 - 2026-07-09
+
+Patch release. One bug fixed; no new features. The v2.0 feature train (LDAP/SAML SSO, plugin loader, tool-level audit log, SIEM forwarder, /metrics) continues on the `release/v2.0.0` branch.
+
+### Fixed
+
+- **`infrastructure_summary_get` returned `host_count` / `enabled_host_count` / `item_count` / `trigger_count` / `template_count` as 0** (#54, reported by [@scotttouzet-secvis](https://github.com/scotttouzet-secvis)). The tool requested the counts with `output="count"`, which is not a valid Zabbix API parameter value - every supported Zabbix version silently ignores it and returns a list of id objects, which the counting helper quietly converted to 0. The severity breakdown and top-hosts fields in the same response were computed through `problem.get` with `output="extend"`, which is why they looked correct while the counts did not. The helper now uses the documented `countOutput: true`. Verified live before/after on Zabbix 6.0.47, 7.0.26 and 7.4.8; a regression test emulates the real API semantics (list for `output=count`, string count for `countOutput`) and guards that the invalid parameter cannot come back.
+
+### Thanks
+
+Big thanks to [@scotttouzet-secvis](https://github.com/scotttouzet-secvis) for the exemplary bug report on #54 - the "counts are zero but the problem data in the same response is right, and a manual `host_get` with `countOutput` works" observation, with permissions already ruled out, pointed straight at the root cause and cut the diagnosis time to minutes.
+
 ## v1.31 - 2026-06-03
 
 Patch release. Two operator-impacting bugs fixed; no new features. Everything else queued for the v2.0 cut (LDAP/SAML SSO, plugin loader runtime, tool-level audit log, SIEM forwarder, /metrics Prometheus endpoint) stays on the `release/2.0.0` branch.
