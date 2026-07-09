@@ -1204,25 +1204,23 @@ def infrastructure_summary_get(
     """
     try:
         top_n = int(kwargs.get("top_n", 5))
-        # Counts via output="count" - one cheap query each.
-        def _count(method: str) -> int:
+        # Counts via countOutput=true - one cheap query each. Zabbix
+        # returns the count as a string ("1753"). Note: output="count"
+        # is NOT a valid API value - Zabbix silently ignores it and
+        # returns a list of ids, which is why issue #54 saw zeros.
+        def _count(method: str, extra: dict | None = None) -> int:
             try:
-                v = client_manager.call(server_name, method, {"output": "count"})
+                params: dict[str, Any] = {"countOutput": True}
+                if extra:
+                    params.update(extra)
+                v = client_manager.call(server_name, method, params)
                 return int(v) if isinstance(v, (int, str)) else 0
             except Exception:
                 return 0
 
         host_count = _count("host.get")
         # Enabled hosts only - status=0 in Zabbix means monitored.
-        # countOutput is faster than fetching the hostid list and len().
-        try:
-            v = client_manager.call(server_name, "host.get", {
-                "output": "count",
-                "filter": {"status": 0},
-            })
-            host_enabled = int(v) if isinstance(v, (int, str)) else 0
-        except Exception:
-            host_enabled = 0
+        host_enabled = _count("host.get", {"filter": {"status": 0}})
         item_count = _count("item.get")
         trigger_count = _count("trigger.get")
         template_count = _count("template.get")
