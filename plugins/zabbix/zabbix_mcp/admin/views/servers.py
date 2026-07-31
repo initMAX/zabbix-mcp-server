@@ -69,6 +69,7 @@ def _render_servers_list(request: Request, admin_app, extra: dict | None = None)
     client_manager = admin_app.client_manager
     servers = []
     drift_detected = False
+    skipped_servers = client_manager.skipped_servers
 
     # Read config to get latest saved values (may differ from live)
     config_zabbix = {}
@@ -99,7 +100,15 @@ def _render_servers_list(request: Request, admin_app, extra: dict | None = None)
         # Don't check live status here — it blocks page load.
         # Status will be loaded async via HTMX /servers/{name}/test
         config_changed = False
-        if name not in client_manager.server_names:
+        config_error = skipped_servers.get(name)
+        if config_error is not None:
+            # Section failed validation at boot and was SKIPPED. This
+            # is not restart-pending drift: restarting re-skips it and
+            # re-raises the banner forever (issue #61 - operator
+            # restarted in a loop). Show the validation error on the
+            # card instead and keep it out of drift_detected.
+            pass
+        elif name not in client_manager.server_names:
             # In config but not live — newly added (or renamed in),
             # not yet active.
             config_changed = True
@@ -114,6 +123,7 @@ def _render_servers_list(request: Request, admin_app, extra: dict | None = None)
             "read_only": read_only,
             "verify_ssl": verify_ssl,
             "config_changed": config_changed,
+            "config_error": config_error,
             "is_live": name in client_manager.server_names,
         })
 

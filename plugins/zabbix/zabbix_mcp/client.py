@@ -154,6 +154,16 @@ class ClientManager:
         return list(self._config.zabbix_servers.keys())
 
     @property
+    def skipped_servers(self) -> dict[str, str]:
+        """[zabbix.X] sections skipped at config load (name -> reason).
+
+        Empty on configs where every section validated. The admin
+        portal uses this to show "config error" instead of a
+        restart-cannot-fix-it "pending" state (issue #61).
+        """
+        return dict(getattr(self._config, "skipped_zabbix_servers", {}) or {})
+
+    @property
     def default_server(self) -> str | None:
         return self._config.default_server
 

@@ -989,6 +989,15 @@ class AdminApp:
                     results[name] = {"status": "token_error", "version": version, "error": "API online but token invalid or expired"}
             except Exception as e:
                 results[name] = {"status": "error", "error": str(e)[:100]}
+        # Sections skipped at config load: report the validation error
+        # instead of leaving the dashboard to guess "not configured".
+        # A restart cannot load these - the config has to be fixed
+        # first (issue #61).
+        try:
+            for name, reason in self.client_manager.skipped_servers.items():
+                results[name] = {"status": "config_error", "error": reason[:300]}
+        except Exception:
+            pass
         return JSONResponse(results)
 
     async def _check_updates(self, request: Request) -> Response:

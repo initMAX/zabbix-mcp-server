@@ -463,6 +463,12 @@ class AppConfig:
     operational_log: OperationalLogConfig = field(default_factory=OperationalLogConfig)
     admin_saml: AdminSamlConfig = field(default_factory=AdminSamlConfig)
     admin_ldap: AdminLdapConfig = field(default_factory=AdminLdapConfig)
+    # [zabbix.X] sections that failed validation at load time and were
+    # skipped (name -> human-readable reason). The admin portal shows
+    # these as "config error" instead of the misleading "needs restart"
+    # - a skipped section stays skipped no matter how often the
+    # operator restarts (issue #61).
+    skipped_zabbix_servers: dict[str, str] = field(default_factory=dict)
 
     @property
     def default_server(self) -> str | None:
@@ -1230,4 +1236,5 @@ def load_config(path: str | Path) -> AppConfig:
         operational_log=ops_cfg,
         admin_saml=admin_saml_cfg,
         admin_ldap=admin_ldap_cfg,
+        skipped_zabbix_servers=dict(skipped_servers),
     )
