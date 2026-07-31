@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.33 - 2026-07-31
+
+Patch release. One admin-portal bug fixed; no new features. The v2.0 feature train (LDAP/SAML SSO, plugin loader, tool-level audit log, SIEM forwarder, /metrics) continues on the `release/v2.0.0` branch.
+
+### Fixed
+
+- **Endless "Configuration changes are pending. The MCP server must be restarted" loop** (#61, reported by [@G0nz0uk](https://github.com/G0nz0uk)). Since the resilience change that skips an invalid `[zabbix.X]` section at boot instead of taking the whole MCP down, a section that fails validation (bad URL, missing token, unresolvable `${ENV_VAR}`) is invisible to the runtime but still present in `config.toml`. The admin portal interpreted that permanent gap as "in config but not live yet" on two surfaces: the dashboard showed the server as pending, and the /servers page re-armed the global restart banner on **every** page render - so even after a restart cleared it, the first visit to /servers raised it again. Operators restarted in a loop; restarting can never load a section that fails validation.
+
+  The config loader now records skipped sections with their validation reasons, and the admin portal says what is actually wrong: the /servers card gets a red "Config error" badge, the exact validation message, and an explicit "restarting will not load it - fix the section" note; the dashboard card shows "config error" with the reason in the tooltip; `/api/server-status` reports `status: "config_error"`. Skipped sections are excluded from restart-drift detection, so the banner no longer resurrects itself.
+
+### Thanks
+
+Thanks to [@G0nz0uk](https://github.com/G0nz0uk) for reporting #61 with screenshots and for patiently confirming that the restart loop survived every restart - the "restart does not clear it" detail is what pointed away from state handling and straight at the drift detector.
+
 ## v1.32 - 2026-07-09
 
 Patch release. One bug fixed; no new features. The v2.0 feature train (LDAP/SAML SSO, plugin loader, tool-level audit log, SIEM forwarder, /metrics) continues on the `release/v2.0.0` branch.

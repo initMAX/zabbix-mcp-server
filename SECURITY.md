@@ -116,13 +116,10 @@ When `public_url`, `allowed_origins`, and `allowed_hosts` are all unset on a non
 
 | Version | Supported |
 |---|---|
-| 1.32 (latest) | Yes |
+| 1.33 (latest) | Yes |
+| 1.32 | Yes |
 | 1.31 | Yes |
 | 1.30 | Yes |
-| 1.29 | Yes |
-| 1.28 | Yes |
-| 1.27 | Yes |
-| 1.26 | Yes |
-| 1.25 | Yes |
-| 1.24 | Yes |
-| < 1.24 | No |
+| < 1.30 | No |
+
+Versions older than 1.30 no longer receive fixes - upgrade with `./deploy/install.sh update` (or `pip install --upgrade zabbix-mcp-server`); config and tokens are preserved across updates.
