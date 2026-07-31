@@ -170,6 +170,12 @@
                     dot.classList.add('status-dot-yellow');
                     dot.dataset.tooltip = name + ': API online (Zabbix ' + info.version + ') but token invalid';
                     if (label) { label.textContent = name + ' — Zabbix ' + info.version + ' '; var warn = document.createElement('span'); warn.style.color = 'var(--color-warning)'; warn.textContent = 'token invalid'; label.appendChild(warn); }
+                } else if (info && info.status === 'config_error') {
+                    // Section skipped at boot - restarting cannot load it,
+                    // the [zabbix.<name>] config has to be fixed (issue #61).
+                    dot.classList.add('status-dot-red');
+                    dot.dataset.tooltip = name + ': config error - ' + info.error + ' (fix the [zabbix.' + name + '] section in config.toml, then restart)';
+                    if (label) { label.title = info.error; label.textContent = name + ' — '; var err = document.createElement('span'); err.style.color = 'var(--color-danger)'; err.textContent = 'config error'; label.appendChild(err); }
                 } else {
                     dot.classList.add('status-dot-red');
                     var errMsg = info ? info.error || 'error' : 'not configured';

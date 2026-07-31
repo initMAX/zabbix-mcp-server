@@ -162,6 +162,9 @@
                 {% if server.config_changed %}
                 <span class="badge badge-warning">⚠️ Config changed</span>
                 {% endif %}
+                {% if server.config_error %}
+                <span class="badge badge-danger">✖ Config error</span>
+                {% endif %}
             </div>
         </div>
 
@@ -174,7 +177,10 @@
                   hx-trigger="load"
                   hx-swap="innerHTML"
                   {% endif %}>
-                {% if server.config_changed %}
+                {% if server.config_error %}
+                <span class="status-dot" style="background: var(--color-danger);"></span>
+                <span class="text-danger">Not loaded - configuration invalid</span>
+                {% elif server.config_changed %}
                 <span class="status-dot status-dot-pulse" style="--pulse-color: var(--color-warning);"></span>
                 <span class="text-muted">Restart required</span>
                 {% else %}
@@ -183,6 +189,15 @@
                 {% endif %}
             </span>
         </div>
+
+        {% if server.config_error %}
+        <div class="server-card-error text-sm text-danger" style="margin-top: 8px;">
+            This server was skipped at startup and restarting will not load it.
+            Fix the problem below in the <code>[zabbix.{{ server.name }}]</code>
+            section (Edit), then restart:<br>
+            <strong>{{ server.config_error }}</strong>
+        </div>
+        {% endif %}
 
         {% if server.error %}
         <div class="server-card-error text-sm text-danger" style="margin-top: 8px;">

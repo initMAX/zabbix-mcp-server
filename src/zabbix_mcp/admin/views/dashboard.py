@@ -57,6 +57,7 @@ async def dashboard(request: Request) -> Response:
 
     # Don't check live status here — it blocks page load
     # Use cached version if available, otherwise show as "unknown"
+    skipped = client_manager.skipped_servers
     all_server_names = sorted(set(client_manager.server_names) | config_servers)
     for name in all_server_names:
         if name in client_manager.server_names:
@@ -77,6 +78,14 @@ async def dashboard(request: Request) -> Response:
             except Exception:
                 pass
             servers.append({"name": name, "status": status})
+        elif name in skipped:
+            # Section failed validation at boot and was skipped - a
+            # restart cannot load it, so do NOT present it as pending
+            # (issue #61: operator restarted in a loop). Carry the
+            # reason so the UI can say what to actually fix.
+            servers.append({
+                "name": name, "status": "error", "error": skipped[name],
+            })
         else:
             servers.append({"name": name, "status": "pending"})
 
