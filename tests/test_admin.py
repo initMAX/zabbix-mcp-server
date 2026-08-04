@@ -662,7 +662,7 @@ class TestTasksAPI(unittest.IsolatedAsyncioTestCase):
         import asyncio
         from zabbix_mcp.task_store import BoundedInMemoryTaskStore, build_tasks_extension
         from mcp.types import (
-            CallToolRequestParams, CallToolResult, CreateTaskResult,
+            CallToolRequestParams, CallToolResult,
             GetTaskRequestParams, GetTaskPayloadRequestParams, TaskMetadata, TextContent,
         )
         store = BoundedInMemoryTaskStore()
@@ -677,8 +677,12 @@ class TestTasksAPI(unittest.IsolatedAsyncioTestCase):
         params = CallToolRequestParams(
             name="report_generate", arguments={}, task=TaskMetadata(ttl=60_000))
         result = await ext.intercept_tool_call(params, ctx=None, call_next=call_next)
-        self.assertIsInstance(result, CreateTaskResult)
-        tid = result.task.task_id
+        # 2026-07-28 wire shape: CallToolResult with the task handle in
+        # _meta under the extension identifier (top-level CreateTaskResult
+        # is not admitted by the tools/call result surface).
+        self.assertIsInstance(result, CallToolResult)
+        handle = result.meta["io.modelcontextprotocol/tasks"]
+        tid = handle["taskId"]
 
         bindings = {b.method: b for b in ext.methods()}
         polled = await bindings["tasks/get"].handler(None, GetTaskRequestParams(taskId=tid))
@@ -729,7 +733,7 @@ class TestTasksAPI(unittest.IsolatedAsyncioTestCase):
         result = await ext.intercept_tool_call(
             CallToolRequestParams(name="report_generate", arguments={}, task=TaskMetadata(ttl=60_000)),
             None, call_next)
-        tid = result.task.task_id
+        tid = result.meta["io.modelcontextprotocol/tasks"]["taskId"]
         bindings = {b.method: b for b in ext.methods()}
         await bindings["tasks/cancel"].handler(None, CancelTaskRequestParams(taskId=tid))
         polled = await bindings["tasks/get"].handler(None, GetTaskRequestParams(taskId=tid))

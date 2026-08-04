@@ -226,7 +226,25 @@ def build_tasks_extension(store: BoundedInMemoryTaskStore, task_augmented_tools:
 
             import asyncio
             asyncio.get_running_loop().create_task(_run_in_background())
-            return CreateTaskResult(task=task)
+            # The 2026-07-28 wire surface for tools/call admits only
+            # CallToolResult | InputRequiredResult - extension data rides
+            # in _meta under the extension identifier. Returning the
+            # legacy top-level CreateTaskResult fails serialization.
+            return CallToolResult(
+                content=[TextContent(
+                    type="text",
+                    text=(
+                        f"Task {task.task_id} accepted. Poll tasks/get with "
+                        f"taskId={task.task_id} until status=completed, then "
+                        f"fetch the payload via tasks/result."
+                    ),
+                )],
+                meta={
+                    "io.modelcontextprotocol/tasks": CreateTaskResult(
+                        task=task
+                    ).model_dump(by_alias=True, exclude_none=True)["task"],
+                },
+            )
 
         def methods(self):
             async def _get(ctx, params: GetTaskRequestParams):
