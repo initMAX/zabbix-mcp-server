@@ -33,9 +33,9 @@ from pathlib import Path
 from typing import Annotated, Any, Optional
 
 from pydantic import Field
-from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.exceptions import ToolError
-from mcp.server.fastmcp.utilities import func_metadata as _fm_module
+from mcp.server.mcpserver import MCPServer as FastMCP
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.utilities import func_metadata as _fm_module
 from mcp.server.auth.provider import AccessToken
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.transport_security import TransportSecuritySettings
