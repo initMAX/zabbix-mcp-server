@@ -33,7 +33,7 @@ from pathlib import Path
 from typing import Annotated, Any, Optional
 
 from pydantic import Field
-from mcp.server.mcpserver import MCPServer as FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.mcpserver.utilities import func_metadata as _fm_module
 from mcp.server.auth.provider import AccessToken
@@ -1139,21 +1139,21 @@ def _load_server_icons() -> list[Icon] | None:
 
 
 def _build_transport_security(config: AppConfig, host: str, port: int) -> TransportSecuritySettings | None:
-    """Compose ``TransportSecuritySettings`` for FastMCP from project config.
+    """Compose ``TransportSecuritySettings`` for MCPServer from project config.
 
     The MCP 2025-11-25 spec asks servers to validate the Origin header
-    against an allowlist (return HTTP 403 on mismatch). FastMCP can
+    against an allowlist (return HTTP 403 on mismatch). MCPServer can
     enforce this via ``TransportSecuritySettings`` but defaults to off
     for backwards compatibility when the bind host is not localhost.
 
-    We keep that BC in the no-config case (return None and let FastMCP
+    We keep that BC in the no-config case (return None and let MCPServer
     decide), but the moment the operator declares ``public_url`` or sets
     ``allowed_hosts`` / ``allowed_origins`` explicitly, we flip
     DNS-rebinding protection on. ``public_url`` alone is enough on its
     own - we derive ``host:port`` for Host and ``scheme://host[:port]``
     for Origin, which covers the typical reverse-proxy deployment.
 
-    Returns None when there is no config at all, in which case FastMCP
+    Returns None when there is no config at all, in which case MCPServer
     falls back to its localhost-only smart default when bound to
     127.0.0.1 / ::1 / localhost, or leaves protection off when bound to
     0.0.0.0. Callers should log a warning in the latter case.
@@ -1259,7 +1259,7 @@ def _raise_if_extension_error(result: str, *, raw_json: bool = False) -> str:
     as a small JSON object ``{"error": "..."}``. Pre-2025-11-25 that
     landed as a successful tool result whose body happened to contain
     error info; SEP-1303 asks for ``isError=true`` on the
-    ``CallToolResult`` instead. Re-raise as ``ToolError`` here, FastMCP
+    ``CallToolResult`` instead. Re-raise as ``ToolError`` here, MCPServer
     converts that into the right shape.
 
     Successful payloads echo Zabbix-controlled strings (host names, item
@@ -1274,7 +1274,7 @@ def _raise_if_extension_error(result: str, *, raw_json: bool = False) -> str:
     if isinstance(parsed, dict) and "error" in parsed and len(parsed) <= 2:
         msg = parsed["error"]
         # Error strings often quote Zabbix-supplied text (host name,
-        # item key, ...). FastMCP ships them verbatim to the LLM via
+        # item key, ...). MCPServer ships them verbatim to the LLM via
         # the SEP-1303 isError envelope. Prepend the same untrusted-
         # data marker so an attacker who controls a Zabbix description
         # cannot craft an error message that reads as instructions.
@@ -1373,7 +1373,7 @@ def _make_tool_handler(
     compact_output: bool = True,
     response_max_chars: int = _RESPONSE_MAX_CHARS,
 ):
-    """Create a tool handler with a proper typed signature for FastMCP schema generation."""
+    """Create a tool handler with a proper typed signature for MCPServer schema generation."""
 
     # Build the actual handler that does the work
     async def handler(**kwargs: Any) -> str:
@@ -1383,7 +1383,7 @@ def _make_tool_handler(
         _raw_err = _check_raw_json_allowed(raw_json)
         if _raw_err:
             # MCP 2025-11-25 (SEP-1303): tool-level errors surface as
-            # CallToolResult(isError=True), not JSON-RPC -32602. FastMCP
+            # CallToolResult(isError=True), not JSON-RPC -32602. MCPServer
             # converts any exception raised inside the handler into that
             # shape; ToolError signals tool-level (vs. system) error.
             raise ToolError(_raw_err)
@@ -1462,7 +1462,7 @@ def _make_tool_handler(
             return _format_result(_truncate_result(result, max_chars=response_max_chars), raw_json)
 
         except ToolError:
-            # Already shaped for the LLM - let FastMCP mark isError=True.
+            # Already shaped for the LLM - let MCPServer mark isError=True.
             raise
         except (ReadOnlyError, RateLimitError, ValueError) as e:
             raise ToolError(str(e))
@@ -1472,7 +1472,7 @@ def _make_tool_handler(
                 f"API call failed for {method_def.api_method}. Check server logs for details."
             )
 
-    # Build a dynamic function signature so FastMCP generates proper JSON Schema
+    # Build a dynamic function signature so MCPServer generates proper JSON Schema
     sig_params: list[inspect.Parameter] = []
 
     # Server parameter
@@ -1523,7 +1523,7 @@ def _make_tool_handler(
 
 
 def _register_tools(
-    mcp: FastMCP,
+    mcp: MCPServer,
     client_manager: ClientManager,
     tools_filter: list[str] | None = None,
     disabled_tools: list[str] | None = None,
@@ -2701,7 +2701,7 @@ def run_server(
             host,
         )
 
-    # Allow CreateTaskResult to escape FastMCP's result converter unchanged
+    # Allow CreateTaskResult to escape MCPServer's result converter unchanged
     # so the task-augmented path on report_generate actually reaches the
     # low-level Server which knows how to ship it to the client. Idempotent.
     # Official tasks extension (io.modelcontextprotocol/tasks) replaces the
@@ -2716,7 +2716,7 @@ def run_server(
 
     # SDK 2.0: host/port/transport_security moved out of the constructor -
     # HTTP binding goes to uvicorn, transport_security to streamable_http_app().
-    mcp = FastMCP(
+    mcp = MCPServer(
         name="zabbix-mcp-server",
         instructions=(
             "Zabbix MCP Server provides full access to the Zabbix monitoring API. "
@@ -2745,7 +2745,7 @@ def run_server(
     )
 
     # Override list_tools so:
-    #   1. report_generate advertises taskSupport=optional (FastMCP's own
+    #   1. report_generate advertises taskSupport=optional (MCPServer's own
     #      list_tools does not expose the execution field).
     #   2. The response is filtered by the calling token's scopes -- a
     #      monitoring-only token sees only monitoring tools, a read-only
@@ -2759,12 +2759,22 @@ def run_server(
     # bare result object (no ServerResult wrapper).
     _orig_entry = mcp._lowlevel_server.get_request_handler("tools/list")
 
+    _tools_cache_ttl_ms = max(0, int(config.server.tools_list_cache_ttl)) * 1000
+
     async def _list_tools_with_execution(ctx, params):
         result = await _orig_entry.handler(ctx, params)
         for tool in result.tools:
             if tool.name in _TASK_AUGMENTED_TOOLS:
                 tool.execution = ToolExecution(taskSupport="optional")
         result.tools = _filter_tools_by_token(result.tools)
+        # 2026-07-28 CacheableResult freshness hint. The catalog only
+        # changes on restart, so a few minutes of client-side caching
+        # saves re-sending the whole schema set every session. Scope is
+        # pinned to "private" because the list above is filtered per
+        # calling token - a shared cache must never serve one token's
+        # catalog to another. Fields are ignored by pre-2026 clients.
+        result.ttl_ms = _tools_cache_ttl_ms
+        result.cache_scope = "private"
         return result
 
     mcp._lowlevel_server.add_request_handler(
@@ -2883,7 +2893,7 @@ def run_server(
 
     try:
         if transport in ("http", "sse"):
-            # Build the ASGI app from FastMCP for full control over TLS and CORS
+            # Build the ASGI app from MCPServer for full control over TLS and CORS
             if transport == "http":
                 asgi_app = mcp.streamable_http_app(transport_security=transport_security)
             else:

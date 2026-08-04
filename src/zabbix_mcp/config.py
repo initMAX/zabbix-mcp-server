@@ -95,7 +95,7 @@ class ServerConfig:
     # Optional explicit Origin header allowlist for DNS rebinding protection
     # (MCP 2025-11-25 §security). When unset and `public_url` is configured,
     # the scheme://host[:port] derived from it is used. When unset on a
-    # localhost bind, FastMCP applies its own localhost wildcard defaults.
+    # localhost bind, MCPServer applies its own localhost wildcard defaults.
     # Wildcard ports work as ``http://example.com:*``. Same shape as
     # ``allowed_hosts`` but for the Origin header rather than Host.
     allowed_origins: list[str] | None = None
@@ -106,6 +106,14 @@ class ServerConfig:
     trusted_proxies: list[str] | None = None
     compact_output: bool = True
     response_max_chars: int = 50000
+    # Freshness hint (seconds) attached to tools/list results as the
+    # 2026-07-28 CacheableResult ``ttlMs``. The tool catalog only changes
+    # on a restart (or a token's scopes changing), so letting clients
+    # reuse it for a few minutes saves re-sending ~100k tokens of schema
+    # on every session. Scope is always "private" - the catalog is
+    # filtered per calling token, so a shared cache must never reuse it
+    # across authorizations. 0 disables caching (always re-fetch).
+    tools_list_cache_ttl: int = 300
     report_logo: str | None = None
     report_company: str = ""
     report_subtitle: str = "IT Monitoring Service"
@@ -498,7 +506,7 @@ def load_config(path: str | Path) -> AppConfig:
                     f"'allowed_origins' entry '{entry}' must start with http:// or https://"
                 )
             # Strip the ``:*`` port-wildcard before URL parsing; it is
-            # FastMCP-internal syntax that urlsplit otherwise rejects.
+            # MCPServer-internal syntax that urlsplit otherwise rejects.
             probe = entry[:-2] if entry.endswith(":*") else entry
             try:
                 parts = urlsplit(probe)
@@ -535,6 +543,12 @@ def load_config(path: str | Path) -> AppConfig:
     if not isinstance(response_max_chars_raw, int) or response_max_chars_raw < 5000:
         raise ConfigError("'response_max_chars' must be an integer >= 5000")
 
+    tools_cache_ttl_raw = server_raw.get("tools_list_cache_ttl", 300)
+    if not isinstance(tools_cache_ttl_raw, int) or tools_cache_ttl_raw < 0:
+        raise ConfigError("'tools_list_cache_ttl' must be an integer >= 0 (seconds; 0 disables client caching)")
+    if tools_cache_ttl_raw > 86400:
+        raise ConfigError("'tools_list_cache_ttl' must be <= 86400 (24 h)")
+
     server_config = ServerConfig(
         transport=transport,
         host=server_raw.get("host", "127.0.0.1"),
@@ -555,6 +569,7 @@ def load_config(path: str | Path) -> AppConfig:
         trusted_proxies=trusted_proxies,
         compact_output=compact_output_raw,
         response_max_chars=response_max_chars_raw,
+        tools_list_cache_ttl=tools_cache_ttl_raw,
         report_logo=server_raw.get("report_logo"),
         report_company=server_raw.get("report_company", ""),
         report_subtitle=server_raw.get("report_subtitle", "IT Monitoring Service"),

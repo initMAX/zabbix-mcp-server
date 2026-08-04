@@ -212,11 +212,11 @@ class TestAPIRegistry(unittest.TestCase):
 
 class TestToolRegistration(unittest.TestCase):
     def test_register_all_tools(self):
-        from mcp.server.mcpserver import MCPServer as FastMCP
+        from mcp.server.mcpserver import MCPServer
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
-        mcp = FastMCP(name="test")
+        mcp = MCPServer(name="test")
         count = _register_tools(mcp, mgr)
         tools = mcp._tool_manager.list_tools()
         self.assertEqual(len(tools), count)
@@ -224,11 +224,11 @@ class TestToolRegistration(unittest.TestCase):
         self.assertGreaterEqual(count, len(ALL_METHODS) + 2)
 
     def test_key_tools_present(self):
-        from mcp.server.mcpserver import MCPServer as FastMCP
+        from mcp.server.mcpserver import MCPServer
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
-        mcp = FastMCP(name="test")
+        mcp = MCPServer(name="test")
         _register_tools(mcp, mgr)
         names = {t.name for t in mcp._tool_manager.list_tools()}
         for expected in [
@@ -239,21 +239,21 @@ class TestToolRegistration(unittest.TestCase):
             self.assertIn(expected, names)
 
     def test_tools_have_descriptions(self):
-        from mcp.server.mcpserver import MCPServer as FastMCP
+        from mcp.server.mcpserver import MCPServer
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
-        mcp = FastMCP(name="test")
+        mcp = MCPServer(name="test")
         _register_tools(mcp, mgr)
         for tool in mcp._tool_manager.list_tools():
             self.assertTrue(tool.description, f"Tool {tool.name} has no description")
 
     def test_tools_have_parameters(self):
-        from mcp.server.mcpserver import MCPServer as FastMCP
+        from mcp.server.mcpserver import MCPServer
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
-        mcp = FastMCP(name="test")
+        mcp = MCPServer(name="test")
         _register_tools(mcp, mgr)
         for tool in mcp._tool_manager.list_tools():
             self.assertIn("properties", tool.parameters)

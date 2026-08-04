@@ -436,9 +436,9 @@ class TestProtocol202511(unittest.TestCase):
     """
 
     def test_transport_security_returns_none_when_unset(self):
-        """No public_url + no allowed_* lists -> let FastMCP decide.
+        """No public_url + no allowed_* lists -> let MCPServer decide.
 
-        In the no-config case we let FastMCP fall back to its localhost
+        In the no-config case we let MCPServer fall back to its localhost
         defaults; that keeps backwards compat with existing 127.0.0.1
         deployments and avoids surprising operators with 403s right after
         the upgrade.
@@ -487,7 +487,7 @@ class TestProtocol202511(unittest.TestCase):
         SEP-1303 (clarified in 2025-11-25) wants tool-level failures to
         surface as CallToolResult(isError=True). Our extension functions
         in api/extensions.py predate that and return error JSON strings;
-        this helper re-raises so FastMCP marks isError correctly.
+        this helper re-raises so MCPServer marks isError correctly.
         """
         from zabbix_mcp.server import _raise_if_extension_error
         from mcp.server.mcpserver.exceptions import ToolError
@@ -551,7 +551,7 @@ class TestProtocol202511(unittest.TestCase):
             os.unlink(path)
 
     def test_allowed_origins_accepts_port_wildcard(self):
-        """``https://app.example.com:*`` is valid (FastMCP port-wildcard)."""
+        """``https://app.example.com:*`` is valid (MCPServer port-wildcard)."""
         import tempfile, textwrap, os
         from zabbix_mcp.config import load_config
         with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
@@ -605,16 +605,16 @@ class TestProtocol202511(unittest.TestCase):
 # Tasks API (MCP 2025-11-25 experimental) - bounded store + helpers
 # ---------------------------------------------------------------------------
 class TestTasksAPI(unittest.IsolatedAsyncioTestCase):
-    """Coverage for the bounded task store and FastMCP integration glue.
+    """Coverage for the bounded task store and the tasks extension.
 
     Three things matter for the Tasks API rollout:
     - The store must enforce TTL bounds (default + ceiling) so a buggy
       or hostile client cannot pin multi-megabyte payloads in RAM.
     - It must reject create_task once the live cap is reached, with a
       clear retryable error (not silent OOM).
-    - The FastMCP convert_result monkey-patch must propagate
-      CreateTaskResult through to the low-level server unchanged, but
-      pass other return types through to the original logic.
+    - The io.modelcontextprotocol/tasks extension must run a
+      task-augmented call in the background and hand back the task
+      handle immediately, while leaving ordinary calls untouched.
     """
 
     async def test_default_ttl_when_client_omits(self):

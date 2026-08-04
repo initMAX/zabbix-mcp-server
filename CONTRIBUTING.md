@@ -25,7 +25,7 @@ src/zabbix_mcp/
 ├── cli.py              # CLI entry point
 ├── config.py           # TOML config loading
 ├── client.py           # Multi-server Zabbix client + rate limiter
-├── server.py           # FastMCP server + dynamic tool registration
+├── server.py           # MCPServer (SDK 2.x) server + dynamic tool registration
 └── api/
     ├── types.py        # MethodDef, ParamDef dataclasses
     ├── common.py       # Shared parameter sets

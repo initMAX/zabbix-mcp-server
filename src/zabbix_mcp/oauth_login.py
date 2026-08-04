@@ -33,7 +33,7 @@ Flow:
 1. The framework's authorize handler calls
    ``ZmcpOAuthProvider.authorize`` which stashes the pending request
    and returns ``<public_url>/oauth/login?request_id=<opaque>``.
-   FastMCP redirects the user-agent there.
+   MCPServer redirects the user-agent there.
 2. GET renders a login form + a consent block listing the scopes the
    client asked for plus the scopes the server is willing to grant.
 3. POST verifies username + password against ``[admin.users.*]``,

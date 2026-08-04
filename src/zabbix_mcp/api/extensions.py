@@ -19,7 +19,7 @@
 
 These functions are standalone — each receives a ClientManager instance and
 server name, performs its work via Zabbix API calls, and returns a JSON string.
-They are registered as MCP tools directly via FastMCP decorators in server.py.
+They are registered as MCP tools directly via MCPServer decorators in server.py.
 """
 
 from __future__ import annotations

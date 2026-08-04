@@ -211,7 +211,8 @@ api_token = "dummy"
         # Spec: CacheableResult on tools/list; per-token filtering makes
         # the catalog private to the authorization.
         self.assertEqual(result.get("cacheScope"), "private")
-        self.assertIn("ttlMs", result)
+        # [server].tools_list_cache_ttl default is 300 s -> 300000 ms.
+        self.assertEqual(result.get("ttlMs"), 300000)
         self.assertEqual(result.get("resultType"), "complete")
         self.assertIn("io.modelcontextprotocol/serverInfo", result.get("_meta", {}))
         self.__class__._stateless_tool_count = len(result["tools"])

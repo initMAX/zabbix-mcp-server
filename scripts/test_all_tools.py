@@ -224,7 +224,7 @@ def build_args(tool_name: str, suite: Suite):
     if n.endswith("_get") and n not in _CUSTOM_GETS:
         # Default: small limit, common output filter to keep responses tiny.
         # ``output`` must be a string ("extend" or comma-separated field list)
-        # per the FastMCP schema; passing a list trips Pydantic validation.
+        # per the MCPServer schema; passing a list trips Pydantic validation.
         return {"limit": 2, "output": "extend"} if n != "configuration_get" else {}
 
     if n == "apiinfo_version":
@@ -312,7 +312,7 @@ def build_args(tool_name: str, suite: Suite):
         return {"method": "apiinfo.version"}
     if n == "history_push":
         # Tool's typed signature has ``items`` as the top-level array
-        # (FastMCP-injected wrap turns the call into the right Zabbix
+        # (MCPServer-injected wrap turns the call into the right Zabbix
         # API shape underneath). One float value on our smoke item.
         if not cid.get("item"):
             return _SKIP("history_push needs the item fixture")

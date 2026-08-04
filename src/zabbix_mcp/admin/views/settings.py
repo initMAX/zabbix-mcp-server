@@ -134,14 +134,14 @@ def _validate_list_entry(key: str, entry: str) -> str | None:
         return None
     if key == "allowed_origins":
         # MCP 2025-11-25 DNS-rebinding allowlist. Same shape as cors_origins
-        # except FastMCP's TransportSecurityMiddleware ALSO accepts the
+        # except MCPServer's TransportSecurityMiddleware ALSO accepts the
         # ``host:*`` port-wildcard suffix (e.g. ``https://app.example.com:*``)
         # to cover varying client ports without listing each one.
         if not entry.startswith(("http://", "https://")):
             return f"Origin '{entry}' must start with http:// or https://"
         from urllib.parse import urlsplit
         # Strip optional ``:*`` port-wildcard before URL parsing - urlsplit
-        # rejects '*' as a port. The wildcard is FastMCP-internal syntax.
+        # rejects '*' as a port. The wildcard is MCPServer-internal syntax.
         probe = entry[:-2] if entry.endswith(":*") else entry
         try:
             parts = urlsplit(probe)

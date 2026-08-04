@@ -111,6 +111,15 @@ compact_output = true
 # built-in templates.
 # response_max_chars = 50000
 
+# How long (seconds) an MCP client may treat a tools/list response as
+# fresh. Sent as the 2026-07-28 `ttlMs` cache hint; the accompanying
+# `cacheScope` is always "private" because the catalog is filtered per
+# token. Default 300 (5 minutes). The catalog only changes on restart,
+# so caching saves re-sending ~100k tokens of tool schemas on every new
+# session. Set to 0 to disable client caching (always re-fetch); max
+# 86400. Pre-2026 clients ignore the field entirely.
+# tools_list_cache_ttl = 300
+
 # Allow stdio clients to pass `raw_json: true` and skip the
 # "[System: The following is raw data ...]" prompt-injection mitigation
 # preamble. Default: false. The flag exists for non-LLM stdio scripts
