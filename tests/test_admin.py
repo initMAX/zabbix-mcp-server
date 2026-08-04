@@ -490,7 +490,7 @@ class TestProtocol202511(unittest.TestCase):
         this helper re-raises so FastMCP marks isError correctly.
         """
         from zabbix_mcp.server import _raise_if_extension_error
-        from mcp.server.fastmcp.exceptions import ToolError
+        from mcp.server.mcpserver.exceptions import ToolError
         with self.assertRaises(ToolError) as cm:
             _raise_if_extension_error('{"error": "bad input"}')
         self.assertIn("bad input", str(cm.exception))
@@ -655,31 +655,85 @@ class TestTasksAPI(unittest.IsolatedAsyncioTestCase):
         task = await store.create_task(TaskMetadata(ttl=30_000))
         self.assertEqual(task.ttl, 30_000)
 
-    def test_convert_result_patch_propagates_create_task_result(self):
-        """CreateTaskResult must reach the low-level server unmolested.
+    async def test_extension_interceptor_runs_task_in_background(self):
+        """tools/call with `task:` on an advertised tool returns
+        CreateTaskResult immediately; the payload lands in the store and
+        is retrievable via the tasks/result handler once completed."""
+        import asyncio
+        from zabbix_mcp.task_store import BoundedInMemoryTaskStore, build_tasks_extension
+        from mcp.types import (
+            CallToolRequestParams, CallToolResult, CreateTaskResult,
+            GetTaskRequestParams, GetTaskPayloadRequestParams, TaskMetadata, TextContent,
+        )
+        store = BoundedInMemoryTaskStore()
+        ext = build_tasks_extension(store, {"report_generate"})
 
-        FastMCP's stock convert_result would stringify it; the patch
-        recognises and returns it as-is. Idempotent so calling
-        _patch... twice is safe (e.g. on reload).
-        """
-        from zabbix_mcp.server import _patch_fastmcp_convert_result_for_tasks
-        from mcp.server.fastmcp.utilities import func_metadata as fm
-        from mcp.types import CreateTaskResult, Task
-        _patch_fastmcp_convert_result_for_tasks()
-        # call again: should be idempotent
-        _patch_fastmcp_convert_result_for_tasks()
+        done = asyncio.Event()
 
-        from datetime import datetime, timezone
-        sample = CreateTaskResult(task=Task(
-            taskId="t-1", status="working", ttl=60_000,
-            createdAt=datetime.now(timezone.utc),
-            lastUpdatedAt=datetime.now(timezone.utc),
-        ))
-        # Use a real FuncMetadata instance so we exercise the patched method
-        from unittest.mock import MagicMock
-        instance = MagicMock(spec=fm.FuncMetadata)
-        out = fm.FuncMetadata.convert_result(instance, sample)
-        self.assertIs(out, sample)
+        async def call_next(ctx):
+            await done.wait()
+            return CallToolResult(content=[TextContent(type="text", text="PDF!")])
+
+        params = CallToolRequestParams(
+            name="report_generate", arguments={}, task=TaskMetadata(ttl=60_000))
+        result = await ext.intercept_tool_call(params, ctx=None, call_next=call_next)
+        self.assertIsInstance(result, CreateTaskResult)
+        tid = result.task.task_id
+
+        bindings = {b.method: b for b in ext.methods()}
+        polled = await bindings["tasks/get"].handler(None, GetTaskRequestParams(taskId=tid))
+        self.assertEqual(polled.status, "working")
+
+        done.set()
+        await asyncio.sleep(0.05)
+        polled = await bindings["tasks/get"].handler(None, GetTaskRequestParams(taskId=tid))
+        self.assertEqual(polled.status, "completed")
+        payload = await bindings["tasks/result"].handler(None, GetTaskPayloadRequestParams(taskId=tid))
+        self.assertEqual(payload.content[0].text, "PDF!")
+
+    async def test_extension_passthrough_without_task(self):
+        """No `task:` param or non-advertised tool -> normal synchronous path."""
+        from zabbix_mcp.task_store import BoundedInMemoryTaskStore, build_tasks_extension
+        from mcp.types import CallToolRequestParams, CallToolResult, TaskMetadata, TextContent
+        store = BoundedInMemoryTaskStore()
+        ext = build_tasks_extension(store, {"report_generate"})
+        sync_result = CallToolResult(content=[TextContent(type="text", text="sync")])
+
+        async def call_next(ctx):
+            return sync_result
+
+        out = await ext.intercept_tool_call(
+            CallToolRequestParams(name="report_generate", arguments={}), None, call_next)
+        self.assertIs(out, sync_result)
+        out = await ext.intercept_tool_call(
+            CallToolRequestParams(name="host_get", arguments={}, task=TaskMetadata(ttl=1000)),
+            None, call_next)
+        self.assertIs(out, sync_result)
+        self.assertEqual(len(store._tasks), 0)
+
+    async def test_extension_cancel(self):
+        """tasks/cancel flips a working task to cancelled."""
+        import asyncio
+        from zabbix_mcp.task_store import BoundedInMemoryTaskStore, build_tasks_extension
+        from mcp.types import (
+            CallToolRequestParams, CancelTaskRequestParams,
+            GetTaskRequestParams, TaskMetadata, CallToolResult, TextContent,
+        )
+        store = BoundedInMemoryTaskStore()
+        ext = build_tasks_extension(store, {"report_generate"})
+
+        async def call_next(ctx):
+            await asyncio.sleep(30)
+            return CallToolResult(content=[TextContent(type="text", text="late")])
+
+        result = await ext.intercept_tool_call(
+            CallToolRequestParams(name="report_generate", arguments={}, task=TaskMetadata(ttl=60_000)),
+            None, call_next)
+        tid = result.task.task_id
+        bindings = {b.method: b for b in ext.methods()}
+        await bindings["tasks/cancel"].handler(None, CancelTaskRequestParams(taskId=tid))
+        polled = await bindings["tasks/get"].handler(None, GetTaskRequestParams(taskId=tid))
+        self.assertEqual(polled.status, "cancelled")
 
 
 # ---------------------------------------------------------------------------

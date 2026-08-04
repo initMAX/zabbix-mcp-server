@@ -212,7 +212,7 @@ class TestAPIRegistry(unittest.TestCase):
 
 class TestToolRegistration(unittest.TestCase):
     def test_register_all_tools(self):
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer as FastMCP
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
@@ -224,7 +224,7 @@ class TestToolRegistration(unittest.TestCase):
         self.assertGreaterEqual(count, len(ALL_METHODS) + 2)
 
     def test_key_tools_present(self):
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer as FastMCP
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
@@ -239,7 +239,7 @@ class TestToolRegistration(unittest.TestCase):
             self.assertIn(expected, names)
 
     def test_tools_have_descriptions(self):
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer as FastMCP
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
@@ -249,7 +249,7 @@ class TestToolRegistration(unittest.TestCase):
             self.assertTrue(tool.description, f"Tool {tool.name} has no description")
 
     def test_tools_have_parameters(self):
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer as FastMCP
 
         cfg = _make_config()
         mgr = ClientManager(cfg)
@@ -1714,21 +1714,34 @@ class TestOAuthProvider(unittest.IsolatedAsyncioTestCase):
             login_path="/oauth/login",
         )
 
-    async def test_register_assigns_client_id(self):
+
+    @staticmethod
+    def _client_info(**kw):
+        """Build OAuthClientInformationFull the way the SDK 2.0 DCR
+        handler does: client_id minted by the handler before the model
+        reaches provider.register_client (client_id is now a required
+        model field)."""
+        from uuid import uuid4
         from mcp.shared.auth import OAuthClientInformationFull
-        ci = OAuthClientInformationFull(
+        kw.setdefault("client_id", str(uuid4()))
+        return OAuthClientInformationFull(**kw)
+
+    async def test_register_preserves_client_id(self):
+        # SDK 2.0 contract: the handler mints client_id; register_client
+        # must keep it verbatim and index the client under it.
+        ci = self._client_info(
             redirect_uris=["http://localhost:8765/callback"],
             client_name="test-client",
             token_endpoint_auth_method="none",
         )
+        minted = ci.client_id
         await self.provider.register_client(ci)
-        self.assertTrue(ci.client_id)
+        self.assertEqual(ci.client_id, minted)
         self.assertIsNone(ci.client_secret)  # public client (PKCE)
-        self.assertIn(ci.client_id, self.provider._clients)
+        self.assertIn(minted, self.provider._clients)
 
     async def test_register_confidential_client_gets_secret(self):
-        from mcp.shared.auth import OAuthClientInformationFull
-        ci = OAuthClientInformationFull(
+        ci = self._client_info(
             redirect_uris=["https://app.example.com/cb"],
             client_name="confidential",
             token_endpoint_auth_method="client_secret_post",
@@ -1737,9 +1750,8 @@ class TestOAuthProvider(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(ci.client_secret)
 
     async def test_authorize_redirects_to_login(self):
-        from mcp.shared.auth import OAuthClientInformationFull
         from mcp.server.auth.provider import AuthorizationParams
-        ci = OAuthClientInformationFull(
+        ci = self._client_info(
             redirect_uris=["http://localhost:8765/cb"],
             client_name="x",
             token_endpoint_auth_method="none",
@@ -1761,9 +1773,8 @@ class TestOAuthProvider(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(pending)
 
     async def test_complete_pending_mints_code_redirect(self):
-        from mcp.shared.auth import OAuthClientInformationFull
         from mcp.server.auth.provider import AuthorizationParams
-        ci = OAuthClientInformationFull(
+        ci = self._client_info(
             redirect_uris=["http://localhost:8765/cb"],
             client_name="x",
             token_endpoint_auth_method="none",

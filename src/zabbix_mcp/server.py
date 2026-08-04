@@ -1115,32 +1115,6 @@ def _ensure_write_tools_set() -> None:
         _WRITE_TOOLS = _build_write_tools_set()
 
 
-def _patch_fastmcp_convert_result_for_tasks() -> None:
-    """Make FastMCP's result converter propagate ``CreateTaskResult``.
-
-    The 1.26 ``FuncMetadata.convert_result`` only special-cases
-    ``CallToolResult``; anything else (including the new
-    ``CreateTaskResult`` from Tasks API) gets shoved through
-    ``_convert_to_content`` and ends up as a stringified text block.
-    The low-level ``Server.call_tool`` decorator already understands
-    ``CreateTaskResult`` and passes it straight through (see
-    ``mcp/server/lowlevel/server.py`` around the ``isinstance(results,
-    CreateTaskResult)`` branch), so we only need to convince FastMCP
-    to leave it alone. Idempotent - safe to call multiple times.
-    """
-    if getattr(_fm_module.FuncMetadata.convert_result, "_zmcp_patched", False):
-        return
-    _orig_convert = _fm_module.FuncMetadata.convert_result
-
-    def _convert_with_tasks(self, result):  # type: ignore[no-untyped-def]
-        if isinstance(result, CreateTaskResult):
-            return result
-        return _orig_convert(self, result)
-
-    _convert_with_tasks._zmcp_patched = True  # type: ignore[attr-defined]
-    _fm_module.FuncMetadata.convert_result = _convert_with_tasks
-
-
 def _load_server_icons() -> list[Icon] | None:
     """Build the ``icons`` list for ``Implementation`` from the bundled brand SVG.
 
@@ -2148,25 +2122,9 @@ def _register_tools(
                 Tasks API may invoke this with `task: {ttl: 60000}` to receive a
                 CreateTaskResult and poll `tasks/get` instead of holding a single
                 long HTTP request - useful when fronted by a proxy with short timeouts."""
-                # Detect task-augmented invocation. ctx.experimental.is_task is True
-                # when the client included `task: {...}` in the request params.
-                try:
-                    ctx = mcp._lowlevel_server.request_context  # type: ignore[attr-defined]
-                    exp = getattr(ctx, "experimental", None)
-                except LookupError:
-                    exp = None
-
-                if exp is not None and exp.is_task:
-                    async def _work(task_ctx) -> CallToolResult:
-                        text = await _report_generate_work(
-                            report_type=report_type, hostgroupid=hostgroupid,
-                            period=period, company=company, server=server,
-                        )
-                        return CallToolResult(
-                            content=[TextContent(type="text", text=text)],
-                            isError=False,
-                        )
-                    return await exp.run_task(_work)
+                # Task-mode invocations are handled by the tasks extension
+                # interceptor before this handler runs - by the time we get
+                # here the call is always synchronous.
 
                 return await _report_generate_work(
                     report_type=report_type, hostgroupid=hostgroupid,
@@ -2746,7 +2704,15 @@ def run_server(
     # Allow CreateTaskResult to escape FastMCP's result converter unchanged
     # so the task-augmented path on report_generate actually reaches the
     # low-level Server which knows how to ship it to the client. Idempotent.
-    _patch_fastmcp_convert_result_for_tasks()
+    # Official tasks extension (io.modelcontextprotocol/tasks) replaces the
+    # experimental 2025-11-25 Tasks API. The interceptor turns a tools/call
+    # carrying `task: {...}` on an advertised tool into an immediate
+    # CreateTaskResult with background execution; tasks/get / tasks/result /
+    # tasks/cancel are served as extension methods (tasks/list is gone per
+    # the 2026-07-28 redesign).
+    from zabbix_mcp.task_store import BoundedInMemoryTaskStore, build_tasks_extension
+    _task_store = BoundedInMemoryTaskStore()
+    _tasks_extension = build_tasks_extension(_task_store, set(_TASK_AUGMENTED_TOOLS))
 
     # SDK 2.0: host/port/transport_security moved out of the constructor -
     # HTTP binding goes to uvicorn, transport_security to streamable_http_app().
@@ -2761,6 +2727,7 @@ def run_server(
         ),
         website_url="https://github.com/initMAX/zabbix-mcp-server",
         icons=_load_server_icons(),
+        extensions=[_tasks_extension],
         **auth_kwargs,
     )
 
@@ -2769,25 +2736,13 @@ def run_server(
     # tasks/list, tasks/cancel handlers on the low-level server. The
     # store ceiling protects against a misbehaved client filling RAM
     # with stale PDF payloads; the periodic sweeper is started below.
-    _experimental = getattr(mcp._lowlevel_server, "experimental", None)
-    if _experimental is not None and hasattr(_experimental, "enable_tasks"):
-        from zabbix_mcp.task_store import BoundedInMemoryTaskStore
-        _task_store = BoundedInMemoryTaskStore()
-        _experimental.enable_tasks(store=_task_store)
-        object.__setattr__(config, "_task_store", _task_store)
-    else:
-        # SDK 2.0: tasks moved to the official extension - re-enabled in
-        # the tasks-extension migration step (issue #64 item 3).
-        _task_store = None
-        object.__setattr__(config, "_task_store", None)
-        logger.warning("Tasks API temporarily disabled during SDK 2.0 migration (issue #64)")
-    if _task_store is not None:
-        logger.info(
-            "Experimental Tasks API enabled (default TTL %ds, ceiling %dh, max %d live tasks)",
-            _task_store._default_ttl_ms // 1000,
-            _task_store._max_ttl_ms // 3_600_000,
-            _task_store._max_live_tasks,
-        )
+    object.__setattr__(config, "_task_store", _task_store)
+    logger.info(
+        "Tasks extension enabled (default TTL %ds, ceiling %dh, max %d live tasks)",
+        _task_store._default_ttl_ms // 1000,
+        _task_store._max_ttl_ms // 3_600_000,
+        _task_store._max_live_tasks,
+    )
 
     # Override list_tools so:
     #   1. report_generate advertises taskSupport=optional (FastMCP's own
