@@ -2151,7 +2151,7 @@ def _register_tools(
                 # Detect task-augmented invocation. ctx.experimental.is_task is True
                 # when the client included `task: {...}` in the request params.
                 try:
-                    ctx = mcp._mcp_server.request_context  # type: ignore[attr-defined]
+                    ctx = mcp._lowlevel_server.request_context  # type: ignore[attr-defined]
                     exp = getattr(ctx, "experimental", None)
                 except LookupError:
                     exp = None
@@ -2748,10 +2748,10 @@ def run_server(
     # low-level Server which knows how to ship it to the client. Idempotent.
     _patch_fastmcp_convert_result_for_tasks()
 
+    # SDK 2.0: host/port/transport_security moved out of the constructor -
+    # HTTP binding goes to uvicorn, transport_security to streamable_http_app().
     mcp = FastMCP(
         name="zabbix-mcp-server",
-        host=host,
-        port=port,
         instructions=(
             "Zabbix MCP Server provides full access to the Zabbix monitoring API. "
             "Use the tools to query hosts, problems, triggers, items, and all other "
@@ -2761,7 +2761,6 @@ def run_server(
         ),
         website_url="https://github.com/initMAX/zabbix-mcp-server",
         icons=_load_server_icons(),
-        transport_security=transport_security,
         **auth_kwargs,
     )
 
@@ -2770,16 +2769,25 @@ def run_server(
     # tasks/list, tasks/cancel handlers on the low-level server. The
     # store ceiling protects against a misbehaved client filling RAM
     # with stale PDF payloads; the periodic sweeper is started below.
-    from zabbix_mcp.task_store import BoundedInMemoryTaskStore
-    _task_store = BoundedInMemoryTaskStore()
-    mcp._mcp_server.experimental.enable_tasks(store=_task_store)
-    object.__setattr__(config, "_task_store", _task_store)
-    logger.info(
-        "Experimental Tasks API enabled (default TTL %ds, ceiling %dh, max %d live tasks)",
-        _task_store._default_ttl_ms // 1000,
-        _task_store._max_ttl_ms // 3_600_000,
-        _task_store._max_live_tasks,
-    )
+    _experimental = getattr(mcp._lowlevel_server, "experimental", None)
+    if _experimental is not None and hasattr(_experimental, "enable_tasks"):
+        from zabbix_mcp.task_store import BoundedInMemoryTaskStore
+        _task_store = BoundedInMemoryTaskStore()
+        _experimental.enable_tasks(store=_task_store)
+        object.__setattr__(config, "_task_store", _task_store)
+    else:
+        # SDK 2.0: tasks moved to the official extension - re-enabled in
+        # the tasks-extension migration step (issue #64 item 3).
+        _task_store = None
+        object.__setattr__(config, "_task_store", None)
+        logger.warning("Tasks API temporarily disabled during SDK 2.0 migration (issue #64)")
+    if _task_store is not None:
+        logger.info(
+            "Experimental Tasks API enabled (default TTL %ds, ceiling %dh, max %d live tasks)",
+            _task_store._default_ttl_ms // 1000,
+            _task_store._max_ttl_ms // 3_600_000,
+            _task_store._max_live_tasks,
+        )
 
     # Override list_tools so:
     #   1. report_generate advertises taskSupport=optional (FastMCP's own
@@ -2791,18 +2799,21 @@ def run_server(
     #      source of truth, but pruning the catalog here keeps the LLM
     #      from receiving schemas for tools it cannot call (token-bloat
     #      and "model tries unauthorized tool" issues).
-    _orig_list_tools_handler = mcp._mcp_server.request_handlers.get(ListToolsRequest)
+    # SDK 2.0: request_handlers dict replaced by string-keyed
+    # add/get_request_handler with (ctx, params) handlers returning the
+    # bare result object (no ServerResult wrapper).
+    _orig_entry = mcp._lowlevel_server.get_request_handler("tools/list")
 
-    async def _list_tools_with_execution(req):
-        result = await _orig_list_tools_handler(req)
-        tools_list = result.root.tools
-        for tool in tools_list:
+    async def _list_tools_with_execution(ctx, params):
+        result = await _orig_entry.handler(ctx, params)
+        for tool in result.tools:
             if tool.name in _TASK_AUGMENTED_TOOLS:
                 tool.execution = ToolExecution(taskSupport="optional")
-        tools_list = _filter_tools_by_token(tools_list)
-        return ServerResult(ListToolsResult(tools=tools_list))
+        result.tools = _filter_tools_by_token(result.tools)
+        return result
 
-    mcp._mcp_server.request_handlers[ListToolsRequest] = _list_tools_with_execution
+    mcp._lowlevel_server.add_request_handler(
+        "tools/list", _orig_entry.params_type, _list_tools_with_execution)
 
     tool_count = _register_tools(
         mcp, client_manager, config.server.tools, config.server.disabled_tools,
@@ -2919,7 +2930,7 @@ def run_server(
         if transport in ("http", "sse"):
             # Build the ASGI app from FastMCP for full control over TLS and CORS
             if transport == "http":
-                asgi_app = mcp.streamable_http_app()
+                asgi_app = mcp.streamable_http_app(transport_security=transport_security)
             else:
                 asgi_app = mcp.sse_app()
 
@@ -2929,24 +2940,25 @@ def run_server(
             # would not trigger lazy cleanup on access. Done by wrapping
             # the original lifespan context manager (Starlette 1.0+ no
             # longer exposes the legacy on_startup / on_shutdown lists).
-            from contextlib import asynccontextmanager
-            from zabbix_mcp.task_store import run_periodic_cleanup as _run_cleanup
-            _orig_lifespan_ctx = asgi_app.router.lifespan_context
+            if _task_store is not None:
+                from contextlib import asynccontextmanager
+                from zabbix_mcp.task_store import run_periodic_cleanup as _run_cleanup
+                _orig_lifespan_ctx = asgi_app.router.lifespan_context
 
-            @asynccontextmanager
-            async def _lifespan_with_cleanup(app):
-                async with _orig_lifespan_ctx(app) as state:
-                    cleanup_task = asyncio.create_task(_run_cleanup(_task_store))
-                    try:
-                        yield state
-                    finally:
-                        cleanup_task.cancel()
+                @asynccontextmanager
+                async def _lifespan_with_cleanup(app):
+                    async with _orig_lifespan_ctx(app) as state:
+                        cleanup_task = asyncio.create_task(_run_cleanup(_task_store))
                         try:
-                            await cleanup_task
-                        except (asyncio.CancelledError, Exception):
-                            pass
+                            yield state
+                        finally:
+                            cleanup_task.cancel()
+                            try:
+                                await cleanup_task
+                            except (asyncio.CancelledError, Exception):
+                                pass
 
-            asgi_app.router.lifespan_context = _lifespan_with_cleanup
+                asgi_app.router.lifespan_context = _lifespan_with_cleanup
 
             # Capture client IP in context var for token IP allowlist checks.
             # When behind a reverse proxy listed in [server].trusted_proxies,
