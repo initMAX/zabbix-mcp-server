@@ -69,7 +69,7 @@ We will acknowledge your report within 48 hours and work with you on a fix.
 
 ### Origin / Host validation (DNS rebinding protection)
 
-Per the MCP 2025-11-25 spec, the server can reject requests whose `Origin` or `Host` header does not match the operator-declared allowlist (returns HTTP 403 / 421 respectively). This blocks DNS rebinding attacks against an MCP endpoint reachable from a browser context.
+Per the MCP spec (2025-11-25 and later), the server can reject requests whose `Origin` or `Host` header does not match the operator-declared allowlist (returns HTTP 403 / 421 respectively). This blocks DNS rebinding attacks against an MCP endpoint reachable from a browser context.
 
 **Recommended minimum configuration for production**: set `[server].public_url` to the externally-reachable URL of the server, e.g.
 
@@ -116,7 +116,8 @@ When `public_url`, `allowed_origins`, and `allowed_hosts` are all unset on a non
 
 | Version | Supported |
 |---|---|
-| 1.33 (latest) | Yes |
+| 1.34 (latest) | Yes |
+| 1.33 | Yes |
 | 1.32 | Yes |
 | 1.31 | Yes |
 | 1.30 | Yes |

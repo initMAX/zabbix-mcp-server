@@ -735,7 +735,9 @@ items = json.loads(result)
 
 #### Tasks API for long-running tools
 
-When fronted by Cloudflare or a reverse proxy with a typical 30 s read timeout, synchronous PDF generation on bigger host groups can fail mid-flight. The `report_generate` tool advertises `execution.taskSupport: "optional"` (per MCP 2025-11-25 spec), so MCP clients can opt into asynchronous execution: instead of holding a single long HTTP request, the client receives a task id, polls until the task completes, then pulls the final payload.
+When fronted by Cloudflare or a reverse proxy with a typical 30 s read timeout, synchronous PDF generation on bigger host groups can fail mid-flight. The `report_generate` tool advertises `execution.taskSupport: "optional"`, so MCP clients can opt into asynchronous execution: instead of holding a single long HTTP request, the client receives a task id, polls until the task completes, then pulls the final payload.
+
+Since v1.34 this runs on the official `io.modelcontextprotocol/tasks` extension (MCP 2026-07-28), advertised under `capabilities.extensions`: a `tools/call` carrying `task: {...}` returns immediately with the task handle in the result `_meta`, the client polls `tasks/get` and fetches the payload from `tasks/result`. `tasks/cancel` stops work in flight. The store keeps its guard rails - default TTL 1 h, 24 h ceiling, capped live tasks with a retryable error.
 
 Other tools stay synchronous (under 5 s typically) - the polling overhead is not worth it.
 
@@ -983,7 +985,7 @@ All available options with detailed descriptions are in [`config.example.toml`](
 
 ## OAuth 2.1 Authorization Server
 
-Since v1.28 the server ships an embedded OAuth 2.1 authorization server. Clients that auto-discover authentication (ChatGPT custom apps, Claude Desktop remote, MCP Inspector, any [MCP 2025-11-25](https://modelcontextprotocol.io/specification) client) can sign in against your Zabbix MCP deployment **without an external IdP, without a hardcoded bearer, and without operators learning OAuth library internals**.
+Since v1.28 the server ships an embedded OAuth 2.1 authorization server. Clients that auto-discover authentication (ChatGPT custom apps, Claude Desktop remote, MCP Inspector, any [MCP 2025-11-25 or 2026-07-28](https://modelcontextprotocol.io/specification) client) can sign in against your Zabbix MCP deployment **without an external IdP, without a hardcoded bearer, and without operators learning OAuth library internals**.
 
 ```toml
 [server]
@@ -1143,6 +1145,22 @@ The installer automatically detects the best available Python (>=3.10). If none 
 </table>
 
 The server uses the standard Zabbix JSON-RPC API. Methods not available in your Zabbix version will return an error from the Zabbix server — the MCP server itself does not enforce version checks.
+
+## MCP Protocol Compatibility
+
+The server answers **every supported protocol revision from one endpoint** - no separate URL, no per-client configuration. A client negotiates the revision it knows; the server adapts.
+
+<table>
+<tr><th width="220">Protocol revision</th><th width="120">Status</th><th>Notes</th></tr>
+<tr><td>2026-07-28</td><td>Supported (v1.34+)</td><td>Stateless: no <code>initialize</code> handshake, no <code>Mcp-Session-Id</code>. Each request carries its version, client info and capabilities in <code>_meta</code>. Adds <code>server/discover</code>, cacheable list results, and the <code>io.modelcontextprotocol/tasks</code> extension.</td></tr>
+<tr><td>2025-11-25</td><td>Fully supported</td><td>What Claude Desktop, claude.ai connectors, ChatGPT custom apps and MCP Inspector speak today. Handshake + session transport, unchanged.</td></tr>
+<tr><td>2025-06-18, 2025-03-26, 2024-11-05</td><td>Supported</td><td>Older revisions still negotiate; a request without a version header is treated as 2025-03-26 per spec.</td></tr>
+</table>
+
+Two operator-visible knobs come with the 2026-07-28 revision:
+
+- **`[server].tools_list_cache_ttl`** (seconds, default 300) - the `ttlMs` freshness hint on `tools/list`. The catalog only changes on restart, so letting clients cache it saves re-sending the whole schema set every session. `cacheScope` is always `private` because the catalog is filtered per token.
+- **`Mcp-Method` / `Mcp-Name` request headers** - the revision requires them on Streamable HTTP POSTs, which means an L7 firewall or reverse proxy can allow or deny individual MCP methods and tool names **without parsing the JSON-RPC body**. Useful when policy says "this network segment may call read tools only".
 
 ## Development
 

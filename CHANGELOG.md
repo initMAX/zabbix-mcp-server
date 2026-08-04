@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.34 - 2026-08-04
+
+**MCP 2026-07-28 protocol support.** The server now answers both the new stateless revision and every earlier one from a single endpoint - existing clients (Claude Desktop, claude.ai connectors, ChatGPT custom apps, MCP Inspector) keep working unchanged, no config edits, no reconnect required.
+
+### Added
+
+- **MCP 2026-07-28 revision** ([#64](https://github.com/initMAX/zabbix-mcp-server/issues/64)). The July 2026 spec makes MCP stateless: no `initialize` handshake, no `Mcp-Session-Id`, every request carries its protocol version, client info and capabilities in `_meta`. Upgrading to the 2.x MCP SDK brings dual-revision serving - a 2026-07-28 client and a 2025-11-25 client can talk to the same endpoint at the same time, each getting the transport it expects. `server/discover` (the new up-front capability probe) is served automatically.
+- **`io.modelcontextprotocol/tasks` extension.** The experimental Tasks API used for long-running `report_generate` calls moved out of the core protocol into an official extension and was redesigned: a `tools/call` carrying `task: {...}` returns immediately with the task handle in the result `_meta`, the client polls `tasks/get`, then pulls the payload from `tasks/result`; `tasks/cancel` now actually stops work in flight. The bounded store keeps its guard rails (default TTL 1 h, 24 h ceiling, capped live tasks with a retryable error). `tasks/list` is gone per the redesign.
+- **`[server].tools_list_cache_ttl`** (seconds, default 300, `0` disables, max 86400) - sets the `ttlMs` freshness hint on `tools/list` results. With 237 tools the catalog is roughly 100k tokens of schema; letting clients reuse it for a few minutes cuts that off every new session. `cacheScope` is pinned to `private` because the catalog is filtered per token, so a shared cache can never serve one token's catalog to another. Pre-2026 clients ignore both fields.
+- **`Mcp-Method` / `Mcp-Name` request headers** are honoured on Streamable HTTP POSTs. Beyond spec compliance this is an operational win: an L7 firewall or reverse proxy can now allow or deny individual MCP methods and tool names without parsing the JSON-RPC body.
+- **README gains an "MCP Protocol Compatibility" section** listing every negotiable revision and the two operator-visible knobs above.
+
+### Security
+
+- **RFC 9207 issuer identification** ([SEP-2468](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2468)). The `/authorize` response now carries `iss=<public_url>` next to `code` and `state`, so a client can verify the authorization code came from the authorization server it started the flow with - closing the classic AS mix-up hole. Clients that do not know the parameter ignore it.
+
+### Changed
+
+- Minimum MCP SDK is now `mcp>=2.0.0`. Python floor is unchanged (3.10+), so every OS in the installer matrix stays supported. Note for custom container images: the SDK's new HTTP client uses the **system CA store** instead of a bundled `certifi`, so an image stripped of `ca-certificates` will fail TLS to Zabbix - the shipped Dockerfile is unaffected.
+- Internals renamed from `FastMCP` to `MCPServer` following the SDK.
+
+### Verified
+
+- Full test suite (361 tests) with zero regressions, including a new dual-generation e2e suite that drives one live server with both a legacy handshake client and a stateless 2026-07-28 client and asserts both see an identical tool catalog
+- CRUD smoke against live Zabbix 7.4: 255/261, exactly the pre-upgrade baseline
+- Real AI clients against a real deployment: Claude Code CLI (read and write round trips) and the claude.ai connector (OAuth reconnect, consent screen, live chat answering from `infrastructure_summary_get`)
+- New-protocol path verified on the same deployment: stateless `tools/list`, `server/discover`, a live tool call, and the full task lifecycle
+
+
 ## v1.33 - 2026-07-31
 
 Patch release. One admin-portal bug fixed; no new features. The v2.0 feature train (LDAP/SAML SSO, plugin loader, tool-level audit log, SIEM forwarder, /metrics) continues on the `release/v2.0.0` branch.
