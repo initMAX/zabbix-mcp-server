@@ -292,10 +292,16 @@ class ZmcpOAuthProvider:
         # fragments correctly, and re-encodes via urlunparse so we never
         # produce malformed output even when the registered redirect_uri
         # already carries a query string or hash fragment.
+        # RFC 9207 (SEP-2468): the authorization response SHOULD carry
+        # ``iss`` so the client can verify the code came from the
+        # authorization server it started the flow with, defeating
+        # mix-up attacks where a malicious AS replays a code obtained
+        # elsewhere. Clients that do not know the parameter ignore it.
         return construct_redirect_uri(
             str(pending.params.redirect_uri),
             code=code_str,
             state=pending.params.state,
+            iss=self._public_url,
         )
 
     # ------------------------------------------------------------------

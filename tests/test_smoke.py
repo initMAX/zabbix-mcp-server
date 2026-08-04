@@ -1795,6 +1795,9 @@ class TestOAuthProvider(unittest.IsolatedAsyncioTestCase):
         self.assertIn("http://localhost:8765/cb?", redirect)
         self.assertIn("state=state-xyz", redirect)
         self.assertIn("code=", redirect)
+        # RFC 9207: the authorization response must identify the issuer
+        # so the client can detect an AS mix-up before redeeming.
+        self.assertIn("iss=https%3A%2F%2Fmcp.example.com", redirect)
 
     async def test_audience_binding_rejects_other_deployment(self):
         # An access token issued for a different MCP server URL must not
