@@ -1,5 +1,3 @@
-[![MCP Toplist](https://mcptoplist.com/badge/glama%2FinitMAX%2Fzabbix-mcp-server.svg)](https://mcptoplist.com/server/glama%2FinitMAX%2Fzabbix-mcp-server)
-
 <div align="center">
     <a href="https://github.com/initMAX/zabbix-mcp-server"><img src="./.readme/zabbix-mcp-server-preview.png" alt="Zabbix MCP Server" width="700"></a>
 </div>
@@ -23,7 +21,8 @@
     <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue">&nbsp;
     <img alt="Tools" src="https://img.shields.io/badge/tools-237-green">&nbsp;
     <img alt="Zabbix" src="https://img.shields.io/badge/zabbix-5.0%E2%80%948.0-red">&nbsp;
-    <a href="https://safeskill.dev/scan/initmax-zabbix-mcp-server"><img alt="SafeSkill" src="https://img.shields.io/badge/SafeSkill-100%2F100_Verified%20Safe-brightgreen"></a>
+    <a href="https://safeskill.dev/scan/initmax-zabbix-mcp-server"><img alt="SafeSkill" src="https://img.shields.io/badge/SafeSkill-100%2F100_Verified%20Safe-brightgreen"></a>&nbsp;
+    <a href="https://mcptoplist.com/server/glama%2FinitMAX%2Fzabbix-mcp-server"><img alt="MCP Toplist" src="https://mcptoplist.com/badge/glama%2FinitMAX%2Fzabbix-mcp-server.svg"></a>
 </div>
 <br>
 <br>
