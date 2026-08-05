@@ -1,3 +1,5 @@
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2FinitMAX%2Fzabbix-mcp-server.svg)](https://mcptoplist.com/server/glama%2FinitMAX%2Fzabbix-mcp-server)
+
 <div align="center">
     <a href="https://github.com/initMAX/zabbix-mcp-server"><img src="./.readme/zabbix-mcp-server-preview.png" alt="Zabbix MCP Server" width="700"></a>
 </div>
