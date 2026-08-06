@@ -324,6 +324,138 @@
     </form>
 </div>
 
+<!-- Section 4b: Report Delivery (issue #68) -->
+<div class="settings-section">
+    <h2 class="settings-section-title">&#x1F4E4; Report Delivery</h2>
+    <div class="form-hint" style="margin-bottom:12px;">
+        &#x26A0;&#xFE0F; All changes in this section require a <strong>server restart</strong> to take effect.
+    </div>
+    <div class="form-hint" style="margin-bottom:16px;">
+        By default <code>report_generate</code> returns the PDF inline, which can exceed an AI client's
+        context window on a large host group. These two channels hand the file over out of band instead -
+        the AI client then receives only a short receipt. <strong>Both are off until you configure them,
+        and the AI client never chooses the destination.</strong>
+    </div>
+
+    <form method="post" action="/settings/report_delivery">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
+        <div class="settings-row">
+            <div class="settings-label">Save to directory <span class="tooltip-icon" tabindex="0" data-tooltip="Absolute path the server may write generated PDFs into. Must exist and be writable by the service user. The filename is generated server-side (report type + host group + timestamp) and the resolved path is asserted to stay inside this directory, so a tool call can never write elsewhere. Leave empty to refuse save_to_file requests.">&#x1F6C8;</span></div>
+            <div>
+                <input type="text" name="output_dir" class="form-input" value="{{ settings.report_output_dir | default('') }}" placeholder="/var/lib/zabbix-mcp/reports">
+                <div class="form-hint">
+                    Enables <code>save_to_file: true</code>. Must be an absolute path that exists and is
+                    writable by the service user. Empty = saving refused.
+                </div>
+                {% if settings.report_output_dir %}
+                <div class="text-sm" style="margin-top:4px;"><span class="badge badge-success">Saving enabled</span></div>
+                {% endif %}
+            </div>
+        </div>
+        {% if current_user_role == 'admin' %}
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Directory Settings</button>
+        </div>
+        {% endif %}
+    </form>
+
+    <hr style="margin:24px 0; border:none; border-top:1px solid var(--border-color);">
+
+    <form method="post" action="/settings/report_email">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="_cfg_mtime" value="{{ config_mtime | default('') }}">
+        <div class="settings-row">
+            <div class="settings-label">Email reports <span class="tooltip-icon" tabindex="0" data-tooltip="Lets an AI client ask for a generated report to be mailed as a PDF attachment instead of returned inline. Requires SMTP host, From address and at least one allowed recipient.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="enabled" {% if settings.mail_enabled %}checked{% endif %} {% if current_user_role != 'admin' %}disabled{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>Enable <code>email_to</code></span>
+                </label>
+                <div class="form-hint">When off, an email request is refused with an explanation.</div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">SMTP host <span class="tooltip-icon" tabindex="0" data-tooltip="Hostname or IP of the mail relay. Required when email is enabled.">&#x1F6C8;</span></div>
+            <div>
+                <input type="text" name="smtp_host" class="form-input" value="{{ settings.mail_smtp_host | default('') }}" placeholder="smtp.example.com">
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">SMTP port <span class="tooltip-icon" tabindex="0" data-tooltip="587 for STARTTLS (the usual choice), 465 for implicit TLS, 25 for an unauthenticated internal relay.">&#x1F6C8;</span></div>
+            <div>
+                <input type="number" name="smtp_port" class="form-input" value="{{ settings.mail_smtp_port | default(587) }}" min="1" max="65535">
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Encryption <span class="tooltip-icon" tabindex="0" data-tooltip="STARTTLS upgrades a plain connection (port 587). Implicit TLS connects encrypted from the start (port 465). Tick neither only for a trusted internal relay.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label" style="margin-bottom:8px;">
+                    <span class="toggle">
+                        <input type="checkbox" name="use_starttls" {% if settings.mail_use_starttls %}checked{% endif %} {% if current_user_role != 'admin' %}disabled{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>STARTTLS (port 587)</span>
+                </label>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="use_ssl" {% if settings.mail_use_ssl %}checked{% endif %} {% if current_user_role != 'admin' %}disabled{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>Implicit TLS (port 465)</span>
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">SMTP username <span class="tooltip-icon" tabindex="0" data-tooltip="Leave empty for a relay that does not require authentication.">&#x1F6C8;</span></div>
+            <div>
+                <input type="text" name="smtp_user" class="form-input" value="{{ settings.mail_smtp_user | default('') }}" placeholder="(optional)">
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">SMTP password <span class="tooltip-icon" tabindex="0" data-tooltip="Stored in config.toml. Leave blank to keep the currently stored password - it is never sent back to this page.">&#x1F6C8;</span></div>
+            <div>
+                <input type="password" name="smtp_password" class="form-input" value="" placeholder="{% if settings.mail_password_configured %}(unchanged){% else %}(none){% endif %}" autocomplete="new-password">
+                <div class="form-hint">
+                    Leave blank to keep the stored password.
+                    {% if settings.mail_password_configured %}<span class="badge badge-success">Password configured</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">From address <span class="tooltip-icon" tabindex="0" data-tooltip="Envelope sender for report emails. Required when email is enabled. Use an address your relay is allowed to send as.">&#x1F6C8;</span></div>
+            <div>
+                <input type="text" name="from_address" class="form-input" value="{{ settings.mail_from_address | default('') }}" placeholder="zabbix-mcp@example.com">
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Allowed recipients <span class="tooltip-icon" tabindex="0" data-tooltip="THE SAFETY FENCE. A report is only mailed to an address matching this list. Without it an AI client could mail monitoring data to any address it invents. Comma-separated; an entry may glob a whole domain, e.g. *@example.com.">&#x1F6C8;</span></div>
+            <div>
+                <input type="text" name="allowed_recipients" class="form-input" value="{{ settings.mail_allowed_recipients | default('') }}" placeholder="ops@example.com, *@example.com">
+                <div class="form-hint">
+                    <strong>Required when email is enabled.</strong> Comma-separated. A report is mailed only
+                    to an address matching this list - <code>*@example.com</code> permits a whole domain.
+                    This is what stops an AI client from mailing monitoring data to an arbitrary address.
+                </div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">SMTP timeout (s) <span class="tooltip-icon" tabindex="0" data-tooltip="How long to wait for the mail relay before giving up. Default 30 seconds.">&#x1F6C8;</span></div>
+            <div>
+                <input type="number" name="timeout" class="form-input" value="{{ settings.mail_timeout | default(30) }}" min="5" max="300">
+            </div>
+        </div>
+        {% if current_user_role == 'admin' %}
+        <div style="margin-top:16px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Email Settings</button>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
 <!-- Section 5: Admin Portal -->
 <div class="settings-section">
     <h2 class="settings-section-title">&#x2699;&#xFE0F; Admin Portal</h2>

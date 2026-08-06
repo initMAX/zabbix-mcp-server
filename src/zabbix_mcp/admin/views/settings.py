@@ -24,10 +24,10 @@ logger = logging.getLogger("zabbix_mcp.admin")
 RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file", "log_file"}
 
 # List fields — split comma-separated into TOML arrays
-LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools"}
+LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools", "allowed_recipients"}
 
 # Boolean fields — checkbox present = True, absent = False
-BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled"}
+BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "use_starttls", "use_ssl"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -50,6 +50,24 @@ SECTION_CONFIG = {
         "toml_section": "server",
         "allowed_keys": {"report_company", "report_subtitle", "report_logo"},
         "min_role": "operator",
+    },
+    # [reporting] / [reporting.email] - out-of-band delivery of generated
+    # PDFs (issue #68). Admin-only: output_dir points at a directory the
+    # service writes into, and the email block holds SMTP credentials
+    # plus the recipient allowlist that fences what an AI client may do.
+    "report_delivery": {
+        "toml_section": "reporting",
+        "allowed_keys": {"output_dir"},
+        "min_role": "admin",
+    },
+    "report_email": {
+        "toml_section": "reporting.email",
+        "allowed_keys": {
+            "enabled", "smtp_host", "smtp_port", "smtp_user", "smtp_password",
+            "from_address", "use_starttls", "use_ssl", "timeout",
+            "allowed_recipients",
+        },
+        "min_role": "admin",
     },
     "admin": {
         "toml_section": "admin",
@@ -74,7 +92,7 @@ SECTION_CONFIG = {
 # Keys that must not be cleared when the submitted value is empty.
 # The settings UI sends "" for api_key when the operator does not want
 # to rotate the stored secret; treat that as "keep current value".
-SECRET_KEEP_EMPTY = {"api_key"}
+SECRET_KEEP_EMPTY = {"api_key", "smtp_password"}
 
 
 def _normalize_ip_entry(entry: str) -> str:
@@ -239,6 +257,25 @@ async def settings_view(request: Request) -> Response:
             settings["ai_api_key_configured"] = bool(ai_cfg.get("api_key"))
             settings["ai_timeout"] = int(ai_cfg.get("timeout") or 180)
             settings["ai_max_tokens"] = int(ai_cfg.get("max_tokens") or 8000)
+
+            # [reporting] / [reporting.email] - out-of-band report
+            # delivery (#68). Same rule as the AI key: the SMTP
+            # password is never sent to the browser, only whether one
+            # is stored, so the field can be left blank to keep it.
+            rep_cfg = dict(doc.get("reporting", {})) if isinstance(doc.get("reporting"), dict) else {}
+            mail_cfg = dict(rep_cfg.get("email", {})) if isinstance(rep_cfg.get("email"), dict) else {}
+            settings["report_output_dir"] = rep_cfg.get("output_dir", "")
+            settings["mail_enabled"] = bool(mail_cfg.get("enabled", False))
+            settings["mail_smtp_host"] = mail_cfg.get("smtp_host", "")
+            settings["mail_smtp_port"] = int(mail_cfg.get("smtp_port") or 587)
+            settings["mail_smtp_user"] = mail_cfg.get("smtp_user", "")
+            settings["mail_password_configured"] = bool(mail_cfg.get("smtp_password"))
+            settings["mail_from_address"] = mail_cfg.get("from_address", "")
+            settings["mail_use_starttls"] = bool(mail_cfg.get("use_starttls", True))
+            settings["mail_use_ssl"] = bool(mail_cfg.get("use_ssl", False))
+            settings["mail_timeout"] = int(mail_cfg.get("timeout") or 30)
+            _recips = mail_cfg.get("allowed_recipients", []) or []
+            settings["mail_allowed_recipients"] = ", ".join(_recips) if isinstance(_recips, list) else str(_recips)
         except Exception as e:
             logger.error("Failed to read config: %s", e)
 
@@ -300,6 +337,45 @@ async def settings_update(request: Request) -> Response:
                 return admin_app.flash_redirect(
                     "/settings", f"Public URL is invalid: {exc}", "danger"
                 )
+
+    # [reporting] / [reporting.email] - the config parser refuses these
+    # at boot, so catch them here instead of letting a save brick the
+    # next start (issue #68).
+    if section == "report_delivery":
+        out_dir = str(form.get("output_dir", "") or "").strip()
+        if out_dir:
+            import os as _os
+            expanded = _os.path.expanduser(out_dir)
+            if not _os.path.isabs(expanded):
+                return admin_app.flash_redirect(
+                    "/settings", "Report output directory must be an absolute path.", "danger")
+            if not _os.path.isdir(expanded):
+                return admin_app.flash_redirect(
+                    "/settings",
+                    f"Report output directory does not exist: {out_dir}. "
+                    f"Create it and make it writable by the service user first.",
+                    "danger")
+            if not _os.access(expanded, _os.W_OK):
+                return admin_app.flash_redirect(
+                    "/settings",
+                    f"Report output directory is not writable by the service user: {out_dir}",
+                    "danger")
+
+    if section == "report_email" and str(form.get("enabled", "")).lower() in ("on", "true", "1", "yes"):
+        missing = [label for key, label in (
+            ("smtp_host", "SMTP host"), ("from_address", "From address"),
+        ) if not str(form.get(key, "") or "").strip()]
+        if missing:
+            return admin_app.flash_redirect(
+                "/settings",
+                f"{' and '.join(missing)} required when report email is enabled.", "danger")
+        if not str(form.get("allowed_recipients", "") or "").strip():
+            return admin_app.flash_redirect(
+                "/settings",
+                "Allowed recipients must list at least one address or pattern - "
+                "without it an AI client could mail reports to any address. "
+                "Use e.g. ops@example.com or *@example.com.",
+                "danger")
 
     try:
         doc = load_config_document(admin_app.config_path)

@@ -2033,11 +2033,17 @@ def _register_tools(
     # ------------------------------------------------------------------
     try:
         from zabbix_mcp.reporting.engine import ReportEngine, REPORTING_AVAILABLE, _REPORT_TEMPLATES
-        if REPORTING_AVAILABLE:
+        # `config` is optional on this entry point (tests register the
+        # tool set without one). Everything below reads branding and
+        # delivery settings off it, so skip the whole block rather than
+        # dereferencing None - the report tool needs a config to be
+        # useful anyway.
+        if REPORTING_AVAILABLE and config is not None:
+            _server_cfg = config.server
             report_engine = ReportEngine(
-                logo_path=getattr(config.server, "report_logo", None),
-                company_name=getattr(config.server, "report_company", ""),
-                subtitle=getattr(config.server, "report_subtitle", "IT Monitoring Service"),
+                logo_path=getattr(_server_cfg, "report_logo", None),
+                company_name=getattr(_server_cfg, "report_company", ""),
+                subtitle=getattr(_server_cfg, "report_subtitle", "IT Monitoring Service"),
             )
 
             # Load custom templates from [report_templates.*] config sections
@@ -2123,9 +2129,12 @@ def _register_tools(
                                     pdf_bytes, filename, recipients,
                                     email_config=config.reporting.email,
                                     subject=(
-                                        f"Zabbix {report_type} report "
-                                        f"({_period_label}) - "
-                                        f"{company or report_engine.company_name}"
+                                        f"Zabbix {report_type} report ({_period_label})"
+                                        # Only append the company when there is one -
+                                        # otherwise the subject ends in a dangling dash.
+                                        + (f" - {_company}"
+                                           if (_company := (company or report_engine.company_name or "").strip())
+                                           else "")
                                     ),
                                     body=(
                                         f"Attached: {report_type} report for host group "
