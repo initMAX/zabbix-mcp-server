@@ -360,7 +360,12 @@ async def settings_update(request: Request) -> Response:
             if not _os.access(expanded, _os.W_OK):
                 return admin_app.flash_redirect(
                     "/settings",
-                    f"Report output directory is not writable by the service user: {out_dir}",
+                    f"Report output directory is not writable by the service: {out_dir}. "
+                    f"Check ownership, and note that on a systemd install the unit runs with "
+                    f"ProtectSystem=strict - a path outside ReadWritePaths / StateDirectory is "
+                    f"read-only however it is owned. /var/lib/zabbix-mcp/reports is set up for "
+                    f"this out of the box; for anything else add it with "
+                    f"'systemctl edit zabbix-mcp-server'.",
                     "danger")
 
     if section == "report_delivery":

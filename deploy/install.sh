@@ -625,6 +625,16 @@ RestrictSUIDSGID=yes
 RestrictNamespaces=yes
 ReadWritePaths=/var/log/zabbix-mcp /etc/zabbix-mcp
 
+# Report output directory for [reporting].output_dir. StateDirectory
+# creates it with the right ownership on every start AND makes it
+# writable under ProtectSystem=strict - without this the whole
+# filesystem is read-only to the service and saving a report fails
+# with EROFS no matter how the directory is owned.
+# An operator pointing output_dir somewhere else must add that path
+# here (systemctl edit zabbix-mcp-server) for the same reason.
+StateDirectory=zabbix-mcp/reports
+StateDirectoryMode=0750
+
 [Install]
 WantedBy=multi-user.target
 UNIT

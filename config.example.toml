@@ -431,8 +431,13 @@ compact_output = true
 # [reporting]
 # Absolute path to a directory the server may write reports into. Required
 # before `save_to_file: true` works; the filename is generated server-side
-# and the resolved path is asserted to stay inside this directory. The
-# directory must exist and be writable by the service user.
+# and the resolved path is asserted to stay inside this directory.
+#
+# /var/lib/zabbix-mcp/reports is created by the installer (systemd
+# StateDirectory) and works out of the box. If you point this somewhere
+# else, add that path to the unit's ReadWritePaths - the service runs with
+# ProtectSystem=strict, so any other location is read-only no matter who
+# owns it:  systemctl edit zabbix-mcp-server
 # output_dir = "/var/lib/zabbix-mcp/reports"
 
 # Resource links (zabbix://reports/<id>) let report_generate hand the client

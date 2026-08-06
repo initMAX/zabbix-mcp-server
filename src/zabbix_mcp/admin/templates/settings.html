@@ -345,8 +345,11 @@
             <div>
                 <input type="text" name="output_dir" class="form-input" value="{{ settings.report_output_dir | default('') }}" placeholder="/var/lib/zabbix-mcp/reports">
                 <div class="form-hint">
-                    Enables <code>save_to_file: true</code>. Must be an absolute path that exists and is
-                    writable by the service user. Empty = saving refused.
+                    Enables <code>save_to_file: true</code>. <code>/var/lib/zabbix-mcp/reports</code> is
+                    created by the installer and works out of the box. Any other path must be added to the
+                    unit's <code>ReadWritePaths</code> (<code>systemctl edit zabbix-mcp-server</code>) -
+                    the service runs with <code>ProtectSystem=strict</code>, so everything else is
+                    read-only regardless of ownership. Empty = saving refused.
                 </div>
                 {% if settings.report_output_dir %}
                 <div class="text-sm" style="margin-top:4px;"><span class="badge badge-success">Saving enabled</span></div>
