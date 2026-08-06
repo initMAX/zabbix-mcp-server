@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.35 - 2026-08-07
+
+Two operator-visible bug fixes plus a reporting feature for deployments where a full PDF cannot travel back through the MCP channel.
+
+### Added
+
+- **Out-of-band delivery for generated reports** ([#68](https://github.com/initMAX/zabbix-mcp-server/issues/68), requested by [@metehan25](https://github.com/metehan25)). A comprehensive report returned inline as a base64 data URI can exceed the LLM's context window or a reverse-proxy read timeout, so it never arrives. `report_generate` gains two channels that hand the payload over instead and answer with a short receipt (path / recipients / size):
+  - `save_to_file: true` writes the PDF into `[reporting].output_dir`. The filename is generated server-side from report type, host group and timestamp, and the resolved path is asserted to stay inside the configured directory.
+  - `email_to: "ops@example.com"` mails it as an attachment using `[reporting.email]`.
+
+  Both are off until the operator configures them, and the AI client asks for delivery without choosing the destination. Email additionally requires `allowed_recipients` - an exact address or a `*@domain` glob - and the config parser refuses to enable email without it, because otherwise a model could mail monitoring data to any address it invents. 25 MB attachment ceiling; SMTP failures are surfaced without credentials. Asking for a channel the operator has not enabled returns a plain explanation of what is missing.
+
+### Fixed
+
+- **OAuth client registration raised a false "restart needed" banner** ([#69](https://github.com/initMAX/zabbix-mcp-server/issues/69), surfaced by [@G0nz0uk](https://github.com/G0nz0uk) in #67). Dynamic client registration appends an `[oauth_clients.<id>]` section to `config.toml` at runtime so the client survives the next boot. The admin portal's drift detector compared the file against the snapshot taken at startup, concluded the configuration had changed, and asked for a restart - even though the running provider already held that client in memory. Restarting helped only until the next client registered or reconnected, so the banner kept coming back. The registration path now refreshes the baseline; a change the running process has *not* absorbed still raises the banner as before.
+- **`install.sh update` silently pinned to a deleted branch** ([#60](https://github.com/initMAX/zabbix-mcp-server/issues/60)). The update path fetched without `--prune`, so a checkout left on a branch that had been merged and deleted upstream kept resetting to the last cached commit of that dead branch while reporting success - operators stayed on an old version with no visible error. Now the fetch prunes, a missing remote branch is reported plainly, and the update falls back to `origin/main`.
+
+### Verified
+
+- 380 unit + e2e tests; CRUD smoke against live Zabbix 7.4; installer matrix 18/18
+- Report delivery exercised end to end against a live Zabbix: a real availability report written to disk as a valid 37 KB PDF with the payload omitted from the response, and the refusal path returning a clear operator-facing message
+
 ## v1.34 - 2026-08-04
 
 **MCP 2026-07-28 protocol support.** The server now answers both the new stateless revision and every earlier one from a single endpoint - existing clients (Claude Desktop, claude.ai connectors, ChatGPT custom apps, MCP Inspector) keep working unchanged, no config edits, no reconnect required.
