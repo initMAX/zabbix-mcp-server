@@ -2051,7 +2051,10 @@ def _register_tools(
             # handed to the client as a pointer instead of a base64 blob
             # in the model's context (issue #68).
             from zabbix_mcp.reporting.store import ReportStore
-            report_store = ReportStore()
+            report_store = ReportStore(
+                ttl_s=config.reporting.link_ttl,
+                max_reports=config.reporting.link_max_reports,
+            )
             # Module-global so the resource handler registered further
             # down (outside this try block) can reach the same store.
             globals()["_ZMCP_REPORT_STORE"] = report_store

@@ -57,7 +57,7 @@ SECTION_CONFIG = {
     # plus the recipient allowlist that fences what an AI client may do.
     "report_delivery": {
         "toml_section": "reporting",
-        "allowed_keys": {"output_dir"},
+        "allowed_keys": {"output_dir", "link_ttl", "link_max_reports"},
         "min_role": "admin",
     },
     "report_email": {
@@ -265,6 +265,8 @@ async def settings_view(request: Request) -> Response:
             rep_cfg = dict(doc.get("reporting", {})) if isinstance(doc.get("reporting"), dict) else {}
             mail_cfg = dict(rep_cfg.get("email", {})) if isinstance(rep_cfg.get("email"), dict) else {}
             settings["report_output_dir"] = rep_cfg.get("output_dir", "")
+            settings["report_link_ttl"] = int(rep_cfg.get("link_ttl") or 3600)
+            settings["report_link_max"] = int(rep_cfg.get("link_max_reports") or 20)
             settings["mail_enabled"] = bool(mail_cfg.get("enabled", False))
             settings["mail_smtp_host"] = mail_cfg.get("smtp_host", "")
             settings["mail_smtp_port"] = int(mail_cfg.get("smtp_port") or 587)
@@ -360,6 +362,22 @@ async def settings_update(request: Request) -> Response:
                     "/settings",
                     f"Report output directory is not writable by the service user: {out_dir}",
                     "danger")
+
+    if section == "report_delivery":
+        for key, label, lo, hi in (
+            ("link_ttl", "Link lifetime", 60, 86400),
+            ("link_max_reports", "Stored reports limit", 1, 500),
+        ):
+            raw_val = str(form.get(key, "") or "").strip()
+            if raw_val:
+                try:
+                    val = int(raw_val)
+                except ValueError:
+                    return admin_app.flash_redirect(
+                        "/settings", f"{label} must be a whole number.", "danger")
+                if not (lo <= val <= hi):
+                    return admin_app.flash_redirect(
+                        "/settings", f"{label} must be between {lo} and {hi}.", "danger")
 
     if section == "report_email" and str(form.get("enabled", "")).lower() in ("on", "true", "1", "yes"):
         missing = [label for key, label in (

@@ -435,6 +435,12 @@ compact_output = true
 # directory must exist and be writable by the service user.
 # output_dir = "/var/lib/zabbix-mcp/reports"
 
+# Resource links (zabbix://reports/<id>) let report_generate hand the client
+# a pointer instead of a base64 blob, so the PDF never enters the model's
+# context. These two bound how long and how much is held in memory for that.
+# link_ttl = 3600           # seconds a link stays fetchable (60 - 86400)
+# link_max_reports = 20     # reports held at once; oldest evicted first (1 - 500)
+
 # [reporting.email]
 # SMTP settings for `email_to`. When enabled, smtp_host, from_address and
 # allowed_recipients are all required.

@@ -160,6 +160,14 @@ class ReportingConfig:
     """
 
     output_dir: str = ""
+    # How long a zabbix://reports/<id> link stays fetchable, in seconds.
+    # Long enough for the user to click through in the conversation,
+    # short enough that a forgotten report does not sit in RAM all day.
+    link_ttl: int = 3600
+    # Ceiling on concurrently held reports; the oldest is evicted first,
+    # because the report just generated matters more than one nobody
+    # fetched.
+    link_max_reports: int = 20
     email: ReportEmailConfig = field(default_factory=ReportEmailConfig)
 
 
@@ -729,7 +737,21 @@ def load_config(path: str | Path) -> AppConfig:
                 "monitoring data anywhere. Use e.g. [\"ops@example.com\"] or [\"*@example.com\"]."
             )
 
-    reporting_cfg = ReportingConfig(output_dir=output_dir, email=email_cfg)
+    link_ttl_raw = reporting_raw.get("link_ttl", 3600)
+    if not isinstance(link_ttl_raw, int) or not (60 <= link_ttl_raw <= 86400):
+        raise ConfigError(
+            "'[reporting].link_ttl' must be an integer between 60 and 86400 seconds"
+        )
+    link_max_raw = reporting_raw.get("link_max_reports", 20)
+    if not isinstance(link_max_raw, int) or not (1 <= link_max_raw <= 500):
+        raise ConfigError("'[reporting].link_max_reports' must be an integer between 1 and 500")
+
+    reporting_cfg = ReportingConfig(
+        output_dir=output_dir,
+        link_ttl=link_ttl_raw,
+        link_max_reports=link_max_raw,
+        email=email_cfg,
+    )
 
     return AppConfig(
         server=server_config, zabbix_servers=zabbix_servers,

@@ -353,6 +353,26 @@
                 {% endif %}
             </div>
         </div>
+        <div class="settings-row">
+            <div class="settings-label">Link lifetime (s) <span class="tooltip-icon" tabindex="0" data-tooltip="How long a zabbix://reports/&lt;id&gt; link stays fetchable. Long enough for the user to click through in the conversation, short enough that a forgotten report does not sit in memory all day. 60 - 86400 seconds; default 3600 (1 hour).">&#x1F6C8;</span></div>
+            <div>
+                <input type="number" name="link_ttl" class="form-input" value="{{ settings.report_link_ttl | default(3600) }}" min="60" max="86400">
+                <div class="form-hint">
+                    How long a generated report stays fetchable through its resource link,
+                    after which it is deleted. 3600 = 1 hour, 900 = 15 minutes. Max 86400 (24 h).
+                </div>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Stored reports limit <span class="tooltip-icon" tabindex="0" data-tooltip="Ceiling on reports held for resource links at any one time. When full, the oldest is dropped first - the report just generated matters more than one nobody fetched. Each report is typically a few hundred kB.">&#x1F6C8;</span></div>
+            <div>
+                <input type="number" name="link_max_reports" class="form-input" value="{{ settings.report_link_max | default(20) }}" min="1" max="500">
+                <div class="form-hint">
+                    How many reports may be held for links at once. When full the oldest is
+                    dropped first. Each is typically a few hundred kB.
+                </div>
+            </div>
+        </div>
         {% if current_user_role == 'admin' %}
         <div style="margin-top:16px;">
             <button type="submit" class="btn btn-primary btn-sm">Save Directory Settings</button>

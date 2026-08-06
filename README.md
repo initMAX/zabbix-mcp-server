@@ -753,7 +753,7 @@ Even with tasks, the finished PDF still has to travel back through the MCP chann
 // -> text summary + resource_link zabbix://reports/<id> (application/pdf, 37 kB)
 ```
 
-This also kicks in **automatically** when the inline payload would exceed `[server].response_max_chars` - those calls used to fail outright, so a link is strictly better. Links expire after an hour.
+This also kicks in **automatically** when the inline payload would exceed `[server].response_max_chars` - those calls used to fail outright, so a link is strictly better. Links expire after an hour by default; the lifetime and how many reports are held at once are set in **Settings -> Report Delivery** (`[reporting].link_ttl` / `link_max_reports`).
 
 Two more channels exist for cases where the file should leave the conversation entirely - they answer with a receipt instead of the document:
 
