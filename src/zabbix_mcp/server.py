@@ -2055,9 +2055,26 @@ def _register_tools(
                 ttl_s=config.reporting.link_ttl,
                 max_reports=config.reporting.link_max_reports,
             )
-            # Module-global so the resource handler registered further
-            # down (outside this try block) can reach the same store.
-            globals()["_ZMCP_REPORT_STORE"] = report_store
+
+            # Serve the stored PDFs behind their links. Registered here,
+            # in the scope that owns the store, so two servers in one
+            # process (tests) never share one.
+            @mcp.resource("zabbix://reports/{report_id}", mime_type="application/pdf",
+                          name="Generated report",
+                          description="A PDF report produced by report_generate. Expires after the configured link lifetime.")
+            async def resource_report(report_id: str) -> bytes:
+                """Return the stored PDF for a zabbix://reports/<id> link."""
+                item = report_store.get(report_id)
+                if item is None:
+                    raise ValueError(
+                        f"Report {report_id} is unknown or has expired - generate it again."
+                    )
+                return item[0]
+
+            logger.info(
+                "Registered MCP resource template (zabbix://reports/{id}, ttl %ds, max %d)",
+                config.reporting.link_ttl, config.reporting.link_max_reports,
+            )
 
             # Load custom templates from [report_templates.*] config sections
             try:
@@ -2981,24 +2998,6 @@ def run_server(
 
         logger.info("Registered MCP resources (zabbix://%s/...)", default_srv)
 
-    # Serve generated reports behind their resource links. Registered
-    # whenever reporting is available, independent of a default Zabbix
-    # server, because the link is minted by report_generate itself.
-    _rs = globals().get("_ZMCP_REPORT_STORE")
-    if _rs is not None:
-        @mcp.resource("zabbix://reports/{report_id}", mime_type="application/pdf",
-                      name="Generated report",
-                      description="A PDF report produced by report_generate. Expires after an hour.")
-        async def resource_report(report_id: str) -> bytes:
-            """Return the stored PDF for a zabbix://reports/<id> link."""
-            item = _rs.get(report_id)
-            if item is None:
-                raise ValueError(
-                    f"Report {report_id} is unknown or has expired - generate it again."
-                )
-            return item[0]
-
-        logger.info("Registered MCP resource template (zabbix://reports/{id})")
 
     # HTTP health endpoint (unauthenticated, returns minimal info only)
     if transport in ("http", "sse"):

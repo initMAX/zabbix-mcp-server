@@ -29,7 +29,7 @@ Two operator-visible bug fixes plus a reporting feature for deployments where a 
 
 ### Verified
 
-- 386 unit + e2e tests; CRUD smoke against live Zabbix 7.4; installer matrix 18/18
+- 394 unit + e2e tests; CRUD smoke against live Zabbix 7.4; installer matrix 18/18
 - Report delivery exercised end to end against a live Zabbix: a real availability report returned as a resource link and fetched back as a valid 37 KB PDF, the same report written to disk, and mailed through a real SMTP dialog with the attachment verified byte for byte
 - Admin portal walked in a browser: both forms save into the right TOML tables, the resulting config passes `--check-config`, and the empty-allowlist guard refuses the save with an explanation
 
