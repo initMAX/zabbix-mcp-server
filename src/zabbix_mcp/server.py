@@ -1119,48 +1119,127 @@ def _ensure_write_tools_set() -> None:
 _HOST_RE = re.compile(r"^[A-Za-z0-9.\-]+(:\d{1,5})?$|^\[[0-9A-Fa-f:.]+\](:\d{1,5})?$")
 
 
-def _request_base_from_headers(
-    headers: dict[bytes, bytes], scheme: str, trusted_proxy: bool
-) -> str | None:
-    """Scheme + authority the caller used, from the inbound HTTP headers.
+def _forwarded_base_from_headers(headers: dict[bytes, bytes]) -> str | None:
+    """Public scheme + authority as declared by a trusted reverse proxy.
 
-    ``X-Forwarded-Host`` / ``-Proto`` are honoured only when the peer is a
-    configured trusted proxy, exactly as ``X-Forwarded-For`` is above -
-    otherwise any client could dictate the value. The result is only ever
-    echoed back to the client that sent it, never used to authorize
-    anything, so a forged Host misleads nobody but its author.
+    Only ``X-Forwarded-Host`` / ``-Proto`` are read, and the caller must
+    already have established that the peer is a configured trusted proxy.
+    The bare ``Host`` header is deliberately NOT used: the MCP SDK pins
+    the accepted Host to loopback whenever no explicit host allowlist is
+    configured, so "the address the caller dialled" is ``127.0.0.1:8080``
+    in exactly the proxied deployment where a link matters - which is how
+    a remote user ends up with a link to their own machine.
+
+    The *last* element of a forwarded chain is taken, not the first: a
+    proxy that appends leaves the client's own value in front, so the
+    nearest hop is the one this server can vouch for. (This is the
+    opposite of ``X-Forwarded-For``, where the first entry is the
+    original client and is what an IP allowlist wants.)
     """
-    host = headers.get(b"host", b"").decode("latin-1").strip()
-    if trusted_proxy:
-        fwd_host = headers.get(b"x-forwarded-host", b"").decode("latin-1").split(",")[0].strip()
-        fwd_proto = headers.get(b"x-forwarded-proto", b"").decode("latin-1").split(",")[0].strip()
-        if fwd_host:
-            host = fwd_host
-        if fwd_proto in ("http", "https"):
-            scheme = fwd_proto
-    # Anything that is not a plain authority would let a header smuggle a
-    # path, a query or another origin into the link we hand the user.
+    host = headers.get(b"x-forwarded-host", b"").decode("latin-1").split(",")[-1].strip()
     if not host or not _HOST_RE.match(host):
+        # Not a bare authority - a header could otherwise smuggle a path,
+        # a query or a second origin into the link handed to the user.
         return None
-    return f"{scheme}://{host}"
+    proto = headers.get(b"x-forwarded-proto", b"").decode("latin-1").split(",")[-1].strip()
+    if proto not in ("http", "https"):
+        return None
+    return f"{proto}://{host}"
+
+
+def _make_request_context_middleware(inner_app, trusted_proxies: list[str]):
+    """ASGI middleware publishing per-request context to the tool handlers.
+
+    Sets two context variables consumed further down: the client IP (for
+    token IP allowlists) and, when a trusted proxy declared one, the
+    public base URL for report download links.
+
+    ``trusted_proxies`` entries are parsed as addresses or networks, so
+    ``10.0.0.0/24`` and any spelling of an IPv6 address match the peer.
+    String equality silently ignored both, which used to only weaken the
+    IP allowlist but now also decides whether a download link is correct.
+    Unparseable entries stay literal so nothing that worked before stops.
+    """
+    import ipaddress
+
+    from zabbix_mcp.token_store import (
+        current_client_ip as _cip_var,
+        current_request_base as _rb_var,
+        current_token_info as _cti_var,
+    )
+
+    nets = []
+    literals = set()
+    for entry in trusted_proxies:
+        try:
+            nets.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            literals.add(entry)
+            logger.warning(
+                "trusted_proxies entry %r is not an IP address or network; it will "
+                "only match an exact string.", entry)
+
+    def _is_trusted(addr: str | None) -> bool:
+        if not addr:
+            return False
+        if addr in literals:
+            return True
+        try:
+            parsed = ipaddress.ip_address(addr)
+        except ValueError:
+            return False
+        return any(parsed in net for net in nets)
+
+    async def _middleware(scope, receive, send):
+        _cti_var.set(None)
+        peer = None
+        base = None
+        if scope["type"] in ("http", "websocket"):
+            client = scope.get("client")
+            raw_peer = client[0] if client else None
+            peer = raw_peer
+            headers = dict(scope.get("headers", []))
+            trusted = _is_trusted(raw_peer)
+            if trusted:
+                # The original client, for the token IP allowlist: the
+                # FIRST entry of the forwarded chain.
+                xff = headers.get(b"x-forwarded-for", b"").decode()
+                if xff:
+                    first = xff.split(",")[0].strip()
+                    if first:
+                        peer = first
+                if scope["type"] == "http":
+                    base = _forwarded_base_from_headers(headers)
+        _cip_var.set(peer)
+        _rb_var.set(base)
+        try:
+            await inner_app(scope, receive, send)
+        finally:
+            _cti_var.set(None)
+            _cip_var.set(None)
+            _rb_var.set(None)
+
+    return _middleware
 
 
 def _report_download_base(config, transport: str) -> tuple[str | None, str | None]:
     """Base URL for report downloads, or (None, reason) when there is none.
 
     A download URL that does not resolve is worse than no URL: the model
-    hands the user a dead link. So this only answers when the server can
-    honestly name an address the caller is known to reach it on.
+    hands the user a dead link, and the report id in it - which is the
+    credential - goes to whatever answers at that address. So a URL is
+    only built from an address somebody explicitly vouched for:
 
-    ``[server].public_url`` wins - it is the operator stating the public
-    address, and it is the only correct answer when TLS terminates
-    upstream (the local ``tls_cert_file`` says nothing about the scheme
-    the client speaks). Otherwise the authority from the request itself
-    is used, because that is by definition an address this client just
-    reached. The local bind is deliberately NOT a fallback: behind a
-    reverse proxy it is typically 127.0.0.1, and handing that to a remote
-    user points them at their own machine - a dead link that also leaks a
-    live report id to whatever answers on their port 8080.
+    * ``[server].public_url`` - the operator stating the public address.
+      The only correct answer when TLS terminates upstream, since the
+      local ``tls_cert_file`` says nothing about the scheme the client
+      speaks.
+    * ``X-Forwarded-Host`` / ``-Proto`` from a peer in
+      ``[server].trusted_proxies`` - the proxy stating it instead.
+
+    Nothing is inferred from the local bind or from a bare ``Host``
+    header; see :func:`_forwarded_base_from_headers` for why the latter
+    cannot be trusted here.
     """
     if transport not in ("http", "sse"):
         return None, (
@@ -1175,8 +1254,9 @@ def _report_download_base(config, transport: str) -> tuple[str | None, str | Non
     if base:
         return base.rstrip("/"), None
     return None, (
-        "No download URL: the address this server is reachable on could not be "
-        "determined. Set [server].public_url. The report_uri resource link still works."
+        "No download URL: set [server].public_url to the address clients reach this "
+        "server on (any scheme). Without it the server cannot know which address a "
+        "link should point at. The report_uri resource link still works."
     )
 
 
@@ -3149,10 +3229,11 @@ def run_server(
                     "[server].public_url to the https address, or disable "
                     "[reporting].download_urls.", _pub or f"http://{host}:{port}")
             elif not _pub:
-                logger.info(
-                    "Report download URLs enabled; each link is built from the address "
-                    "that client connected to. Set [server].public_url to pin them to a "
-                    "fixed public address.")
+                logger.warning(
+                    "Report download URLs are enabled but [server].public_url is not "
+                    "set, so no link can be built unless a proxy listed in "
+                    "trusted_proxies sends X-Forwarded-Host and X-Forwarded-Proto. "
+                    "Reports will be delivered as MCP resource links only.")
 
             @mcp.custom_route("/reports/{report_id}.pdf", methods=["GET"])
             async def http_report_download(request: Request):
@@ -3254,46 +3335,8 @@ def run_server(
             # honor the first entry of X-Forwarded-For (the original client);
             # otherwise the raw TCP peer is used so an untrusted client
             # cannot impersonate an arbitrary IP via XFF.
-            from zabbix_mcp.token_store import (
-                current_client_ip as _cip_var,
-                current_request_base as _rb_var,
-                current_token_info as _cti_var,
-            )
-            _inner_app = asgi_app
-            _trusted_proxies = set(config.server.trusted_proxies or [])
-
-            async def _client_ip_middleware(scope, receive, send):
-                _cti_var.set(None)
-                peer = None
-                base = None
-                if scope["type"] in ("http", "websocket"):
-                    client = scope.get("client")
-                    raw_peer = client[0] if client else None
-                    peer = raw_peer
-                    headers = dict(scope.get("headers", []))
-                    trusted = raw_peer in _trusted_proxies
-                    if trusted:
-                        xff = headers.get(b"x-forwarded-for", b"").decode()
-                        if xff:
-                            first = xff.split(",")[0].strip()
-                            if first:
-                                peer = first
-                    # The authority the caller actually dialled. Report download
-                    # links are built from this, because the local bind may well
-                    # be 127.0.0.1 behind a proxy - handing that to a remote user
-                    # points them at their own machine.
-                    if scope["type"] == "http":
-                        base = _request_base_from_headers(
-                            headers, scope.get("scheme") or "http", trusted)
-                _cip_var.set(peer)
-                _rb_var.set(base)
-                try:
-                    await _inner_app(scope, receive, send)
-                finally:
-                    _cti_var.set(None)
-                    _cip_var.set(None)
-                    _rb_var.set(None)
-            asgi_app = _client_ip_middleware
+            asgi_app = _make_request_context_middleware(
+                asgi_app, config.server.trusted_proxies or [])
 
             # Apply IP allowlist middleware if configured
             if config.server.allowed_hosts:

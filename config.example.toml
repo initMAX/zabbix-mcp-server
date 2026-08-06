@@ -451,8 +451,10 @@ compact_output = true
 # open. The random report id in the path IS the credential (unguessable, one
 # report, dies with the link), so the route needs no bearer token.
 #
-# The URL is built from [server].public_url; without it, from the address the
-# client connected on. The local bind is never used - behind a proxy that is
+# SET [server].public_url - without it there is usually no link. The URL is
+# only built from an address something vouched for: public_url, or
+# X-Forwarded-Host + X-Forwarded-Proto from a peer in trusted_proxies. The
+# local bind and a bare Host are never used: behind a proxy both read
 # 127.0.0.1, which would point a remote user at their own machine.
 # Behind a reverse proxy that forwards a LIST of paths rather than all of `/`,
 # forward /reports/ too, otherwise the link 404s:

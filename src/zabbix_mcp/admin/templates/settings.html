@@ -390,8 +390,10 @@
                     Lets the AI hand out a link a person can click; the <code>zabbix://</code>
                     resource link only works inside an MCP client. The link needs no token -
                     the unguessable report id is the credential, and it expires with the link
-                    above. Requires <strong>Public URL</strong> (MCP Server section) to be set;
-                    behind a reverse proxy that forwards individual paths, forward
+                    above. Requires <strong>Public URL</strong> (MCP Server section) to be set,
+                    unless a reverse proxy in <code>trusted_proxies</code> sends
+                    <code>X-Forwarded-Host</code>; nothing is guessed from the local bind.
+                    Behind a proxy that forwards individual paths, forward
                     <code>/reports/</code> too or the link answers 404.
                 </div>
             </div>

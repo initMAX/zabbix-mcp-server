@@ -773,9 +773,9 @@ The 122-bit random report id (uuid4) **is** the credential (a capability URL): u
 > ProxyPassReverse /reports/ http://127.0.0.1:8080/reports/
 > ```
 >
-> Set `[server].public_url` to the address clients actually reach. Without it the link is built from the `Host` the client connected on (`X-Forwarded-Host` / `-Proto` are honoured from a peer listed in `[server].trusted_proxies`), which is right in the common case but pins nothing - `public_url` is the operator stating it once. The local bind is deliberately never used: behind a proxy it is `127.0.0.1`, and a remote user handed that would be pointed at their own machine.
+> **Set `[server].public_url`** - without it there is usually no download link at all. The URL is only built from an address somebody vouched for: `public_url`, or `X-Forwarded-Host` + `X-Forwarded-Proto` from a peer listed in `[server].trusted_proxies`. Nothing is inferred from the local bind or a bare `Host`: behind a proxy both are `127.0.0.1`, and a remote user handed that would be pointed at their own machine.
 
-The URL is only emitted when the server can honestly build one. On **stdio transport there is no HTTP listener at all**, and a request that arrives without a usable `Host` gives nothing to build from; in both cases the response carries a `download_url_unavailable` line explaining what to configure, and the `zabbix://` resource link keeps working as before.
+When no such address exists - **stdio has no HTTP listener at all**, and an unproxied server without `public_url` has nothing to vouch for it - the response carries a `download_url_unavailable` line naming what to configure instead of a link that would not resolve. The `zabbix://` resource link keeps working either way.
 
 Two more channels exist for cases where the file should leave the conversation entirely - they answer with a receipt instead of the document:
 

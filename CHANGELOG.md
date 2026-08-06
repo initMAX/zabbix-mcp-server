@@ -22,10 +22,11 @@ Report delivery, finished: v1.35 could not actually write to disk, and the link 
 
 ### Fixed (edge cases in the above)
 
-- **The link is never built from the local bind.** The shipped default binds `127.0.0.1` behind a reverse proxy, so a bind-derived link handed a remote user `http://127.0.0.1:8080/reports/<id>.pdf` - a dead link that also sends a live report id to whatever answers on *their* port 8080. `[server].public_url` wins; otherwise the link is built from the authority the caller actually connected on, with `X-Forwarded-Host` / `-Proto` believed only from a peer listed in `[server].trusted_proxies` (the same rule already applied to `X-Forwarded-For`) and the `Host` accepted only if it is a bare authority, so a header cannot smuggle a path or a second origin into the link.
-- No URL is emitted when none can be built honestly: **stdio has no HTTP listener at all**, and a request without a usable `Host` gives nothing to work from. Both return a `download_url_unavailable` line naming what to configure; the resource link keeps working on every transport.
+- **Nothing about the link is inferred.** The URL is built only from `[server].public_url`, or from `X-Forwarded-Host` + `X-Forwarded-Proto` sent by a peer in `[server].trusted_proxies`. Neither the local bind nor a bare `Host` header is used: the shipped default binds `127.0.0.1` behind a reverse proxy, and with no host allowlist configured the MCP SDK rejects any non-loopback `Host` anyway, so both read `127.0.0.1` in exactly the deployment where a link matters - handing a remote user `http://127.0.0.1:8080/reports/<id>.pdf`, a dead link that also sends a live report id to whatever answers on *their* port 8080. A forwarded value is accepted only as a bare authority, so no header can smuggle a path or a second origin into the link, and the *last* element of a chain is taken because a proxy that appends leaves the client's own value in front.
+- No URL is emitted when none can be built honestly: **stdio has no HTTP listener at all**, and an unproxied server without `public_url` has nothing vouching for its address. Both return a `download_url_unavailable` line naming what to configure; the resource link keeps working on every transport.
 - The effective transport is used rather than the configured one, because `--transport` overrides `config.toml`.
-- Serving download URLs over plaintext HTTP now logs a startup warning: the report id travels as a bearer credential and the PDF is unencrypted in transit.
+- `[server].trusted_proxies` entries are now matched as addresses or networks rather than by string equality, so `10.0.0.0/24` and any spelling of an IPv6 address actually match the peer. Previously both were silently ignored, which weakened the token IP allowlist and would now also have suppressed download links; an entry that is neither address nor network logs a warning and keeps its old literal behaviour.
+- Serving download URLs over plaintext HTTP logs a startup warning, and enabling them without `public_url` logs one too: the report id travels as a bearer credential and the PDF is unencrypted in transit.
 
 ### Fixed (internal)
 
@@ -34,7 +35,7 @@ Report delivery, finished: v1.35 could not actually write to disk, and the link 
 
 ### Verified
 
-- 408 unit + e2e tests, including 13 new cases pinning the URL builder: stdio, loopback bind, reverse-proxy TLS, spoofed `X-Forwarded-*` from an untrusted peer, forwarded chains, IPv6 literals, and `Host` values carrying a path, a query or CRLF
+- 416 unit + e2e tests (two pre-existing macOS-only symlink failures aside), including 21 new cases across two files: the URL builder (stdio, nothing vouched for, forwarded chains, IPv6 literals, values carrying a path/query/CRLF) and the request-context middleware driven as itself - trusted-proxy CIDR and IPv6 matching, an untrusted peer's `X-Forwarded-*` being ignored, the context not surviving the request, and two interleaved requests never seeing each other's value
 - End to end on a live server: the exact `download_url` returned by `report_generate` fetched over HTTPS as a valid PDF with every security header present, and the same tool over stdio returning no URL plus the explanation
 - Reproduced the `ProtectSystem=strict` failure with `systemd-run` before the fix and confirmed the write succeeds after it
 
