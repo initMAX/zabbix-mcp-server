@@ -292,6 +292,24 @@ class _CsrfMiddleware:
         await self.app(scope, receive, send)
 
 
+# Handle to the running AdminApp, set in AdminApp.__init__. Lets code
+# outside the admin package (the OAuth client persister in server.py)
+# refresh the restart-drift baseline after a runtime config write that
+# does not actually require a restart. None when the admin portal is
+# disabled - callers treat that as a no-op.
+_LIVE_ADMIN_APP: "AdminApp | None" = None
+
+
+def refresh_config_baseline() -> None:
+    """Re-snapshot config.toml as the new 'no restart needed' baseline.
+
+    No-op when the admin portal is not running. See issue #69.
+    """
+    app = _LIVE_ADMIN_APP
+    if app is not None:
+        app._snapshot_config()
+
+
 class AdminApp:
     """Admin portal application.
 
@@ -340,16 +358,12 @@ class AdminApp:
         self.restart_needed = False
         self._initial_config_dump: str | None = None
         self._config_dump_mtime: float | None = None
-        try:
-            from zabbix_mcp.admin.config_writer import (
-                load_config_document, TOMLKIT_AVAILABLE,
-            )
-            if TOMLKIT_AVAILABLE:
-                import tomlkit as _tomlkit
-                doc = load_config_document(self.config_path)
-                self._initial_config_dump = _tomlkit.dumps(doc)
-        except Exception:
-            pass
+        self._snapshot_config()
+        # Expose the live instance so runtime config writers that do NOT
+        # need a restart (OAuth dynamic client registration) can refresh
+        # the baseline instead of tripping the drift detector - issue #69.
+        global _LIVE_ADMIN_APP
+        _LIVE_ADMIN_APP = self
         self.start_time = datetime.now()
 
         # Jinja2 environment
@@ -379,6 +393,34 @@ class AdminApp:
             get_checker().start(enabled=update_check_enabled)
         except Exception as exc:
             logger.debug("Update checker not started: %s", exc)
+
+    def _snapshot_config(self) -> None:
+        """Record the current config.toml as the 'nothing pending' baseline.
+
+        Called at startup, and again after a runtime write that the
+        running process has already absorbed (issue #69: dynamic OAuth
+        client registration appends an ``[oauth_clients.<id>]`` section
+        so the client survives the next boot - the provider already
+        holds it in memory, so demanding a restart is a false alarm).
+        """
+        try:
+            from zabbix_mcp.admin.config_writer import (
+                load_config_document, TOMLKIT_AVAILABLE,
+            )
+            if not TOMLKIT_AVAILABLE:
+                return
+            import tomlkit as _tomlkit
+            from os import stat as _stat
+            self._initial_config_dump = _tomlkit.dumps(
+                load_config_document(self.config_path))
+            try:
+                self._config_dump_mtime = _stat(self.config_path).st_mtime
+            except OSError:
+                self._config_dump_mtime = None
+            self.restart_needed = False
+        except Exception:
+            # Never let snapshotting break startup or a registration.
+            pass
 
     def _compute_restart_needed(self) -> bool:
         """Check if the on-disk config differs from the running snapshot.

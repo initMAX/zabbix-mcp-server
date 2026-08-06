@@ -2503,6 +2503,15 @@ def run_server(
                         sub.add(k, v)
                     doc["oauth_clients"][str(client_info.client_id)] = sub
                     save_config_document(cfg_path_for_oauth, doc)
+                # The running provider already holds this client, so the
+                # write is persistence for the NEXT boot only - re-baseline
+                # the admin portal's drift detector instead of leaving it
+                # to raise a false "restart needed" banner (issue #69).
+                try:
+                    from zabbix_mcp.admin.app import refresh_config_baseline
+                    refresh_config_baseline()
+                except Exception:
+                    logger.debug("Could not refresh admin restart baseline", exc_info=True)
 
             oauth_provider = ZmcpOAuthProvider(
                 public_url=server_url,
