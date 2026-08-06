@@ -127,6 +127,43 @@ class ServerConfig:
 
 
 @dataclass(frozen=True)
+class ReportEmailConfig:
+    """SMTP settings for mailing generated PDF reports (issue #68).
+
+    Disabled by default. ``allowed_recipients`` is the safety fence:
+    an AI client may ask for a report to be mailed, but only to an
+    address the operator listed. Entries may glob a domain, e.g.
+    ``*@example.com``. An empty list permits nothing.
+    """
+
+    enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    from_address: str = ""
+    use_starttls: bool = True
+    use_ssl: bool = False
+    timeout: int = 30
+    allowed_recipients: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class ReportingConfig:
+    """Out-of-band delivery for generated reports (issue #68).
+
+    A full PDF returned inline as base64 can exceed an LLM's context
+    window or a proxy's read timeout. With ``output_dir`` set, the
+    report can be written to disk instead and the tool returns just the
+    path. Empty (the default) keeps the tool read-only with respect to
+    the filesystem.
+    """
+
+    output_dir: str = ""
+    email: ReportEmailConfig = field(default_factory=ReportEmailConfig)
+
+
+@dataclass(frozen=True)
 class AdminAIConfig:
     """Admin portal AI assistant (report template generator).
 
@@ -200,6 +237,7 @@ class AppConfig:
     zabbix_servers: dict[str, ZabbixServerConfig] = field(default_factory=dict)
     admin_ai: AdminAIConfig = field(default_factory=AdminAIConfig)
     oauth: OAuthConfig = field(default_factory=OAuthConfig)
+    reporting: ReportingConfig = field(default_factory=ReportingConfig)
     # [zabbix.X] sections that failed validation at load time and were
     # skipped (name -> human-readable reason). The admin portal shows
     # these as "config error" instead of the misleading "needs restart"
@@ -645,8 +683,57 @@ def load_config(path: str | Path) -> AppConfig:
         refresh_token_ttl_seconds=int(oauth_raw.get("refresh_token_ttl_seconds", 30 * 24 * 3600) or 30 * 24 * 3600),
     )
 
+    # ------------------------------------------------------------------
+    # [reporting] / [reporting.email] - out-of-band report delivery (#68)
+    # ------------------------------------------------------------------
+    reporting_raw = raw.get("reporting", {}) or {}
+    email_raw = reporting_raw.get("email", {}) or {}
+
+    output_dir = str(reporting_raw.get("output_dir", "") or "")
+    if output_dir:
+        output_dir = _resolve_env_vars(output_dir)
+        if not os.path.isabs(os.path.expanduser(output_dir)):
+            raise ConfigError(
+                "'[reporting].output_dir' must be an absolute path "
+                f"(got {output_dir!r})"
+            )
+
+    allowed_recipients_raw = email_raw.get("allowed_recipients", []) or []
+    if not isinstance(allowed_recipients_raw, list) or not all(
+        isinstance(r, str) for r in allowed_recipients_raw
+    ):
+        raise ConfigError("'[reporting.email].allowed_recipients' must be a list of strings")
+
+    email_enabled = bool(email_raw.get("enabled", False))
+    email_cfg = ReportEmailConfig(
+        enabled=email_enabled,
+        smtp_host=str(email_raw.get("smtp_host", "") or ""),
+        smtp_port=int(email_raw.get("smtp_port", 587) or 587),
+        smtp_user=str(email_raw.get("smtp_user", "") or ""),
+        smtp_password=_resolve_env_vars(str(email_raw.get("smtp_password", "") or "")),
+        from_address=str(email_raw.get("from_address", "") or ""),
+        use_starttls=bool(email_raw.get("use_starttls", True)),
+        use_ssl=bool(email_raw.get("use_ssl", False)),
+        timeout=int(email_raw.get("timeout", 30) or 30),
+        allowed_recipients=list(allowed_recipients_raw),
+    )
+    if email_enabled:
+        if not email_cfg.smtp_host:
+            raise ConfigError("'[reporting.email].smtp_host' is required when email is enabled")
+        if not email_cfg.from_address:
+            raise ConfigError("'[reporting.email].from_address' is required when email is enabled")
+        if not email_cfg.allowed_recipients:
+            raise ConfigError(
+                "'[reporting.email].allowed_recipients' must list at least one address "
+                "or pattern when email is enabled - without it an AI client could mail "
+                "monitoring data anywhere. Use e.g. [\"ops@example.com\"] or [\"*@example.com\"]."
+            )
+
+    reporting_cfg = ReportingConfig(output_dir=output_dir, email=email_cfg)
+
     return AppConfig(
         server=server_config, zabbix_servers=zabbix_servers,
         admin_ai=admin_ai, oauth=oauth_cfg,
         skipped_zabbix_servers=dict(skipped_servers),
+        reporting=reporting_cfg,
     )

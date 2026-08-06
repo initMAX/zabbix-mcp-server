@@ -417,6 +417,43 @@ compact_output = true
 # refresh_token_ttl_seconds = 604800
 
 # ---------------------------------------------------------------------------
+# Report delivery (optional)
+# ---------------------------------------------------------------------------
+# By default `report_generate` returns the PDF inline as a base64 data URI.
+# A big report can blow past an LLM's context window or a reverse-proxy read
+# timeout, so the report never arrives. These two channels hand the payload
+# over out of band instead, and the tool returns a short receipt (path or
+# recipients) rather than the document itself.
+#
+# Both are OFF by default and fenced by the operator: an AI client may ask
+# for delivery, but never decides where the file lands or who receives it.
+
+# [reporting]
+# Absolute path to a directory the server may write reports into. Required
+# before `save_to_file: true` works; the filename is generated server-side
+# and the resolved path is asserted to stay inside this directory. The
+# directory must exist and be writable by the service user.
+# output_dir = "/var/lib/zabbix-mcp/reports"
+
+# [reporting.email]
+# SMTP settings for `email_to`. When enabled, smtp_host, from_address and
+# allowed_recipients are all required.
+# enabled = false
+# smtp_host = "smtp.example.com"
+# smtp_port = 587
+# smtp_user = ""                     # empty = no SMTP auth
+# smtp_password = "${SMTP_PASSWORD}" # ${ENV_VAR} expansion supported
+# from_address = "zabbix-mcp@example.com"
+# use_starttls = true                # STARTTLS on the plain port (587)
+# use_ssl = false                    # implicit TLS instead (465)
+# timeout = 30
+#
+# THE SAFETY FENCE: a report is only mailed to an address matching this
+# list. Without it an AI client could mail monitoring data anywhere. Entries
+# may glob a domain. An empty list means nothing can be mailed.
+# allowed_recipients = ["ops@example.com", "*@example.com"]
+
+# ---------------------------------------------------------------------------
 # Admin Portal
 # ---------------------------------------------------------------------------
 # Web-based administration portal for managing MCP tokens, users, report

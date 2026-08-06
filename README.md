@@ -742,6 +742,27 @@ Since v1.34 this runs on the official `io.modelcontextprotocol/tasks` extension 
 
 Other tools stay synchronous (under 5 s typically) - the polling overhead is not worth it.
 
+#### Report delivery: disk and email
+
+Even with tasks, the finished PDF still has to travel back through the MCP channel and into the model's context. For a big host group that is wasteful at best and fatal at worst. Two out-of-band channels avoid it entirely - the tool then answers with a short receipt instead of the document:
+
+```jsonc
+// writes /var/lib/zabbix-mcp/reports/zabbix-availability-42-20260807-101500.pdf
+{ "report_type": "availability", "hostgroupid": "42", "save_to_file": true }
+
+// mails it as an attachment
+{ "report_type": "availability", "hostgroupid": "42", "email_to": "ops@example.com" }
+```
+
+Both are **off until the operator turns them on**, and the AI client never picks the destination:
+
+| | Config | Fence |
+|---|---|---|
+| `save_to_file` | `[reporting].output_dir` | Filename is generated server-side; the resolved path must stay inside the configured directory |
+| `email_to` | `[reporting.email]` | Every recipient must match `allowed_recipients` (exact address or a `*@domain` glob); 25 MB attachment ceiling |
+
+Asking for a channel the operator has not configured returns a plain explanation of what is missing, not a stack trace. See `config.example.toml` for the full block.
+
 ```python
 # Async PDF generation via Tasks API. Requires a client that advertises
 # tasks support in initialize() - the official `mcp` Python SDK does.
