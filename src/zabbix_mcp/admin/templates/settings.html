@@ -436,9 +436,15 @@
             <div>
                 <input type="text" name="allowed_recipients" class="form-input" value="{{ settings.mail_allowed_recipients | default('') }}" placeholder="ops@example.com, *@example.com">
                 <div class="form-hint">
-                    <strong>Required when email is enabled.</strong> Comma-separated. A report is mailed only
-                    to an address matching this list - <code>*@example.com</code> permits a whole domain.
-                    This is what stops an AI client from mailing monitoring data to an arbitrary address.
+                    <strong>Required when email is enabled.</strong> The AI client picks the recipient; this
+                    list decides how far it may reach. Comma-separated:
+                    <ul style="margin:6px 0 0 18px; padding:0;">
+                        <li><code>*@yourcompany.com</code> - the usual choice: staff can ask for a report to
+                            be sent to any colleague, nowhere else.</li>
+                        <li><code>ops@yourcompany.com</code> - one fixed mailbox only.</li>
+                        <li><code>*</code> - any address at all. Works, but a confused or prompt-injected
+                            model could then mail monitoring data outside the company.</li>
+                    </ul>
                 </div>
             </div>
         </div>

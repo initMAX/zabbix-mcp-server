@@ -6,21 +6,32 @@ Two operator-visible bug fixes plus a reporting feature for deployments where a 
 
 ### Added
 
-- **Out-of-band delivery for generated reports** ([#68](https://github.com/initMAX/zabbix-mcp-server/issues/68), requested by [@metehan25](https://github.com/metehan25)). A comprehensive report returned inline as a base64 data URI can exceed the LLM's context window or a reverse-proxy read timeout, so it never arrives. `report_generate` gains two channels that hand the payload over instead and answer with a short receipt (path / recipients / size):
-  - `save_to_file: true` writes the PDF into `[reporting].output_dir`. The filename is generated server-side from report type, host group and timestamp, and the resolved path is asserted to stay inside the configured directory.
-  - `email_to: "ops@example.com"` mails it as an attachment using `[reporting.email]`.
+- **Report delivery that keeps the PDF out of the context window** ([#68](https://github.com/initMAX/zabbix-mcp-server/issues/68), requested by [@metehan25](https://github.com/metehan25)). A comprehensive report returned inline as a base64 data URI can exceed the LLM's context window or a reverse-proxy read timeout, so it never arrives at all.
 
-  Both are off until the operator configures them, and the AI client asks for delivery without choosing the destination. Email additionally requires `allowed_recipients` - an exact address or a `*@domain` glob - and the config parser refuses to enable email without it, because otherwise a model could mail monitoring data to any address it invents. 25 MB attachment ceiling; SMTP failures are surfaced without credentials. Asking for a channel the operator has not enabled returns a plain explanation of what is missing.
+  **Resource links are the primary answer.** `report_generate` can hand back a pointer (`zabbix://reports/<id>`) plus a one-line summary instead of the document; the client fetches the bytes over `resources/read` only when the user actually wants the file, so the PDF never enters the conversation. Ask for it with `as_link: true` - and it now happens **automatically** when the inline payload would exceed `[server].response_max_chars`, which is exactly the case that used to fail. Links live for an hour in a capped in-memory store.
+
+  Two further channels move the file out of the conversation entirely, answering with a receipt (path / recipients / size):
+  - `save_to_file: true` writes the PDF into `[reporting].output_dir`. The filename is generated server-side from report type, host group and timestamp, and the resolved path is asserted to stay inside the configured directory.
+  - `email_to: "ops@example.com"` mails it as an attachment using `[reporting.email]` - the fallback for "send it to a person, not a chat".
+
+  Both are off until the operator configures them, and the AI client asks for delivery without choosing the destination. Email additionally requires `allowed_recipients` - an exact address, a `*@domain` glob for a whole company, or `*` for no restriction at all - and the config parser refuses to enable email without it, because otherwise a model could mail monitoring data to any address it invents. 25 MB attachment ceiling; SMTP failures are surfaced without credentials. Asking for a channel the operator has not enabled returns a plain explanation of what is missing.
+
+- **Report delivery is configured in the admin portal**, not by hand-editing `config.toml`: Settings gains a **Report Delivery** section with the output directory and the full SMTP block including the recipient allowlist. Paths are validated on submit (absolute, exists, writable) and email cannot be enabled without an allowlist, so a typo cannot brick the next start. The SMTP password is never sent back to the browser - blank means "keep the stored one", as with the AI key.
 
 ### Fixed
 
 - **OAuth client registration raised a false "restart needed" banner** ([#69](https://github.com/initMAX/zabbix-mcp-server/issues/69), surfaced by [@G0nz0uk](https://github.com/G0nz0uk) in #67). Dynamic client registration appends an `[oauth_clients.<id>]` section to `config.toml` at runtime so the client survives the next boot. The admin portal's drift detector compared the file against the snapshot taken at startup, concluded the configuration had changed, and asked for a restart - even though the running provider already held that client in memory. Restarting helped only until the next client registered or reconnected, so the banner kept coming back. The registration path now refreshes the baseline; a change the running process has *not* absorbed still raises the banner as before.
 - **`install.sh update` silently pinned to a deleted branch** ([#60](https://github.com/initMAX/zabbix-mcp-server/issues/60)). The update path fetched without `--prune`, so a checkout left on a branch that had been merged and deleted upstream kept resetting to the last cached commit of that dead branch while reporting success - operators stayed on an old version with no visible error. Now the fetch prunes, a missing remote branch is reported plainly, and the update falls back to `origin/main`.
 
+### Fixed (internal)
+
+- `_register_tools()` dereferenced `config.server` while `config` is optional on that entry point, so the whole tool registration raised `AttributeError` once the `reporting` extra was installed. The reporting block is now skipped when no config was passed.
+
 ### Verified
 
-- 380 unit + e2e tests; CRUD smoke against live Zabbix 7.4; installer matrix 18/18
-- Report delivery exercised end to end against a live Zabbix: a real availability report written to disk as a valid 37 KB PDF with the payload omitted from the response, and the refusal path returning a clear operator-facing message
+- 386 unit + e2e tests; CRUD smoke against live Zabbix 7.4; installer matrix 18/18
+- Report delivery exercised end to end against a live Zabbix: a real availability report returned as a resource link and fetched back as a valid 37 KB PDF, the same report written to disk, and mailed through a real SMTP dialog with the attachment verified byte for byte
+- Admin portal walked in a browser: both forms save into the right TOML tables, the resulting config passes `--check-config`, and the empty-allowlist guard refuses the save with an explanation
 
 ## v1.34 - 2026-08-04
 

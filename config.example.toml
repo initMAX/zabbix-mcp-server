@@ -448,9 +448,15 @@ compact_output = true
 # use_ssl = false                    # implicit TLS instead (465)
 # timeout = 30
 #
-# THE SAFETY FENCE: a report is only mailed to an address matching this
-# list. Without it an AI client could mail monitoring data anywhere. Entries
-# may glob a domain. An empty list means nothing can be mailed.
+# THE SAFETY FENCE. The AI client picks the recipient ("email the report to
+# petr@example.com"); this list decides how far it may reach:
+#   ["*@example.com"]      - the usual choice: any colleague, nobody outside
+#   ["ops@example.com"]    - one fixed mailbox only
+#   ["*"]                  - any address at all. Works, but a confused or
+#                            prompt-injected model could then mail monitoring
+#                            data outside the company.
+# An empty list means nothing can be mailed, and enabling email without a
+# list is refused at startup.
 # allowed_recipients = ["ops@example.com", "*@example.com"]
 
 # ---------------------------------------------------------------------------

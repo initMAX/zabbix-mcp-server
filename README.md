@@ -742,19 +742,32 @@ Since v1.34 this runs on the official `io.modelcontextprotocol/tasks` extension 
 
 Other tools stay synchronous (under 5 s typically) - the polling overhead is not worth it.
 
-#### Report delivery: disk and email
+#### Report delivery: keeping the PDF out of the context window
 
-Even with tasks, the finished PDF still has to travel back through the MCP channel and into the model's context. For a big host group that is wasteful at best and fatal at worst. Two out-of-band channels avoid it entirely - the tool then answers with a short receipt instead of the document:
+Even with tasks, the finished PDF still has to travel back through the MCP channel and into the model's context. For a big host group that is wasteful at best and fatal at worst.
+
+**The default answer is a resource link.** The tool hands back a pointer plus a one-line summary; the client fetches the bytes over `resources/read` only if the user actually wants the document, so the PDF never enters the conversation:
+
+```jsonc
+{ "report_type": "availability", "hostgroupid": "42", "as_link": true }
+// -> text summary + resource_link zabbix://reports/<id> (application/pdf, 37 kB)
+```
+
+This also kicks in **automatically** when the inline payload would exceed `[server].response_max_chars` - those calls used to fail outright, so a link is strictly better. Links expire after an hour.
+
+Two more channels exist for cases where the file should leave the conversation entirely - they answer with a receipt instead of the document:
 
 ```jsonc
 // writes /var/lib/zabbix-mcp/reports/zabbix-availability-42-20260807-101500.pdf
 { "report_type": "availability", "hostgroupid": "42", "save_to_file": true }
 
-// mails it as an attachment
+// mails it as an attachment (a fallback for "send it to a person, not a chat")
 { "report_type": "availability", "hostgroupid": "42", "email_to": "ops@example.com" }
 ```
 
 Both are **off until the operator turns them on**, and the AI client never picks the destination:
+
+Configured in the admin portal under **Settings -> Report Delivery** (or in `config.example.toml`):
 
 | | Config | Fence |
 |---|---|---|

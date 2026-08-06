@@ -45,6 +45,7 @@ from mcp.types import (
     Icon,
     ListToolsRequest,
     ListToolsResult,
+    ResourceLink,
     ServerResult,
     TextContent,
     ToolAnnotations,
@@ -2046,6 +2047,15 @@ def _register_tools(
                 subtitle=getattr(_server_cfg, "report_subtitle", "IT Monitoring Service"),
             )
 
+            # Backs zabbix://reports/<id> links so a finished PDF can be
+            # handed to the client as a pointer instead of a base64 blob
+            # in the model's context (issue #68).
+            from zabbix_mcp.reporting.store import ReportStore
+            report_store = ReportStore()
+            # Module-global so the resource handler registered further
+            # down (outside this try block) can reach the same store.
+            globals()["_ZMCP_REPORT_STORE"] = report_store
+
             # Load custom templates from [report_templates.*] config sections
             try:
                 from zabbix_mcp.admin.config_writer import load_config_document as _load_cfg_doc, TOMLKIT_AVAILABLE as _TK
@@ -2064,7 +2074,8 @@ def _register_tools(
                 *, report_type: str, hostgroupid: str,
                 period: str | None, company: str | None, server: str | None,
                 save_to_file: bool = False, email_to: list[str] | str | None = None,
-            ) -> str:
+                as_link: bool = False,
+            ) -> str | CallToolResult:
                 """Synchronous PDF generation - shared between sync and task-augmented paths."""
                 from zabbix_mcp.reporting import data_fetcher
                 srv = client_manager.resolve_server(server or client_manager.default_server)
@@ -2099,6 +2110,9 @@ def _register_tools(
                     # timeout. When the caller asks for disk or email, hand
                     # over the payload there and return a short receipt
                     # instead of the base64 blob.
+                    from zabbix_mcp.reporting.delivery import (
+                        build_filename as _delivery_filename,
+                    )
                     recipients = email_to
                     if isinstance(recipients, str):
                         recipients = [r.strip() for r in recipients.split(",") if r.strip()]
@@ -2151,6 +2165,46 @@ def _register_tools(
                         return json.dumps(summary)
 
                     encoded = base64.b64encode(pdf_bytes).decode("ascii")
+
+                    # A base64 PDF is ~1.37x the file size and lands
+                    # verbatim in the model's context. Past the response
+                    # ceiling the call would be truncated or blow the
+                    # window - those calls fail today (#68), so answering
+                    # with a resource link instead can only be an
+                    # improvement. `as_link` asks for it explicitly.
+                    _limit = getattr(config.server, "response_max_chars", 50000) if config else 50000
+                    if as_link or len(encoded) > _limit:
+                        filename = _delivery_filename(report_type, hostgroupid)
+                        rid = report_store.put(pdf_bytes, filename)
+                        uri = report_store.uri(rid)
+                        summary["report_uri"] = uri
+                        summary["note"] = (
+                            "Returned as a resource link so the PDF stays out of the "
+                            "conversation context. Read the resource to obtain the file; "
+                            f"it expires in {report_store._ttl_s // 60} minutes."
+                        )
+                        if not as_link:
+                            summary["note"] += (
+                                f" (Inline delivery was skipped automatically: the encoded "
+                                f"report is {len(encoded)} chars, above the "
+                                f"{_limit}-char response limit.)"
+                            )
+                        return CallToolResult(content=[
+                            TextContent(type="text", text=json.dumps(summary)),
+                            ResourceLink(
+                                type="resource_link",
+                                uri=uri,
+                                name=filename,
+                                title=f"Zabbix {report_type} report",
+                                description=(
+                                    f"{report_type} report for host group {hostgroupid}, "
+                                    f"period {period or '30d'} ({summary['size_kb']} kB PDF)"
+                                ),
+                                mimeType="application/pdf",
+                                size=len(pdf_bytes),
+                            ),
+                        ])
+
                     summary["report"] = f"data:application/pdf;base64,{encoded}"
                     return json.dumps(summary)
                 except ToolError:
@@ -2173,6 +2227,7 @@ def _register_tools(
                 server: Annotated[Optional[str], Field(description=server_desc)] = None,
                 save_to_file: Annotated[bool, Field(description="Write the PDF to the server's configured report directory instead of returning it inline. Requires [reporting].output_dir. Returns the path.")] = False,
                 email_to: Annotated[Optional[str], Field(description="Comma-separated recipients to email the PDF to as an attachment instead of returning it inline. Requires [reporting.email] and each address must match the operator's allowed_recipients.")] = None,
+                as_link: Annotated[bool, Field(description="Return the report as an MCP resource link (zabbix://reports/<id>) instead of inline base64, so the PDF stays out of the conversation context. Read the linked resource to obtain the file. Applied automatically when the inline payload would exceed the response limit.")] = False,
             ):
                 """Generate a PDF report from Zabbix monitoring data. Supported report
                 types: availability (SLA/uptime), capacity_host (CPU/memory/disk),
@@ -2196,7 +2251,7 @@ def _register_tools(
                 # here the call is always synchronous.
 
                 return await _report_generate_work(
-                    save_to_file=save_to_file, email_to=email_to,
+                    save_to_file=save_to_file, email_to=email_to, as_link=as_link,
                     report_type=report_type, hostgroupid=hostgroupid,
                     period=period, company=company, server=server,
                 )
@@ -2922,6 +2977,25 @@ def run_server(
             return json.dumps(result, indent=2)
 
         logger.info("Registered MCP resources (zabbix://%s/...)", default_srv)
+
+    # Serve generated reports behind their resource links. Registered
+    # whenever reporting is available, independent of a default Zabbix
+    # server, because the link is minted by report_generate itself.
+    _rs = globals().get("_ZMCP_REPORT_STORE")
+    if _rs is not None:
+        @mcp.resource("zabbix://reports/{report_id}", mime_type="application/pdf",
+                      name="Generated report",
+                      description="A PDF report produced by report_generate. Expires after an hour.")
+        async def resource_report(report_id: str) -> bytes:
+            """Return the stored PDF for a zabbix://reports/<id> link."""
+            item = _rs.get(report_id)
+            if item is None:
+                raise ValueError(
+                    f"Report {report_id} is unknown or has expired - generate it again."
+                )
+            return item[0]
+
+        logger.info("Registered MCP resource template (zabbix://reports/{id})")
 
     # HTTP health endpoint (unauthenticated, returns minimal info only)
     if transport in ("http", "sse"):
