@@ -2434,11 +2434,14 @@ def _register_tools(
                 types: availability (SLA/uptime), capacity_host (CPU/memory/disk),
                 capacity_network (bandwidth/traffic), backup (daily success/fail matrix).
 
-                Returns a link, not the document: an https `download_url` the user can
-                open in a browser plus a `zabbix://reports/<id>` MCP resource, so a
-                multi-megabyte PDF never enters the conversation. Give the user the
-                download_url. Links expire (an hour by default). Pass `as_link: false`
-                for the old inline base64 data URI - only practical for small reports.
+                Returns a link, not the document, so a multi-megabyte PDF never enters
+                the conversation: always a `zabbix://reports/<id>` MCP resource, and -
+                when the operator configured a public address for this server - a
+                `download_url` any browser can open. Give the user the download_url
+                when it is there; when it is not, the response says why in
+                `download_url_unavailable` and the resource link still holds the file.
+                Links expire (an hour by default). Pass `as_link: false` for the old
+                inline base64 data URI - only practical for small reports.
 
                 Two further deliveries exist when the operator enabled them:
                 `save_to_file: true` writes the PDF into the server's configured report
