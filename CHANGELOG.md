@@ -23,15 +23,21 @@ Two operator-visible bug fixes plus a reporting feature for deployments where a 
 - **OAuth client registration raised a false "restart needed" banner** ([#69](https://github.com/initMAX/zabbix-mcp-server/issues/69), surfaced by [@G0nz0uk](https://github.com/G0nz0uk) in #67). Dynamic client registration appends an `[oauth_clients.<id>]` section to `config.toml` at runtime so the client survives the next boot. The admin portal's drift detector compared the file against the snapshot taken at startup, concluded the configuration had changed, and asked for a restart - even though the running provider already held that client in memory. Restarting helped only until the next client registered or reconnected, so the banner kept coming back. The registration path now refreshes the baseline; a change the running process has *not* absorbed still raises the banner as before.
 - **`install.sh update` silently pinned to a deleted branch** ([#60](https://github.com/initMAX/zabbix-mcp-server/issues/60)). The update path fetched without `--prune`, so a checkout left on a branch that had been merged and deleted upstream kept resetting to the last cached commit of that dead branch while reporting success - operators stayed on an old version with no visible error. Now the fetch prunes, a missing remote branch is reported plainly, and the update falls back to `origin/main`.
 
+### Security
+
+- `SECURITY.md` gains a **Report Delivery** section documenting the fences on all three channels: unguessable random link ids served over the authenticated MCP endpoint with a bounded store, server-generated filenames with the resolved path confined to the configured directory, and the mandatory recipient allowlist that stops an AI client from turning email into an exfiltration path for monitoring data.
+
 ### Fixed (internal)
 
 - `_register_tools()` dereferenced `config.server` while `config` is optional on that entry point, so the whole tool registration raised `AttributeError` once the `reporting` extra was installed. The reporting block is now skipped when no config was passed.
+- The resource handler reached the report store through a module-level global, which two servers in one process would have shared. Registration now happens in the scope that owns the store.
 
 ### Verified
 
 - 394 unit + e2e tests; CRUD smoke against live Zabbix 7.4; installer matrix 18/18
 - Report delivery exercised end to end against a live Zabbix: a real availability report returned as a resource link and fetched back as a valid 37 KB PDF, the same report written to disk, and mailed through a real SMTP dialog with the attachment verified byte for byte
-- Admin portal walked in a browser: both forms save into the right TOML tables, the resulting config passes `--check-config`, and the empty-allowlist guard refuses the save with an explanation
+- Admin portal walked in a browser: every form saves into the right TOML table, the resulting config passes `--check-config`, and the guards refuse a bad save with an explanation (empty allowlist, out-of-range link lifetime)
+- A new contract test pins that anything the Settings form can write still parses at boot - the failure mode a UI-configured feature has to be protected from
 
 ## v1.34 - 2026-08-04
 

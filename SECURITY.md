@@ -105,6 +105,16 @@ When `public_url`, `allowed_origins`, and `allowed_hosts` are all unset on a non
 - TLS private keys saved with `0600` permissions; TLS directory `0750`
 - Report template preview uses `SandboxedEnvironment` — prevents server-side template injection (SSTI)
 
+### Report Delivery (v1.35+)
+
+`report_generate` can hand a finished PDF to a resource link, the filesystem, or a mailbox instead of returning it inline. All three are reachable from an AI client, so all three are fenced by the operator.
+
+**Resource links** (`zabbix://reports/<id>`) hold the PDF in memory between the tool call and `resources/read`. The id is a random 128-bit hex token, not a filename or a sequence number, so links cannot be guessed or enumerated. Reads go through the same authenticated MCP endpoint as every other request - a link is not a public URL. The store is bounded by `[reporting].link_ttl` (default 1 h, max 24 h) and `[reporting].link_max_reports` (default 20, oldest evicted first), so a client cannot pin memory by generating reports it never fetches.
+
+**Filesystem** delivery is refused unless `[reporting].output_dir` names an absolute, existing directory. The AI client cannot supply a path or a filename: the name is generated server-side from report type, host group and timestamp, sanitised to `[A-Za-z0-9._-]`, and the resolved target is asserted to stay inside the configured directory before the write. Files are written `0640`.
+
+**Email** delivery is refused unless `[reporting.email].enabled` is set **and** the recipient matches `allowed_recipients`. The allowlist is mandatory - the config loader and the admin form both refuse to enable email without it, because an LLM that can pick an arbitrary recipient is an exfiltration channel for monitoring data. Entries are exact addresses or `*@domain` globs; `*` disables the restriction entirely and should be a deliberate choice. Attachments are capped at 25 MB and SMTP failures are reported without echoing credentials. The SMTP password is stored in `config.toml` under the same `0640` permissions as the rest of the file, supports `${ENV_VAR}` indirection, and is never sent to the admin portal's browser session.
+
 ### Audit Logging
 
 - All admin portal actions logged to `/var/log/zabbix-mcp/audit.log` (JSON lines)
