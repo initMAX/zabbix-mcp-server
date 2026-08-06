@@ -755,6 +755,28 @@ Even with tasks, the finished PDF still has to travel back through the MCP chann
 
 This also kicks in **automatically** when the inline payload would exceed `[server].response_max_chars` - those calls used to fail outright, so a link is strictly better. Links expire after an hour by default; the lifetime and how many reports are held at once are set in **Settings -> Report Delivery** (`[reporting].link_ttl` / `link_max_reports`).
 
+**A `zabbix://` link can only be opened by an MCP client**, so the person reading the chat cannot click it. When the server runs over HTTP the same report is therefore also published at an ordinary URL the AI can simply hand over:
+
+```jsonc
+{
+  "report_uri":    "zabbix://reports/d121662ba49d4685a6200b8a4d1cbe65",
+  "download_url":  "https://mcp.example.com/reports/d121662ba49d4685a6200b8a4d1cbe65.pdf"
+}
+```
+
+The 122-bit random report id (uuid4) **is** the credential (a capability URL): unguessable, valid for one report, and dead the moment the link expires. The route needs no bearer token on purpose - the point is that a human can open it in a browser - and it answers with `Content-Disposition: attachment`, `Cache-Control: no-store, private` and `Referrer-Policy: no-referrer`. Set `[reporting].download_urls = false` to keep the MCP link only.
+
+> **Behind a reverse proxy: forward `/reports/` as well.** The download route is served by the MCP backend, so a proxy that forwards a *list* of paths (`/mcp`, `/token`, `/authorize`, ...) rather than a catch-all `/` will answer 404 for a link that otherwise looks perfectly correct. Add it next to the others:
+>
+> ```apache
+> ProxyPass        /reports/ http://127.0.0.1:8080/reports/
+> ProxyPassReverse /reports/ http://127.0.0.1:8080/reports/
+> ```
+>
+> Set `[server].public_url` to the address clients actually reach. Without it the link is built from the `Host` the client connected on (`X-Forwarded-Host` / `-Proto` are honoured from a peer listed in `[server].trusted_proxies`), which is right in the common case but pins nothing - `public_url` is the operator stating it once. The local bind is deliberately never used: behind a proxy it is `127.0.0.1`, and a remote user handed that would be pointed at their own machine.
+
+The URL is only emitted when the server can honestly build one. On **stdio transport there is no HTTP listener at all**, and a request that arrives without a usable `Host` gives nothing to build from; in both cases the response carries a `download_url_unavailable` line explaining what to configure, and the `zabbix://` resource link keeps working as before.
+
 Two more channels exist for cases where the file should leave the conversation entirely - they answer with a receipt instead of the document:
 
 ```jsonc

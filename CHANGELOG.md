@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.36 - 2026-08-07
+
+Report delivery, finished: v1.35 could not actually write to disk, and the link it handed back was one an MCP client could open but a person could not.
+
+> **Behaviour change.** `report_generate` now answers with a link by default instead of an inline base64 PDF, so the return shape changed: callers that read `summary["report"]` (`data:application/pdf;base64,...`) get a resource link and a `download_url` instead. Pass `as_link: false` for the old inline payload, which still applies the `[server].response_max_chars` ceiling. This is why the release is v1.36 and not a patch on v1.35.
+
+### Fixed
+
+- **`save_to_file` could never succeed on a default install.** The service runs with `ProtectSystem=strict`, which makes the entire filesystem read-only apart from an explicit allowlist - so `[reporting].output_dir` failed with `Read-only file system` no matter who owned the directory, and the directory did not exist in the first place. The unit now declares `StateDirectory=zabbix-mcp/reports` (mode 0750), which creates it, chowns it to the service user and makes it writable; `config.example.toml` documents that pointing `output_dir` elsewhere needs a matching `ReadWritePaths`.
+
+### Added
+
+- **A report link a human can click.** `zabbix://reports/<id>` can only be opened by an MCP client, so the person reading the chat was left with nothing to click. When the server runs over HTTP the same report is now also published at `GET /reports/<id>.pdf` and the tool returns it as `download_url` alongside the resource link. The 122-bit random report id (uuid4) is the credential - a capability URL: unguessable, valid for one report, and dead the moment the link expires. The route deliberately needs no bearer token (that is the point of handing it to a person) and answers with `Content-Disposition: attachment`, `Cache-Control: no-store, private`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`. Turn it off with `[reporting].download_urls = false`.
+
+  **Behind a reverse proxy that forwards a list of paths rather than all of `/`, add `/reports/` to it** - otherwise the link looks perfectly correct and answers 404. README, `docs/OAUTH.md` and `config.example.toml` all call this out.
+
+  **Upgrade note:** this is on by default, so a 1.35 install that already serves HTTP starts publishing report downloads at `/reports/<id>.pdf` after the update, with no config change. The route is unauthenticated by design (the id is the credential). Set `[reporting].download_urls = false`, or untick **Settings -> Report Delivery -> Clickable download link**, to keep MCP resource links only.
+
+- Links are now the **default** answer for `report_generate` rather than something the client has to ask for with `as_link: true` (see the note above), and the tool description tells the model to pass the download URL on instead of trying to render the document.
+
+### Fixed (edge cases in the above)
+
+- **The link is never built from the local bind.** The shipped default binds `127.0.0.1` behind a reverse proxy, so a bind-derived link handed a remote user `http://127.0.0.1:8080/reports/<id>.pdf` - a dead link that also sends a live report id to whatever answers on *their* port 8080. `[server].public_url` wins; otherwise the link is built from the authority the caller actually connected on, with `X-Forwarded-Host` / `-Proto` believed only from a peer listed in `[server].trusted_proxies` (the same rule already applied to `X-Forwarded-For`) and the `Host` accepted only if it is a bare authority, so a header cannot smuggle a path or a second origin into the link.
+- No URL is emitted when none can be built honestly: **stdio has no HTTP listener at all**, and a request without a usable `Host` gives nothing to work from. Both return a `download_url_unavailable` line naming what to configure; the resource link keeps working on every transport.
+- The effective transport is used rather than the configured one, because `--transport` overrides `config.toml`.
+- Serving download URLs over plaintext HTTP now logs a startup warning: the report id travels as a bearer credential and the PDF is unencrypted in transit.
+
+### Fixed (internal)
+
+- `report_generate` base64-encoded the whole PDF on every call - including the link path that discards the string - allocating ~1.37x the file and blocking the event loop for the duration. The inline-size check now computes the encoded length arithmetically and the encode happens only when the PDF is actually returned inline.
+- The report id was documented as 128-bit in `SECURITY.md`, `README.md` and the config comments. `uuid4().hex` is 122 random bits (6 are fixed for version and variant) - ample, but a security document should not overstate it.
+
+### Verified
+
+- 408 unit + e2e tests, including 13 new cases pinning the URL builder: stdio, loopback bind, reverse-proxy TLS, spoofed `X-Forwarded-*` from an untrusted peer, forwarded chains, IPv6 literals, and `Host` values carrying a path, a query or CRLF
+- End to end on a live server: the exact `download_url` returned by `report_generate` fetched over HTTPS as a valid PDF with every security header present, and the same tool over stdio returning no URL plus the explanation
+- Reproduced the `ProtectSystem=strict` failure with `systemd-run` before the fix and confirmed the write succeeds after it
+
 ## v1.35 - 2026-08-07
 
 Two operator-visible bug fixes plus a reporting feature for deployments where a full PDF cannot travel back through the MCP channel.

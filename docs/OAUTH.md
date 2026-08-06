@@ -112,11 +112,19 @@ For production you have two equally good options:
    The same setup works behind any HTTPS-terminating reverse proxy.
    Three battle-tested snippets follow - pick the one matching your
    stack. All three forward `/mcp`, `/authorize`, `/token`, `/register`,
-   `/revoke`, `/oauth/login`, `/static/*`, and `/.well-known/*` to the
-   single MCP backend port. If you also want the admin portal exposed
-   under the same hostname, proxy a second backend on a different
-   `Location` / `location` / matcher - see "Admin portal under the
-   same hostname" below.
+   `/revoke`, `/oauth/login`, `/reports/*`, `/static/*`, and
+   `/.well-known/*` to the single MCP backend port.
+
+   > If you graft these onto an existing vhost with a *per-path*
+   > `ProxyPass` allowlist instead of the catch-all `/` below, do not
+   > forget `/reports/`. Report download links are built from
+   > `public_url`, so a missing entry there produces a link that looks
+   > right and answers 404. The MCP resource link keeps working either
+   > way; only the human-clickable URL depends on the proxy.
+
+   If you also want the admin portal exposed under the same hostname,
+   proxy a second backend on a different `Location` / `location` /
+   matcher - see "Admin portal under the same hostname" below.
 
    **Caddy** (Let's Encrypt automatic):
 

@@ -168,6 +168,13 @@ class ReportingConfig:
     # because the report just generated matters more than one nobody
     # fetched.
     link_max_reports: int = 20
+    # Also hand out an https download URL next to the MCP resource link.
+    # zabbix://reports/<id> is only fetchable by an MCP client - a human
+    # reading the conversation cannot click it. The URL carries the same
+    # random 122-bit id as the resource and expires with it: a capability
+    # URL, deliberately usable without a bearer token so the operator can
+    # simply open it. Set false to hand out the MCP link only.
+    download_urls: bool = True
     email: ReportEmailConfig = field(default_factory=ReportEmailConfig)
 
 
@@ -746,10 +753,15 @@ def load_config(path: str | Path) -> AppConfig:
     if not isinstance(link_max_raw, int) or not (1 <= link_max_raw <= 500):
         raise ConfigError("'[reporting].link_max_reports' must be an integer between 1 and 500")
 
+    download_urls_raw = reporting_raw.get("download_urls", True)
+    if not isinstance(download_urls_raw, bool):
+        raise ConfigError("'[reporting].download_urls' must be a boolean (true or false)")
+
     reporting_cfg = ReportingConfig(
         output_dir=output_dir,
         link_ttl=link_ttl_raw,
         link_max_reports=link_max_raw,
+        download_urls=download_urls_raw,
         email=email_cfg,
     )
 

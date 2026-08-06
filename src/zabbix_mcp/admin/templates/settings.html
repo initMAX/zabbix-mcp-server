@@ -376,6 +376,26 @@
                 </div>
             </div>
         </div>
+        <div class="settings-row">
+            <div class="settings-label">Clickable download link <span class="tooltip-icon" tabindex="0" data-tooltip="Publishes each generated report at /reports/&lt;id&gt;.pdf so the AI can hand the user a link they can open in a browser. A zabbix:// resource link can only be opened by an MCP client. The random report id is the only credential and dies with the link.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="download_urls" {% if settings.report_download_urls is not defined or settings.report_download_urls %}checked{% endif %} {% if current_user_role != 'admin' %}disabled{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>Serve reports at <code>/reports/&lt;id&gt;.pdf</code></span>
+                </label>
+                <div class="form-hint">
+                    Lets the AI hand out a link a person can click; the <code>zabbix://</code>
+                    resource link only works inside an MCP client. The link needs no token -
+                    the unguessable report id is the credential, and it expires with the link
+                    above. Requires <strong>Public URL</strong> (MCP Server section) to be set;
+                    behind a reverse proxy that forwards individual paths, forward
+                    <code>/reports/</code> too or the link answers 404.
+                </div>
+            </div>
+        </div>
         {% if current_user_role == 'admin' %}
         <div style="margin-top:16px;">
             <button type="submit" class="btn btn-primary btn-sm">Save Directory Settings</button>

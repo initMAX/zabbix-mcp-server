@@ -1116,6 +1116,70 @@ def _ensure_write_tools_set() -> None:
         _WRITE_TOOLS = _build_write_tools_set()
 
 
+_HOST_RE = re.compile(r"^[A-Za-z0-9.\-]+(:\d{1,5})?$|^\[[0-9A-Fa-f:.]+\](:\d{1,5})?$")
+
+
+def _request_base_from_headers(
+    headers: dict[bytes, bytes], scheme: str, trusted_proxy: bool
+) -> str | None:
+    """Scheme + authority the caller used, from the inbound HTTP headers.
+
+    ``X-Forwarded-Host`` / ``-Proto`` are honoured only when the peer is a
+    configured trusted proxy, exactly as ``X-Forwarded-For`` is above -
+    otherwise any client could dictate the value. The result is only ever
+    echoed back to the client that sent it, never used to authorize
+    anything, so a forged Host misleads nobody but its author.
+    """
+    host = headers.get(b"host", b"").decode("latin-1").strip()
+    if trusted_proxy:
+        fwd_host = headers.get(b"x-forwarded-host", b"").decode("latin-1").split(",")[0].strip()
+        fwd_proto = headers.get(b"x-forwarded-proto", b"").decode("latin-1").split(",")[0].strip()
+        if fwd_host:
+            host = fwd_host
+        if fwd_proto in ("http", "https"):
+            scheme = fwd_proto
+    # Anything that is not a plain authority would let a header smuggle a
+    # path, a query or another origin into the link we hand the user.
+    if not host or not _HOST_RE.match(host):
+        return None
+    return f"{scheme}://{host}"
+
+
+def _report_download_base(config, transport: str) -> tuple[str | None, str | None]:
+    """Base URL for report downloads, or (None, reason) when there is none.
+
+    A download URL that does not resolve is worse than no URL: the model
+    hands the user a dead link. So this only answers when the server can
+    honestly name an address the caller is known to reach it on.
+
+    ``[server].public_url`` wins - it is the operator stating the public
+    address, and it is the only correct answer when TLS terminates
+    upstream (the local ``tls_cert_file`` says nothing about the scheme
+    the client speaks). Otherwise the authority from the request itself
+    is used, because that is by definition an address this client just
+    reached. The local bind is deliberately NOT a fallback: behind a
+    reverse proxy it is typically 127.0.0.1, and handing that to a remote
+    user points them at their own machine - a dead link that also leaks a
+    live report id to whatever answers on their port 8080.
+    """
+    if transport not in ("http", "sse"):
+        return None, (
+            "No download URL: the server runs on stdio transport, so it has no HTTP "
+            "listener. The report_uri resource link still works."
+        )
+    public = (getattr(config.server, "public_url", "") or "").strip().rstrip("/")
+    if public:
+        return public, None
+    from zabbix_mcp.token_store import current_request_base
+    base = current_request_base.get()
+    if base:
+        return base.rstrip("/"), None
+    return None, (
+        "No download URL: the address this server is reachable on could not be "
+        "determined. Set [server].public_url. The report_uri resource link still works."
+    )
+
+
 def _load_server_icons() -> list[Icon] | None:
     """Build the ``icons`` list for ``Implementation`` from the bundled brand SVG.
 
@@ -1533,6 +1597,7 @@ def _register_tools(
     compact_output: bool = True,
     response_max_chars: int = _RESPONSE_MAX_CHARS,
     config: AppConfig | None = None,
+    transport: str = "stdio",
 ) -> int:
     """Register Zabbix API methods as MCP tools. Returns tool count.
 
@@ -2055,10 +2120,19 @@ def _register_tools(
                 ttl_s=config.reporting.link_ttl,
                 max_reports=config.reporting.link_max_reports,
             )
+            # Reachable from the /reports/<id>.pdf HTTP route, which is
+            # registered later, when the ASGI app is built, and so cannot
+            # close over this scope. The store rides on the AppConfig
+            # rather than a module global because config is per-server:
+            # two servers in one process (tests) get two configs and
+            # therefore two stores. Registering two servers against ONE
+            # config would make the route serve the last one's store -
+            # not a shape run_server can produce (single call site), but
+            # the reason this is an attribute and not a global.
+            object.__setattr__(config, "_report_store", report_store)
 
-            # Serve the stored PDFs behind their links. Registered here,
-            # in the scope that owns the store, so two servers in one
-            # process (tests) never share one.
+            # Serve the stored PDFs behind their links, registered in the
+            # scope that owns the store.
             @mcp.resource("zabbix://reports/{report_id}", mime_type="application/pdf",
                           name="Generated report",
                           description="A PDF report produced by report_generate. Expires after the configured link lifetime.")
@@ -2094,7 +2168,7 @@ def _register_tools(
                 *, report_type: str, hostgroupid: str,
                 period: str | None, company: str | None, server: str | None,
                 save_to_file: bool = False, email_to: list[str] | str | None = None,
-                as_link: bool = False,
+                as_link: bool = True,
             ) -> str | CallToolResult:
                 """Synchronous PDF generation - shared between sync and task-augmented paths."""
                 from zabbix_mcp.reporting import data_fetcher
@@ -2184,31 +2258,58 @@ def _register_tools(
                         )
                         return json.dumps(summary)
 
-                    encoded = base64.b64encode(pdf_bytes).decode("ascii")
-
                     # A base64 PDF is ~1.37x the file size and lands
                     # verbatim in the model's context. Past the response
                     # ceiling the call would be truncated or blow the
                     # window - those calls fail today (#68), so answering
                     # with a resource link instead can only be an
                     # improvement. `as_link` asks for it explicitly.
+                    #
+                    # The encoded length is computed, not measured: links
+                    # are now the default, and actually encoding a report
+                    # only to discard the string would allocate ~1.37x the
+                    # PDF and block the event loop on every single call.
+                    _encoded_len = -(-len(pdf_bytes) // 3) * 4
                     _limit = getattr(config.server, "response_max_chars", 50000) if config else 50000
-                    if as_link or len(encoded) > _limit:
+                    if as_link or _encoded_len > _limit:
                         filename = _delivery_filename(report_type, hostgroupid)
                         rid = report_store.put(pdf_bytes, filename)
                         uri = report_store.uri(rid)
                         summary["report_uri"] = uri
+
+                        # A zabbix:// URI is only meaningful to an MCP
+                        # client. Hand out an https URL too so the person
+                        # reading the conversation can just click it.
+                        download_url = None
+                        _no_url_reason = None
+                        if config is not None and config.reporting.download_urls:
+                            base, _no_url_reason = _report_download_base(config, transport)
+                            if base:
+                                download_url = f"{base}/reports/{rid}.pdf"
+                                summary["download_url"] = download_url
+
+                        _mins = report_store._ttl_s // 60
                         summary["note"] = (
-                            "Returned as a resource link so the PDF stays out of the "
-                            "conversation context. Read the resource to obtain the file; "
-                            f"it expires in {report_store._ttl_s // 60} minutes."
+                            "Delivered as a link so the PDF stays out of the conversation "
+                            f"context. Expires in {_mins} minutes. "
+                            + ("Give the user the download_url - it opens in a browser. "
+                               if download_url else "")
+                            + "MCP clients can also read the report_uri resource directly."
                         )
+                        if _no_url_reason:
+                            summary["download_url_unavailable"] = _no_url_reason
                         if not as_link:
                             summary["note"] += (
                                 f" (Inline delivery was skipped automatically: the encoded "
-                                f"report is {len(encoded)} chars, above the "
+                                f"report is {_encoded_len} chars, above the "
                                 f"{_limit}-char response limit.)"
                             )
+                        _desc = (
+                            f"{report_type} report for host group {hostgroupid}, "
+                            f"period {period or '30d'} ({summary['size_kb']} kB PDF)"
+                        )
+                        if download_url:
+                            _desc += f". Download: {download_url}"
                         return CallToolResult(content=[
                             TextContent(type="text", text=json.dumps(summary)),
                             ResourceLink(
@@ -2216,16 +2317,16 @@ def _register_tools(
                                 uri=uri,
                                 name=filename,
                                 title=f"Zabbix {report_type} report",
-                                description=(
-                                    f"{report_type} report for host group {hostgroupid}, "
-                                    f"period {period or '30d'} ({summary['size_kb']} kB PDF)"
-                                ),
+                                description=_desc,
                                 mimeType="application/pdf",
                                 size=len(pdf_bytes),
                             ),
                         ])
 
-                    summary["report"] = f"data:application/pdf;base64,{encoded}"
+                    summary["report"] = (
+                        f"data:application/pdf;base64,"
+                        f"{base64.b64encode(pdf_bytes).decode('ascii')}"
+                    )
                     return json.dumps(summary)
                 except ToolError:
                     raise
@@ -2247,20 +2348,23 @@ def _register_tools(
                 server: Annotated[Optional[str], Field(description=server_desc)] = None,
                 save_to_file: Annotated[bool, Field(description="Write the PDF to the server's configured report directory instead of returning it inline. Requires [reporting].output_dir. Returns the path.")] = False,
                 email_to: Annotated[Optional[str], Field(description="Comma-separated recipients to email the PDF to as an attachment instead of returning it inline. Requires [reporting.email] and each address must match the operator's allowed_recipients.")] = None,
-                as_link: Annotated[bool, Field(description="Return the report as an MCP resource link (zabbix://reports/<id>) instead of inline base64, so the PDF stays out of the conversation context. Read the linked resource to obtain the file. Applied automatically when the inline payload would exceed the response limit.")] = False,
+                as_link: Annotated[bool, Field(description="Default true: return a link (an https download_url the user can click, plus the zabbix://reports/<id> MCP resource) instead of the PDF itself, so the document stays out of the conversation context. Set false to force the inline base64 data URI, which is only practical for small reports.")] = True,
             ):
                 """Generate a PDF report from Zabbix monitoring data. Supported report
                 types: availability (SLA/uptime), capacity_host (CPU/memory/disk),
                 capacity_network (bandwidth/traffic), backup (daily success/fail matrix).
 
-                By default returns the report as a base64-encoded PDF data URI. Large
-                reports can exceed the context window, so two out-of-band deliveries
-                are available when the operator enabled them: `save_to_file: true`
-                writes the PDF into the server's configured report directory, and
-                `email_to: "ops@example.com"` mails it as an attachment. With either,
-                the response carries only a short receipt (path / recipients / size),
-                not the payload. Both are refused with a clear message when the
-                operator has not configured them.
+                Returns a link, not the document: an https `download_url` the user can
+                open in a browser plus a `zabbix://reports/<id>` MCP resource, so a
+                multi-megabyte PDF never enters the conversation. Give the user the
+                download_url. Links expire (an hour by default). Pass `as_link: false`
+                for the old inline base64 data URI - only practical for small reports.
+
+                Two further deliveries exist when the operator enabled them:
+                `save_to_file: true` writes the PDF into the server's configured report
+                directory, and `email_to: "ops@example.com"` mails it as an attachment.
+                Both answer with a short receipt (path / recipients / size) and are
+                refused with a clear message when not configured.
 
                 Long-running (5-30 s typically). Clients that support the MCP tasks
                 extension may invoke this with `task: {ttl: 60000}` to get a task
@@ -2940,6 +3044,9 @@ def run_server(
         compact_output=config.server.compact_output,
         response_max_chars=config.server.response_max_chars,
         config=config,
+        # Effective transport, not config.server.transport - the CLI can
+        # override it, and stdio has no HTTP listener to link to.
+        transport=transport,
     )
     # Build the write-tools set for the tools/list scope filter once we
     # know everything that will ever be registered.
@@ -3007,6 +3114,68 @@ def run_server(
         @mcp.custom_route("/health", methods=["GET"])
         async def http_health(request: Request) -> JSONResponse:
             return JSONResponse({"status": "ok"})
+
+        # Human-clickable download for a generated report. The MCP
+        # resource link (zabbix://reports/<id>) can only be fetched by an
+        # MCP client - somebody reading the conversation cannot open it.
+        # This serves the same bytes over the server's own HTTP(S)
+        # endpoint so the AI can hand out a link a person can click.
+        #
+        # The random report id (122 bits, uuid4) IS the credential (a
+        # capability URL): unguessable, single-report, dead as soon as it
+        # expires. It is deliberately reachable without a bearer token,
+        # because the point is that a human can open it in a browser.
+        # Operators who do not want that set [reporting].download_urls
+        # = false and keep the MCP link only.
+        if config is not None and config.reporting.download_urls:
+            from starlette.responses import Response as _StarletteResponse
+
+            # The report id in the URL is a bearer-style credential and
+            # the PDF is monitoring data. Over plaintext HTTP on a
+            # reachable interface both cross the network in the clear.
+            # That is the operator's call (the whole MCP API already
+            # travels the same way), but it should never be a surprise.
+            _pub = (config.server.public_url or "").strip()
+            _plain = _pub.startswith("http://") or (
+                not _pub
+                and host not in ("127.0.0.1", "localhost", "::1")
+                and not config.server.tls_cert_file
+            )
+            if _plain:
+                logger.warning(
+                    "Report download URLs will be served over plaintext HTTP (%s). The "
+                    "report id acts as a password and the PDF is unencrypted in "
+                    "transit. Terminate TLS in front of the server and set "
+                    "[server].public_url to the https address, or disable "
+                    "[reporting].download_urls.", _pub or f"http://{host}:{port}")
+            elif not _pub:
+                logger.info(
+                    "Report download URLs enabled; each link is built from the address "
+                    "that client connected to. Set [server].public_url to pin them to a "
+                    "fixed public address.")
+
+            @mcp.custom_route("/reports/{report_id}.pdf", methods=["GET"])
+            async def http_report_download(request: Request):
+                store = getattr(config, "_report_store", None)
+                if store is None:
+                    return _StarletteResponse("Report downloads are not available.", status_code=404)
+                item = store.get(request.path_params["report_id"])
+                if item is None:
+                    return _StarletteResponse(
+                        "This report link has expired or does not exist.", status_code=404)
+                pdf_bytes, filename = item
+                return _StarletteResponse(
+                    pdf_bytes,
+                    media_type="application/pdf",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{filename}"',
+                        # A capability URL must not be cached by shared
+                        # proxies or leaked through a Referer header.
+                        "Cache-Control": "no-store, private",
+                        "Referrer-Policy": "no-referrer",
+                        "X-Content-Type-Options": "nosniff",
+                    },
+                )
 
         # OAuth login + consent UI - only registered when [oauth].enabled.
         # Lives on the MCP port (same origin as the issuer URL) so the
@@ -3085,30 +3254,45 @@ def run_server(
             # honor the first entry of X-Forwarded-For (the original client);
             # otherwise the raw TCP peer is used so an untrusted client
             # cannot impersonate an arbitrary IP via XFF.
-            from zabbix_mcp.token_store import current_client_ip as _cip_var, current_token_info as _cti_var
+            from zabbix_mcp.token_store import (
+                current_client_ip as _cip_var,
+                current_request_base as _rb_var,
+                current_token_info as _cti_var,
+            )
             _inner_app = asgi_app
             _trusted_proxies = set(config.server.trusted_proxies or [])
 
             async def _client_ip_middleware(scope, receive, send):
                 _cti_var.set(None)
                 peer = None
+                base = None
                 if scope["type"] in ("http", "websocket"):
                     client = scope.get("client")
-                    if client:
-                        peer = client[0]
-                        if peer in _trusted_proxies:
-                            headers = dict(scope.get("headers", []))
-                            xff = headers.get(b"x-forwarded-for", b"").decode()
-                            if xff:
-                                first = xff.split(",")[0].strip()
-                                if first:
-                                    peer = first
+                    raw_peer = client[0] if client else None
+                    peer = raw_peer
+                    headers = dict(scope.get("headers", []))
+                    trusted = raw_peer in _trusted_proxies
+                    if trusted:
+                        xff = headers.get(b"x-forwarded-for", b"").decode()
+                        if xff:
+                            first = xff.split(",")[0].strip()
+                            if first:
+                                peer = first
+                    # The authority the caller actually dialled. Report download
+                    # links are built from this, because the local bind may well
+                    # be 127.0.0.1 behind a proxy - handing that to a remote user
+                    # points them at their own machine.
+                    if scope["type"] == "http":
+                        base = _request_base_from_headers(
+                            headers, scope.get("scheme") or "http", trusted)
                 _cip_var.set(peer)
+                _rb_var.set(base)
                 try:
                     await _inner_app(scope, receive, send)
                 finally:
                     _cti_var.set(None)
                     _cip_var.set(None)
+                    _rb_var.set(None)
             asgi_app = _client_ip_middleware
 
             # Apply IP allowlist middleware if configured

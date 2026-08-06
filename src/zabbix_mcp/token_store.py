@@ -40,6 +40,14 @@ logger = logging.getLogger("zabbix_mcp.token_store")
 current_token_info: contextvars.ContextVar[Any] = contextvars.ContextVar("current_token_info", default=None)
 # Context variable to hold client IP for token IP allowlist checks
 current_client_ip: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_client_ip", default=None)
+# Scheme + authority the current client actually reached us on ("https://mcp.example.com"),
+# taken from the request Host (or X-Forwarded-Host/-Proto from a trusted proxy). Used to
+# build report download links: the address the caller used is the only one it is known to
+# be able to reach, whereas the local bind may be a loopback address behind a proxy.
+# Never used for an authorization decision - the client controls Host, so a forged value
+# can only mislead the client that sent it.
+current_request_base: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "current_request_base", default=None)
 
 
 def check_token_authorization(

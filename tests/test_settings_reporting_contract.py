@@ -58,9 +58,13 @@ class TestSettingsSectionRegistry(unittest.TestCase):
     def test_toggle_and_list_keys_declared(self):
         # A checkbox not in BOOL_KEYS lands in TOML as the string "on";
         # a list field not in LIST_KEYS lands as one long string.
-        for key in ("use_starttls", "use_ssl"):
+        for key in ("use_starttls", "use_ssl", "download_urls"):
             self.assertIn(key, BOOL_KEYS)
         self.assertIn("allowed_recipients", LIST_KEYS)
+
+    def test_download_urls_toggle_is_writable(self):
+        self.assertIn("download_urls",
+                      SECTION_CONFIG["report_delivery"]["allowed_keys"])
 
 
 class TestUiWritableConfigLoads(unittest.TestCase):
@@ -73,6 +77,7 @@ class TestUiWritableConfigLoads(unittest.TestCase):
 output_dir = "{out_dir}"
 link_ttl = 900
 link_max_reports = 8
+download_urls = false
 
 [reporting.email]
 enabled = true
@@ -89,6 +94,8 @@ allowed_recipients = ["ops@example.com", "*@example.com"]
             self.assertEqual(cfg.reporting.output_dir, out_dir)
             self.assertEqual(cfg.reporting.link_ttl, 900)
             self.assertEqual(cfg.reporting.link_max_reports, 8)
+            # An unchecked checkbox writes `false`, not a missing key.
+            self.assertFalse(cfg.reporting.download_urls)
             self.assertTrue(cfg.reporting.email.enabled)
             self.assertEqual(cfg.reporting.email.allowed_recipients,
                              ["ops@example.com", "*@example.com"])

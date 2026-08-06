@@ -446,6 +446,23 @@ compact_output = true
 # link_ttl = 3600           # seconds a link stays fetchable (60 - 86400)
 # link_max_reports = 20     # reports held at once; oldest evicted first (1 - 500)
 
+# Publish the same report at a plain HTTP(S) URL as well, so the AI can hand
+# the user a link they can click - a zabbix:// link only an MCP client can
+# open. The random report id in the path IS the credential (unguessable, one
+# report, dies with the link), so the route needs no bearer token.
+#
+# The URL is built from [server].public_url; without it, from the address the
+# client connected on. The local bind is never used - behind a proxy that is
+# 127.0.0.1, which would point a remote user at their own machine.
+# Behind a reverse proxy that forwards a LIST of paths rather than all of `/`,
+# forward /reports/ too, otherwise the link 404s:
+#   ProxyPass        /reports/ http://127.0.0.1:8080/reports/
+#   ProxyPassReverse /reports/ http://127.0.0.1:8080/reports/
+#
+# No URL is emitted on stdio transport - there is no HTTP listener - and the
+# resource link keeps working on every transport either way.
+# download_urls = true
+
 # [reporting.email]
 # SMTP settings for `email_to`. When enabled, smtp_host, from_address and
 # allowed_recipients are all required.

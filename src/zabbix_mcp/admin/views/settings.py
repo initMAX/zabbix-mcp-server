@@ -27,7 +27,8 @@ RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file"
 LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools", "allowed_recipients"}
 
 # Boolean fields — checkbox present = True, absent = False
-BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "use_starttls", "use_ssl"}
+BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "use_starttls",
+             "use_ssl", "download_urls"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -57,7 +58,7 @@ SECTION_CONFIG = {
     # plus the recipient allowlist that fences what an AI client may do.
     "report_delivery": {
         "toml_section": "reporting",
-        "allowed_keys": {"output_dir", "link_ttl", "link_max_reports"},
+        "allowed_keys": {"output_dir", "link_ttl", "link_max_reports", "download_urls"},
         "min_role": "admin",
     },
     "report_email": {
@@ -267,6 +268,7 @@ async def settings_view(request: Request) -> Response:
             settings["report_output_dir"] = rep_cfg.get("output_dir", "")
             settings["report_link_ttl"] = int(rep_cfg.get("link_ttl") or 3600)
             settings["report_link_max"] = int(rep_cfg.get("link_max_reports") or 20)
+            settings["report_download_urls"] = bool(rep_cfg.get("download_urls", True))
             settings["mail_enabled"] = bool(mail_cfg.get("enabled", False))
             settings["mail_smtp_host"] = mail_cfg.get("smtp_host", "")
             settings["mail_smtp_port"] = int(mail_cfg.get("smtp_port") or 587)
