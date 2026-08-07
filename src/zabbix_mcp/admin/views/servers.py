@@ -187,7 +187,11 @@ async def server_create(request: Request) -> Response:
 
     form = await request.form()
     name = str(form.get("name", "")).strip()
-    url = str(form.get("url", "")).strip()
+    # Normalised on the way in, so the value stored in config.toml is the
+    # one the loader will hand the running client. Tolerating the
+    # difference is the fix for #72; not writing it in the first place is
+    # what stops the mismatch existing at all.
+    url = _normalize_url(str(form.get("url", "")).strip())
     api_token = str(form.get("api_token", "")).strip()
     read_only = "read_only" in form
     verify_ssl = "verify_ssl" in form
@@ -309,7 +313,7 @@ async def server_edit(request: Request) -> Response:
         )
 
     new_name = str(form.get("name", "")).strip()
-    url = str(form.get("url", "")).strip()
+    url = _normalize_url(str(form.get("url", "")).strip())
     api_token = str(form.get("api_token", "")).strip()
     read_only = "read_only" in form
     verify_ssl = "verify_ssl" in form

@@ -135,5 +135,27 @@ class TestDriftOnRender(unittest.TestCase):
         self.assertFalse(app.restart_needed)
 
 
+class TestNormalisedOnWrite(unittest.TestCase):
+    """Belt and braces: the slash should not reach config.toml either.
+
+    Tolerating the mismatch fixes the symptom; normalising what the Add
+    Server / Edit Server forms write means the mismatch never exists.
+    """
+
+    def test_form_url_is_normalised(self):
+        from zabbix_mcp.admin.views.servers import _normalize_url
+        self.assertEqual(_normalize_url("https://zabbix.example.com/"),
+                         "https://zabbix.example.com")
+
+    def test_write_and_render_agree(self):
+        # What the form would store, rendered back against a client
+        # holding the loader's value: no drift, by construction.
+        from zabbix_mcp.admin.views.servers import _normalize_url
+        typed = "https://zabbix.example.com/"
+        stored = _normalize_url(typed)
+        app = _render(_cfg(stored), {"Dev": typed})
+        self.assertFalse(app.restart_needed)
+
+
 if __name__ == "__main__":
     unittest.main()
