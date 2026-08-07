@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.36.1 - 2026-08-07
+
+One display bug, reported within hours of v1.36 by [@G0nz0uk](https://github.com/G0nz0uk).
+
+### Fixed
+
+- **"Restart needed" banner that never cleared, on servers whose URL ends in a slash** ([#72](https://github.com/initMAX/zabbix-mcp-server/issues/72), reported by [@G0nz0uk](https://github.com/G0nz0uk) in [#67](https://github.com/initMAX/zabbix-mcp-server/issues/67)). The `/servers` page recomputes configuration drift on every render and compared the URL from `config.toml` against the URL of the running client - but the two came from different places. The page read the raw TOML string, while the running value had been through the config loader, which normalises it with `url.rstrip("/")`. A URL written as `https://host/` therefore differed from itself, raising the banner on every render; restarting could not clear it, because the next boot normalised the URL again and the page compared the same two values. Both sides are now normalised the same way. A genuine edit - a different host, scheme or path - still raises the banner, as does adding a server to the config or removing a live one.
+
+  Nothing was ever actually wrong on an affected server; the banner was cosmetic. If you cannot upgrade yet, removing the trailing slash from the `url =` lines in `config.toml` has the same effect - the running server already treats it as absent.
+
+  This is **not** the same bug as [#69](https://github.com/initMAX/zabbix-mcp-server/issues/69) in v1.35, which was OAuth client registration writing to `config.toml` at runtime. The reporter's data ruled that out: his config file was older than the running process and he had no `[oauth_clients.*]` sections at all.
+
+### Verified
+
+- 425 unit + e2e tests (two pre-existing macOS-only symlink failures aside), including 9 new ones that drive the real `_render_servers_list()` rather than a copy of its comparison - the bug was in where the two operands came from, so a test that re-implemented the check would have passed against the broken code. Confirmed to fail on the pre-fix code (3 of 9), while the six "a genuine change must still raise it" cases pass on both.
+- Reproduced end to end in the admin portal on a live server: with a trailing slash in the URL, v1.36 showed the banner, the header badge and a "Config changed" card on `/servers` (and a clean dashboard until that page was opened); with the fix and the slash still in place, four consecutive renders stayed clean; changing the URL to a genuinely different host raised all three again immediately.
+- CRUD smoke against live Zabbix; installer matrix 18/18.
+
 ## v1.36 - 2026-08-07
 
 Report delivery, finished: v1.35 could not actually write to disk, and the link it handed back was one an MCP client could open but a person could not.
