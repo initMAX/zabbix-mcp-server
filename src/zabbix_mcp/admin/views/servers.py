@@ -59,6 +59,21 @@ def _parse_timeout(raw) -> int:
     return v
 
 
+def _normalize_url(url: str) -> str:
+    """Normalise a Zabbix URL the way the config loader does.
+
+    The two sides of the drift check come from different places: this
+    page reads the raw TOML string, while ``live_config`` went through
+    the loader, which strips the trailing slash (``config.py``). Comparing
+    them unnormalised reports permanent drift for any URL written as
+    ``https://host/`` - and restarting cannot clear it, because the next
+    boot strips the slash again and the page compares the same two values
+    (reported by @G0nz0uk in #67: a restart banner that survived every
+    restart and appeared only on this page).
+    """
+    return (url or "").rstrip("/")
+
+
 def _render_servers_list(request: Request, admin_app, extra: dict | None = None) -> Response:
     """Render the /servers page. Shared by `servers_view` (GET) and
     `server_create` so that a validation failure on Add Server can
@@ -113,7 +128,8 @@ def _render_servers_list(request: Request, admin_app, extra: dict | None = None)
             # not yet active.
             config_changed = True
             drift_detected = True
-        elif live_config and cfg.get("url") and cfg["url"] != live_config.url:
+        elif (live_config and cfg.get("url")
+                and _normalize_url(cfg["url"]) != _normalize_url(live_config.url)):
             config_changed = True
             drift_detected = True
 
