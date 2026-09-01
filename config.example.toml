@@ -597,10 +597,18 @@ update_check_enabled = true
 # The /api_jsonrpc.php path is added automatically by the API client.
 url = "https://zabbix.example.com"
 
-# Zabbix API token for authentication (REQUIRED).
-# This authenticates the MCP server to Zabbix — NOT the same as auth_token above.
-# Create one in Zabbix: User settings > API tokens > Create API token.
-# Tokens inherit the permissions of the Zabbix user they belong to.
+# Zabbix API token for authentication. This authenticates the MCP server
+# to Zabbix — NOT the same as auth_token above. Create one in Zabbix 5.4+:
+# User settings > API tokens > Create API token. Tokens inherit the
+# permissions of the Zabbix user they belong to.
+#
+# Either `api_token` OR `username` + `password` must be set. Zabbix 5.0-5.2
+# do NOT support API tokens, so use the username/password pair there:
+#
+#   username = "zabbix-mcp"
+#   password = "${ZABBIX_PROD_PASSWORD}"
+#
+# When api_token is present it takes precedence over username/password.
 api_token = "your-api-token-here"
 
 # You can reference an environment variable instead of storing the token in plain text:
@@ -644,6 +652,9 @@ verify_ssl = true
 # [zabbix.staging]
 # url = "https://zabbix-staging.example.com"
 # api_token = "${ZABBIX_STAGING_TOKEN}"
+# ... or, for Zabbix 5.0-5.2 (no API tokens), use login credentials instead:
+# username = "zabbix-mcp"
+# password = "${ZABBIX_STAGING_PASSWORD}"
 # read_only = false
 # verify_ssl = false
 # skip_version_check = false

@@ -143,7 +143,8 @@ _USER_METHODS: list[MethodDef] = [
             "it can no longer be used for API calls. Good practice for cleanup "
             "after scripted workflows. Requires ``auth_sessionid`` to be set "
             "to the session id from a prior ``user.login`` call - the "
-            "configured server-level api_token cannot be used here because "
+            "configured server-level credentials (api_token or username/password) "
+            "cannot be used here because "
             "logging it out would break every subsequent call from this MCP."
         ),
         read_only=False,
@@ -151,8 +152,9 @@ _USER_METHODS: list[MethodDef] = [
             ParamDef(
                 "auth_sessionid", "str",
                 "Session id from a prior user.login call. The MCP wrapper "
-                "uses this for the auth field instead of the server-level "
-                "api_token, so invalidating it does not affect other tools.",
+                "uses this for the auth field instead of the configured "
+                "server credentials, so invalidating it does not affect "
+                "other tools.",
                 required=True,
             ),
         ],
@@ -164,7 +166,8 @@ _USER_METHODS: list[MethodDef] = [
             "Check whether a session is still valid. Returns the authenticated "
             "user's details if so. Requires ``auth_sessionid`` to be set to a "
             "session id (typically from a prior ``user.login``); the configured "
-            "server-level api_token cannot validate against the session table."
+            "server credentials (api_token or username/password) cannot "
+            "validate against the session table."
         ),
         read_only=True,
         params=[
@@ -380,7 +383,8 @@ _USERDIRECTORY_METHODS: list[MethodDef] = [
             "that Zabbix can connect to the directory server with the provided "
             "parameters and optionally performs a test authentication. Use this "
             "before creating or updating a directory to validate settings. "
-            "Authenticates with the configured server-level api_token by default; "
+            "Authenticates with the configured server-level credentials (api_token or "
+            "username/password) by default; "
             "set ``auth_sessionid`` to a session id from ``user.login`` if your "
             "Zabbix configuration restricts userdirectory.test to interactive "
             "sessions."
@@ -391,7 +395,7 @@ _USERDIRECTORY_METHODS: list[MethodDef] = [
                 "auth_sessionid", "str",
                 "Optional session id from a prior user.login call. When set, "
                 "the wrapper uses it for the JSON-RPC auth header instead of "
-                "the configured api_token.",
+                "the configured server credentials.",
             ),
             ParamDef(
                 "params", "dict",

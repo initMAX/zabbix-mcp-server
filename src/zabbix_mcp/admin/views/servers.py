@@ -193,6 +193,11 @@ async def server_create(request: Request) -> Response:
     # what stops the mismatch existing at all.
     url = _normalize_url(str(form.get("url", "")).strip())
     api_token = str(form.get("api_token", "")).strip()
+    # Zabbix < 5.4 has no API tokens — username/password is the
+    # alternative. `password` may stay empty on create (nothing to keep);
+    # it is only stored when the operator typed something.
+    username = str(form.get("username", "")).strip()
+    password = str(form.get("password", "")).strip()
     read_only = "read_only" in form
     verify_ssl = "verify_ssl" in form
     request_timeout = _parse_timeout(form.get("request_timeout"))
@@ -207,6 +212,8 @@ async def server_create(request: Request) -> Response:
             "form_name": name,
             "form_url": url,
             "form_api_token": api_token,
+            "form_username": username,
+            "form_password": password,
             "form_read_only": read_only,
             "form_verify_ssl": verify_ssl,
         })
@@ -231,6 +238,13 @@ async def server_create(request: Request) -> Response:
     except Exception as exc:
         return _err(f"Invalid URL: {exc}")
 
+    # Auth method: Zabbix < 5.4 has no API tokens, so username/password
+    # is the fallback (mirrors _parse_zabbix_server in config.py). At
+    # least one method must be provided; if the operator picked
+    # username/password, both fields are required.
+    if not api_token and (not username or not password):
+        return _err("Provide an API token, or a username and password pair (Zabbix < 5.4 has no API tokens).")
+
     # Explicit duplicate-name check before tomlkit raises
     # `KeyAlreadyPresent: Key "<name>" already exists.` and we have to
     # reformat its internal "Key" wording into a user-facing
@@ -251,6 +265,13 @@ async def server_create(request: Request) -> Response:
             "verify_ssl": verify_ssl,
             "request_timeout": request_timeout,
         }
+        # Persist username/password only when filled. Empty password on a
+        # fresh server means the operator left the field blank (nothing to
+        # keep yet), so we simply do not write it.
+        if username:
+            server_data["username"] = username
+        if password:
+            server_data["password"] = password
         add_config_table(admin_app.config_path, "zabbix", name, server_data)
         logger.info("Zabbix server '%s' added by %s", name, session.user)
         client_ip = request.client.host if request.client else ""
@@ -315,6 +336,12 @@ async def server_edit(request: Request) -> Response:
     new_name = str(form.get("name", "")).strip()
     url = _normalize_url(str(form.get("url", "")).strip())
     api_token = str(form.get("api_token", "")).strip()
+    # Zabbix < 5.4 auth. username follows the same "text field, blank =
+    # clear" rule as frontend_username; password follows the "leave empty
+    # to keep" rule as frontend_password / api_token. Clearing the
+    # username also drops the stored password so no orphan secret lingers.
+    username = str(form.get("username", "")).strip()
+    password = str(form.get("password", "")).strip()
     read_only = "read_only" in form
     verify_ssl = "verify_ssl" in form
     request_timeout = _parse_timeout(form.get("request_timeout"))
@@ -368,6 +395,16 @@ async def server_edit(request: Request) -> Response:
             # User cleared username -> also drop password to avoid
             # orphan secret stored without a matching username.
             zabbix[server_name].pop("frontend_password", None)
+
+        # Zabbix API auth: username is a plaintext field that always
+        # writes (blank = clear). password only overwrites when the
+        # operator typed a new value; clearing the username also removes
+        # the stored password so a secret never lingers without its user.
+        zabbix[server_name]["username"] = username
+        if password:
+            zabbix[server_name]["password"] = password
+        elif not username:
+            zabbix[server_name].pop("password", None)
 
         if renamed:
             # tomlkit has no rename — copy the table data into a new entry
@@ -467,7 +504,7 @@ def _friendly_error(exc: Exception) -> str:
     if "ssl" in lower or "certificate" in lower:
         return "TLS handshake failed. Check the certificate or set verify_ssl = false in config.toml."
     if "401" in msg or "unauthorized" in lower:
-        return "Zabbix returned 401. The API token is invalid or expired."
+        return "Zabbix returned 401. The API token or username/password is invalid or expired."
     if "403" in msg or "forbidden" in lower:
         # Cloudflare / generic WAF in front of the Zabbix frontend
         # randomly returns 403 to direct JSON-RPC POSTs (no browser
@@ -491,6 +528,29 @@ def _friendly_error(exc: Exception) -> str:
     return msg
 
 
+def _probe_user_login(url: str, username: str, password: str, verify_ssl: bool) -> tuple[bool, str]:
+    """Probe a Zabbix server using username/password auth (Zabbix < 5.4).
+
+    Returns ``(auth_ok, version)``: ``auth_ok`` is False when the API is
+    reachable but the credentials were rejected (the API answered
+    ``api_version()`` but ``host.get`` failed). Raises on connection /
+    TLS / DNS failures so the caller can show a red error.
+
+    Mirrors the two-step check the token path already runs: the green
+    status must mean "credentials work", not just "Zabbix answered".
+    """
+    from zabbix_utils import ZabbixAPI
+    api = ZabbixAPI(url=url, validate_certs=verify_ssl, skip_version_check=True)
+    # Raises on bad credentials as well as connection problems.
+    api.login(user=username, password=password)
+    version = str(api.api_version())
+    try:
+        api.host.get(limit=1, output=["hostid"])
+        return True, version
+    except Exception:
+        return False, version
+
+
 async def server_test(request: Request) -> Response:
     """Test connection to a specific Zabbix server (HTMX endpoint)."""
     admin_app = request.app.state.admin_app
@@ -503,26 +563,60 @@ async def server_test(request: Request) -> Response:
 
     from starlette.responses import HTMLResponse
     import html as _html
+
+    # Servers configured with username/password (Zabbix < 5.4) can't go
+    # through client_manager.check_connection, which always logs in with
+    # the API token. Read the *saved* config so we test exactly what will
+    # be loaded on restart; fall back to check_connection for
+    # token-authenticated servers.
+    saved = {}
     try:
-        result = await asyncio.to_thread(client_manager.check_connection, server_name)
-        version = _html.escape(client_manager.get_version(server_name))
-        if result.get("token_ok"):
+        doc = load_config_document(admin_app.config_path)
+        saved = dict(doc.get("zabbix", {}).get(server_name, {}) or {})
+    except Exception:
+        pass
+
+    if not saved.get("api_token"):
+        # No API token -> username/password login (Zabbix < 5.4).
+        try:
+            auth_ok, version = await asyncio.to_thread(
+                _probe_user_login,
+                saved.get("url", ""),
+                str(saved.get("username", "") or ""),
+                str(saved.get("password", "") or ""),
+                bool(saved.get("verify_ssl", True)),
+            )
+        except Exception as e:
+            msg = _html.escape(_friendly_error(e))
+            return HTMLResponse(
+                f'<span class="status-dot status-dot-red"></span> Error'
+                f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-danger);">{msg}</span>'
+            )
+        if auth_ok:
             return HTMLResponse(
                 f'<span class="status-dot status-dot-green"></span> Connected'
-                f'<span style="margin-left:8px;">Zabbix {version}</span>'
+                f'<span style="margin-left:8px;">Zabbix {_html.escape(version)}</span>'
                 f'<span class="test-ok" style="margin-left:8px; color:var(--color-success); animation: fadeOut 2s forwards;">&#x2713;</span>'
             )
-        else:
-            return HTMLResponse(
-                f'<span class="status-dot status-dot-yellow"></span> API online'
-                f'<span style="margin-left:8px;">Zabbix {version}</span>'
-                f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-warning);">&#x26A0; Token invalid or expired</span>'
-            )
-    except Exception as e:
-        msg = _html.escape(_friendly_error(e))
         return HTMLResponse(
-            f'<span class="status-dot status-dot-red"></span> Error'
-            f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-danger);">{msg}</span>'
+            f'<span class="status-dot status-dot-yellow"></span> API online'
+            f'<span style="margin-left:8px;">Zabbix {_html.escape(version)}</span>'
+            f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-warning);">&#x26A0; Invalid credentials</span>'
+        )
+
+    result = await asyncio.to_thread(client_manager.check_connection, server_name)
+    version = _html.escape(client_manager.get_version(server_name))
+    if result.get("token_ok"):
+        return HTMLResponse(
+            f'<span class="status-dot status-dot-green"></span> Connected'
+            f'<span style="margin-left:8px;">Zabbix {version}</span>'
+            f'<span class="test-ok" style="margin-left:8px; color:var(--color-success); animation: fadeOut 2s forwards;">&#x2713;</span>'
+        )
+    else:
+        return HTMLResponse(
+            f'<span class="status-dot status-dot-yellow"></span> API online'
+            f'<span style="margin-left:8px;">Zabbix {version}</span>'
+            f'<span style="margin-left:8px; font-size:0.8em; color:var(--color-warning);">&#x26A0; Invalid token or credentials</span>'
         )
 
 
@@ -586,6 +680,8 @@ async def server_test_new(request: Request) -> Response:
     form = await request.form()
     url = str(form.get("url", "")).strip()
     api_token = str(form.get("api_token", "")).strip()
+    username = str(form.get("username", "")).strip()
+    password = str(form.get("password", "")).strip()
     verify_ssl = form.get("verify_ssl") == "1"
 
     # SECURITY: validate URL scheme and block internal/private addresses (SSRF prevention)
@@ -649,13 +745,21 @@ async def server_test_new(request: Request) -> Response:
     except (socket.gaierror, ValueError):
         pass  # Let ZabbixAPI handle DNS errors
 
-    if not url or not api_token:
-        return HTMLResponse('<span class="text-danger">URL and API token are required</span>')
+    if not url:
+        return HTMLResponse('<span class="text-danger">URL is required</span>')
+
+    # Auth method: either an API token or a username/password pair
+    # (Zabbix < 5.4 has no API tokens). Mirrors _parse_zabbix_server.
+    if not api_token and (not username or not password):
+        return HTMLResponse('<span class="text-danger">Provide an API token, or a username and password pair</span>')
 
     try:
         from zabbix_utils import ZabbixAPI
         api = ZabbixAPI(url=url, validate_certs=verify_ssl, skip_version_check=True)
-        api.login(token=api_token)
+        if api_token:
+            api.login(token=api_token)
+        else:
+            api.login(user=username, password=password)
         version = _html.escape(str(api.api_version()))
     except Exception as e:
         msg = _html.escape(_friendly_error(e))
@@ -665,10 +769,10 @@ async def server_test_new(request: Request) -> Response:
         )
     # api_version() is unauthenticated - it only proves the URL
     # points at a Zabbix frontend. Hit an authenticated method too
-    # so the green status reflects "token works" not just "Zabbix
-    # answered". Reported 2026-04-27 with a video where the dialog
-    # said OK against a wrong api_token. Mirrors the same two-step
-    # check the live `/servers/<n>/test` endpoint already runs.
+    # so the green status reflects "credentials work" not just
+    # "Zabbix answered". Reported 2026-04-27 with a video where the
+    # dialog said OK against a wrong api_token. Mirrors the same
+    # two-step check the live `/servers/<n>/test` endpoint already runs.
     try:
         api.host.get(limit=1, output=["hostid"])
         return HTMLResponse(
@@ -678,5 +782,5 @@ async def server_test_new(request: Request) -> Response:
     except Exception:
         return HTMLResponse(
             f'<span class="status-dot status-dot-yellow"></span>'
-            f'<span style="color:var(--color-warning);"> API online (Zabbix {version}) but the API token was rejected. Check that the token has at least read permissions.</span>'
+            f'<span style="color:var(--color-warning);"> API online (Zabbix {version}) but the credentials were rejected. Check that the token or username/password has at least read permissions.</span>'
         )
