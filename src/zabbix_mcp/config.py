@@ -47,6 +47,12 @@ class ZabbixServerConfig:
     read_only: bool = True
     verify_ssl: bool = True
     skip_version_check: bool = False
+    # Optional username + password for Zabbix < 5.4 (API tokens only
+    # exist from 5.4 onward). When `api_token` is set it takes
+    # precedence; these may coexist so ``graph_render`` can still log
+    # in to the frontend.
+    username: str = ""
+    password: str = ""
     # Optional username + password used by ``graph_render`` to acquire
     # a Zabbix frontend session cookie when the API token alone is
     # rejected by ``/chart2.php`` (Zabbix 6.0+ frontend uses signed
@@ -380,18 +386,31 @@ def _parse_zabbix_server(name: str, srv: object) -> "ZabbixServerConfig":
             f"IPv4/IPv6 address."
         )
     api_token = srv.get("api_token")
-    if not api_token:
-        raise ConfigError(f"Zabbix server '{name}' is missing 'api_token'")
-    api_token = _resolve_env_vars(api_token)
-    if not api_token.strip():
-        raise ConfigError(
-            f"Zabbix server '{name}' has empty 'api_token' after resolving "
-            f"environment variables"
-        )
+    username = str(srv.get("username", "") or "")
+    password = str(srv.get("password", "") or "")
+    if api_token:
+        # API token takes precedence when present.
+        api_token = _resolve_env_vars(api_token)
+        if not api_token.strip():
+            raise ConfigError(
+                f"Zabbix server '{name}' has empty 'api_token' after resolving "
+                f"environment variables"
+            )
+    else:
+        # Zabbix < 5.4 has no API tokens: fall back to user.login.
+        if not username or not password:
+            raise ConfigError(
+                f"Zabbix server '{name}' is missing 'api_token' (Zabbix < 5.4) "
+                f"or 'username'/'password'"
+            )
+    username = _resolve_env_vars(username)
+    password = _resolve_env_vars(password)
     return ZabbixServerConfig(
         name=name,
         url=url.rstrip("/"),
         api_token=api_token,
+        username=username,
+        password=password,
         read_only=srv.get("read_only", True),
         verify_ssl=srv.get("verify_ssl", True),
         skip_version_check=srv.get("skip_version_check", False),

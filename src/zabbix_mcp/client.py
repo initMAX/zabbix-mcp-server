@@ -210,13 +210,24 @@ class ClientManager:
         # 300 s default matches Zabbix PHP frontend's max_execution_time
         # so expensive exports / long history.get ranges can complete.
         timeout = getattr(srv, "request_timeout", 300) or 300
+        # zabbix-utils only supports Zabbix >= 6.0 by default (its version
+        # gate is __min_supported__ = 6.0). When authenticating with
+        # username/password we may be talking to Zabbix 5.0-5.2 (which has
+        # no API tokens), so skip the version check. Token auth implies
+        # Zabbix 5.4+ and keeps the user-controlled skip_version_check.
+        skip_version_check = srv.skip_version_check or (not srv.api_token)
         api = ZabbixAPI(
             url=srv.url,
             ssl_context=_build_ssl_context(srv.verify_ssl),
-            skip_version_check=srv.skip_version_check,
+            skip_version_check=skip_version_check,
             timeout=timeout,
         )
-        api.login(token=srv.api_token)
+        if srv.api_token:
+            logger.info("Authenticating to '%s' using API token", name)
+            api.login(token=srv.api_token)
+        else:
+            logger.info("Authenticating to '%s' using user/password", name)
+            api.login(user=srv.username, password=srv.password)
 
         version = api.api_version()
         logger.info("Connected to '%s' - Zabbix %s", name, version)
@@ -375,7 +386,7 @@ class ClientManager:
         return obj(**params)
 
     def check_connection(self, server: str) -> dict:
-        """Verify connectivity and token auth to a Zabbix server.
+        """Verify connectivity and auth (API token or user/password) to a Zabbix server.
 
         Returns dict with 'api_ok' and 'token_ok' status.
         Raises on connection failure.

@@ -1537,9 +1537,10 @@ def _make_tool_handler(
         # session (user.logout, user.checkAuthentication,
         # userdirectory.test) accept an ``auth_sessionid`` parameter
         # that the wrapper uses for the JSON-RPC ``auth`` field
-        # instead of the configured api_token. Lets the caller log in
-        # via user.login first, then exercise these tools without
-        # invalidating the long-lived MCP api_token.
+        # instead of the configured server credentials (api_token or
+        # username/password). Lets the caller log in via user.login
+        # first, then exercise these tools without invalidating the
+        # long-lived MCP server auth session.
         # Only the three session-scoped methods are allowed to consume
         # ``auth_sessionid``. Any other tool that receives the kwarg
         # gets it silently dropped so a caller cannot reroute (say)

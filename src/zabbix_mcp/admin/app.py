@@ -683,7 +683,7 @@ class AdminApp:
                 if result.get("token_ok"):
                     results[name] = {"status": "online", "version": version}
                 else:
-                    results[name] = {"status": "token_error", "version": version, "error": "API online but token invalid or expired"}
+                    results[name] = {"status": "token_error", "version": version, "error": "API online but authentication failed (invalid token or credentials)"}
             except Exception as e:
                 results[name] = {"status": "error", "error": str(e)[:100]}
         # Sections skipped at config load: report the validation error

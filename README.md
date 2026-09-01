@@ -84,7 +84,7 @@ Done. The server is running on `http://127.0.0.1:8080/mcp`.
 
 - Linux server with Python 3.10+
 - Network access to your Zabbix server(s)
-- Zabbix API token ([User settings > API tokens](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens))
+- A Zabbix account to authenticate with: an **API token** ([User settings > API tokens](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens), Zabbix 5.4+) or **username + password** (Zabbix 5.0 – 5.2, which has no API tokens)
 
 ### Install
 
@@ -193,6 +193,10 @@ url = "https://zabbix.example.com"
 api_token = "your-api-token"
 read_only = true
 verify_ssl = true
+
+# Zabbix 5.0 – 5.2 has no API tokens: use username + password instead:
+# username = "zabbix-mcp"
+# password = "${ZABBIX_PROD_PASSWORD}"
 ```
 
 All available options with detailed descriptions are documented in [`config.example.toml`](config.example.toml).
@@ -211,7 +215,7 @@ The config file contains **two different types of tokens** that serve different 
                                     └──────────────────┘
 ```
 
-**`api_token`** (in `[zabbix.*]`) — **required** — authenticates the MCP server to your Zabbix instance. This is a [Zabbix API token](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens) that you create in the Zabbix frontend.
+**`api_token`** (in `[zabbix.*]`) — authenticates the MCP server to your Zabbix instance. This is a [Zabbix API token](https://www.zabbix.com/documentation/current/en/manual/web_interface/frontend_sections/users/api_tokens) that you create in the Zabbix frontend. It is **required** unless you authenticate with `username`/`password` instead — see [Zabbix 5.0 and older](#zabbix-50-and-older-no-api-tokens) below.
 
 How to create one:
 
@@ -229,6 +233,41 @@ The token inherits the permissions of the Zabbix user it belongs to:
 | Complete API access (users, settings, global scripts) | **Super admin** role | `false` |
 
 Use the principle of least privilege — create a dedicated Zabbix user for the MCP server with only the permissions it needs.
+
+#### Zabbix 5.0 and older (no API tokens)
+
+Zabbix only introduced API tokens in **5.4**. On Zabbix **5.0 – 5.2**, authenticate with `username`/`password` instead — the MCP server calls `user.login` on every connection:
+
+```toml
+[zabbix.production]
+url = "https://zabbix.example.com"
+username = "zabbix-mcp"          # dedicated low-privilege account
+password = "${ZABBIX_PROD_PASSWORD}"
+read_only = true
+```
+
+`api_token` takes precedence when both are set. The same least-privilege rule applies: use a dedicated Zabbix user with only the permissions the MCP tools need.
+
+**Keeping the password out of the config file:** `username` and `password` support `${ENV_VAR}` expansion, so you can store the secret in an environment variable instead of plaintext in `config.toml`. Under Docker, add the variable to your `.env` file (the compose file injects it via `env_file`):
+
+```bash
+# .env
+ZABBIX_PROD_USER=zabbix-mcp
+ZABBIX_PROD_PASSWORD=your-password-here
+```
+
+```toml
+# config.toml
+[zabbix.production]
+url = "https://zabbix.example.com"
+username = "${ZABBIX_PROD_USER}"
+password = "${ZABBIX_PROD_PASSWORD}"
+read_only = true
+```
+
+The variable name is up to you (`ZBX_PASSWORD`, `ZABBIX_PASSWORD`, ...) as long as the `${...}` reference in TOML matches the variable in the environment of the running process/container.
+
+> **Zabbix 5.0 note:** the underlying `zabbix-utils` library only supports Zabbix ≥ 6.0 by default. The MCP server automatically skips the version compatibility check whenever it authenticates with `username`/`password`, so no extra config is needed on Zabbix 5.0.
 
 #### MCP Authentication (optional)
 
@@ -293,7 +332,8 @@ read_only = true
 
 [zabbix.staging]
 url = "https://zabbix-staging.example.com"
-api_token = "staging-token"
+username = "zabbix-mcp"
+password = "${ZABBIX_STAGING_PASSWORD}"
 read_only = false
 ```
 
@@ -1024,8 +1064,9 @@ All available options with detailed descriptions are in [`config.example.toml`](
 <tr><td><code>allowed_import_dirs</code></td><td>Directories for <code>source_file</code> imports (default: disabled)</td></tr>
 <tr><td><code>compact_output</code></td><td>Return only key fields from get methods (default: <code>true</code>); set to <code>false</code> to always return all fields</td></tr>
 <tr><td><code>response_max_chars</code></td><td>Maximum characters per tool response before truncation (default: <code>50000</code>, min: <code>5000</code>). Increase for template export workflows: <code>200000</code> for medium templates, <code>500000</code> for large built-in templates. See <a href="#token-budget">Token Budget</a></td></tr>
-<tr><td rowspan="5"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL (must start with <code>http://</code> or <code>https://</code>)</td></tr>
-<tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>)</td></tr>
+<tr><td rowspan="6"><code>[zabbix.&lt;name&gt;]</code></td><td><code>url</code></td><td>Zabbix frontend URL (must start with <code>http://</code> or <code>https://</code>)</td></tr>
+<tr><td><code>api_token</code></td><td>API token (supports <code>${ENV_VAR}</code>) — required unless <code>username</code>/<code>password</code> is set (Zabbix &lt; 5.4)</td></tr>
+<tr><td><code>username</code> / <code>password</code></td><td>Zabbix login credentials for versions without API tokens (Zabbix 5.0 – 5.2); the server calls <code>user.login</code>. Only used when <code>api_token</code> is empty</td></tr>
 <tr><td><code>read_only</code></td><td>Block write operations (default: <code>true</code>)</td></tr>
 <tr><td><code>verify_ssl</code></td><td>Verify TLS certificates (default: <code>true</code>)</td></tr>
 <tr><td><code>skip_version_check</code></td><td>Skip zabbix-utils version compatibility check (default: <code>false</code>)</td></tr>

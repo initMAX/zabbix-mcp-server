@@ -32,9 +32,29 @@
             <input type="url" name="url" id="srv-url" class="form-input" value="{{ server.url | default('') }}" required>
         </div>
         <div class="form-group">
-            <label class="form-label">API Token <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix API token (User settings -> API tokens in Zabbix UI). Must have permissions for the actions the AI client will perform. Leave empty here to keep the current value.">&#x1F6C8;</span></label>
+            <label class="form-label">API Token <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix API token (User settings -> API tokens in Zabbix UI). Must have permissions for the actions the AI client will perform. Zabbix 5.4+ only - for older versions use the username/password fields below instead. Leave empty here to keep the current value.">&#x1F6C8;</span></label>
             <input type="password" name="api_token" id="srv-token" class="form-input" value="" placeholder="Leave empty to keep current" autocomplete="off">
-            <small class="text-muted">Leave empty to keep the current token. Current: <code>{{ server.api_token[:8] }}...{{ server.api_token[-4:] }}</code></small>
+            <small class="text-muted">
+                {% if server.api_token %}
+                Leave empty to keep the current token. Current: <code>{{ server.api_token[:8] }}...{{ server.api_token[-4:] }}</code>
+                {% else %}
+                No API token configured for this server &mdash; authentication uses the username/password below.
+                {% endif %}
+            </small>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Username <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix user for servers without API tokens (Zabbix < 5.4). The MCP server logs in with user.login. Ignored when an API token is set. Leave empty to clear the stored username (also clears the password).">&#x1F6C8;</span></label>
+            <input type="text" name="username" id="srv-user" class="form-input" value="{{ server.username | default('') }}" autocomplete="off" placeholder="e.g. zabbix-api">
+            <small class="text-muted">Used when no API token is set. Leave empty to clear it (and the stored password).</small>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password <span class="tooltip-icon" tabindex="0" data-tooltip="Password for the username above. Leave empty to keep the current value. To remove it, clear the username field above.">&#x1F6C8;</span></label>
+            <input type="password" name="password" id="srv-pass" class="form-input" value="" placeholder="{% if server.password %}Leave empty to keep current{% else %}Not configured{% endif %}" autocomplete="new-password">
+            <small class="text-muted">
+                {% if server.password %}Password is set. Leave empty to keep it; type a new value to replace it. Use <code>${ENV_VAR}</code> to reference an environment variable.
+                {% else %}Not configured. Required unless an API token is set.
+                {% endif %}
+            </small>
         </div>
         <div class="form-group" style="display:flex; gap:24px;">
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;" tabindex="0" data-tooltip="When checked, MCP tools that mutate Zabbix data (host_create, item_update, ...) are blocked at the server level. Recommended for production: leave checked and grant per-token write scope only when needed.">
@@ -113,7 +133,7 @@ function _parseTestResponse(container, responseText) {
         var ver = versionMatch ? versionMatch[1] : '';
         _setTestResult(container, 'status-dot-green', 'Connected' + (ver ? ' — Zabbix ' + ver : ''));
     } else if (yellowDot) {
-        _setTestResult(container, 'status-dot-yellow', 'API online — Token invalid or expired');
+        _setTestResult(container, 'status-dot-yellow', 'API online — Invalid credentials');
     } else if (redDot) {
         var errSpan = doc.querySelector('span[style*="color:var(--color-danger)"]');
         var msg = errSpan ? errSpan.textContent.trim() : doc.body.textContent.trim();
@@ -138,14 +158,16 @@ function _csrfHeader() {
 function testEditServer() {
     var url = document.getElementById('srv-url').value;
     var token = document.getElementById('srv-token').value;
+    var username = document.getElementById('srv-user').value;
+    var password = document.getElementById('srv-pass').value;
     var ssl = document.getElementById('srv-ssl').checked;
     var result = document.getElementById('edit-test-result');
     _setTestResult(result, '', 'Testing...');
 
     var csrf = _csrfHeader();
 
-    // If token is empty, we can't test with a new token — test existing connection
-    if (!token) {
+    // Nothing new typed — test the existing saved connection.
+    if (!token && !username && !password) {
         fetch('/servers/{{ edit_server_name }}/test', {method: 'POST', headers: csrf})
             .then(function(r) { return r.text(); })
             .then(function(html) { _parseTestResponse(result, html); })
@@ -156,7 +178,11 @@ function testEditServer() {
     fetch('/servers/test-new', {
         method: 'POST',
         headers: Object.assign({'Content-Type': 'application/x-www-form-urlencoded'}, csrf),
-        body: 'url=' + encodeURIComponent(url) + '&api_token=' + encodeURIComponent(token) + '&verify_ssl=' + (ssl ? '1' : '0'),
+        body: 'url=' + encodeURIComponent(url)
+            + '&api_token=' + encodeURIComponent(token)
+            + '&username=' + encodeURIComponent(username)
+            + '&password=' + encodeURIComponent(password)
+            + '&verify_ssl=' + (ssl ? '1' : '0'),
     })
     .then(function(r) { return r.text(); })
     .then(function(html) { _parseTestResponse(result, html); })

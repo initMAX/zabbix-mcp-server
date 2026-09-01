@@ -42,9 +42,17 @@
             <input type="url" name="url" class="form-input" placeholder="https://zabbix.example.com" required value="{{ form_url | default('') }}">
         </div>
         <div class="form-group">
-            <label class="form-label">API Token <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix API token (User settings -> API tokens in the Zabbix UI). Must have permissions for the actions the AI client will perform.">&#x1F6C8;</span></label>
-            <input type="text" name="api_token" class="form-input" placeholder="Zabbix API token" required value="{{ form_api_token | default('') }}">
-            <small class="text-muted">Create in Zabbix: User settings &rarr; API tokens</small>
+            <label class="form-label">API Token <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix API token (User settings -> API tokens in the Zabbix UI). Must have permissions for the actions the AI client will perform. Zabbix 5.4+ only - for older versions use the username/password fields below instead.">&#x1F6C8;</span></label>
+            <input type="text" name="api_token" class="form-input" placeholder="Zabbix API token" value="{{ form_api_token | default('') }}">
+            <small class="text-muted">Create in Zabbix: User settings &rarr; API tokens. Leave empty when using username/password below (Zabbix &lt; 5.4).</small>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Username <span class="tooltip-icon" tabindex="0" data-tooltip="Zabbix user for servers without API tokens (Zabbix < 5.4). The MCP server logs in with user.login. Ignored when an API token is set.">&#x1F6C8;</span></label>
+            <input type="text" name="username" class="form-input" placeholder="e.g. zabbix-api" value="{{ form_username | default('') }}" autocomplete="off">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Password <span class="tooltip-icon" tabindex="0" data-tooltip="Password for the username above. Required when no API token is set.">&#x1F6C8;</span></label>
+            <input type="password" name="password" class="form-input" placeholder="Password" value="{{ form_password | default('') }}" autocomplete="new-password">
         </div>
         <div class="form-group" style="display:flex; gap:24px;">
             <label style="display:flex; align-items:center; gap:8px; cursor:pointer;" tabindex="0" data-tooltip="When checked, MCP tools that mutate Zabbix data (host_create, item_update, ...) are blocked at the server level. Recommended for production: leave checked and grant per-token write scope only when needed.">
@@ -90,7 +98,7 @@
             _setTestResult(container, 'status-dot-green', 'Connected' + (ver ? ' — Zabbix ' + ver : ''));
             return true;
         } else if (doc.querySelector('.status-dot-yellow')) {
-            _setTestResult(container, 'status-dot-yellow', 'API online — Token invalid or expired');
+            _setTestResult(container, 'status-dot-yellow', 'API online — Invalid credentials');
             return false;
         } else if (doc.querySelector('.status-dot-red')) {
             var errSpan = doc.querySelector('span[style*="color:var(--color-danger)"]');
@@ -115,6 +123,8 @@
         }
         var url = form.querySelector('[name=url]').value;
         var token = form.querySelector('[name=api_token]').value;
+        var username = form.querySelector('[name=username]').value;
+        var password = form.querySelector('[name=password]').value;
         var ssl = form.querySelector('[name=verify_ssl]').checked;
         var result = document.getElementById('add-test-result');
         var btn = document.getElementById('add-save-btn');
@@ -126,7 +136,11 @@
         fetch('/servers/test-new', {
             method: 'POST',
             headers: _headers,
-            body: 'url=' + encodeURIComponent(url) + '&api_token=' + encodeURIComponent(token) + '&verify_ssl=' + (ssl ? '1' : '0'),
+            body: 'url=' + encodeURIComponent(url)
+                + '&api_token=' + encodeURIComponent(token)
+                + '&username=' + encodeURIComponent(username)
+                + '&password=' + encodeURIComponent(password)
+                + '&verify_ssl=' + (ssl ? '1' : '0'),
         })
         .then(function(r) { return r.text(); })
         .then(function(html) {
