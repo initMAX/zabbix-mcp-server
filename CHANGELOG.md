@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **The admin portal kept reporting the pre-upgrade Zabbix version after a reconnect** ([#89](https://github.com/initMAX/zabbix-mcp-server/issues/89)). `_reconnect` replaced the cached connection but not the cached version, so Test Connection logged the new release while the server pages kept showing the one from the first connect. The version cache is now refreshed on every reconnect, covering both Test Connection and the auto-reconnect in `call()`.
+
 ## v1.37.1 - 2026-10-02
 
 Three security fixes, two of them from a contributor's fork. Please upgrade.

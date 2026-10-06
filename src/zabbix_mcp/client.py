@@ -270,6 +270,13 @@ class ClientManager:
             self._clients.pop(name, None)
             client = self._connect(name)
             self._clients[name] = client
+            # A reconnect sees the server as it is NOW - most visibly a
+            # Zabbix upgrade behind the same URL. Refresh the cached
+            # version alongside the cached connection, otherwise
+            # get_version() (and the admin pages reading it) keep
+            # reporting the pre-upgrade release even after Test
+            # Connection already logged the new one (issue #89).
+            self._versions[name] = str(client.api_version())
             return client
 
     def resolve_server(self, server: str | None) -> str:
