@@ -1,10 +1,17 @@
 # Changelog
 
-## Unreleased
+## v1.37.2 - 2026-10-06
+
+One contributed fix for a case we had never thought to test: a Zabbix upgrade behind the same URL.
 
 ### Fixed
 
-- **The admin portal kept reporting the pre-upgrade Zabbix version after a reconnect** ([#89](https://github.com/initMAX/zabbix-mcp-server/issues/89)). `_reconnect` replaced the cached connection but not the cached version, so Test Connection logged the new release while the server pages kept showing the one from the first connect. The version cache is now refreshed on every reconnect, covering both Test Connection and the auto-reconnect in `call()`.
+- **The admin portal kept reporting the pre-upgrade Zabbix version after a reconnect** ([#89](https://github.com/initMAX/zabbix-mcp-server/issues/89), reported by [@keukie](https://github.com/keukie); [PR #90](https://github.com/initMAX/zabbix-mcp-server/pull/90) by [@helenanova](https://github.com/helenanova)). `_reconnect` replaced the cached connection but not the cached version, so Test Connection logged the new release while the server pages kept showing the one from the first connect. The version cache is now refreshed on every reconnect, covering both Test Connection and the auto-reconnect in `call()`.
+
+### Verified
+
+- 497 unit + e2e tests, all passing; the two new ones (explicit reconnect, auto-reconnect after a dropped socket) fail on the pre-fix code. Every reader of the cached version - the dashboard status poll, Test connection on a saved server, the `health_check` tool - goes through a reconnect first, so after this fix the portal corrects itself after an upgrade without any click.
+- CRUD smoke against live Zabbix 7.4; installer matrix 18/18.
 
 ## v1.37.1 - 2026-10-02
 
