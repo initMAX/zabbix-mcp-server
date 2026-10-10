@@ -486,6 +486,7 @@ def _handle_consent_step(
 
     redirect_url = provider.complete_pending(
         request_id, allowed_grant, subject=subject,
+        role=pending.authenticated_role or "viewer",
     )
     if redirect_url is None:
         return _render_error_page(

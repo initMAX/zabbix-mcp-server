@@ -54,6 +54,8 @@ Zabbix 5.0 and 5.2 have no API tokens (introduced in 5.4) and are out of upstrea
 - POST rate limiting: 30 requests per minute per session
 - Password policy: minimum 10 characters, at least one uppercase letter and one digit
 - Role-based access control: admin (full), operator (tokens/templates), viewer (read-only)
+- OAuth-issued tokens carry the portal role of the user who consented: a `viewer`'s token is read-only at the MCP server (`TokenInfo.read_only`), whatever scopes were granted; `operator` and `admin` tokens may write. An unknown or missing role is treated as read-only. **Before v1.37.3 every OAuth token was writable** - the scope cap kept a viewer to `monitoring` / `extensions`, but `monitoring` includes host, item and trigger create / update / delete, so a viewer could write to any server not set `read_only = true`. Demoting a user does not shrink tokens already issued to them; revoke the client's tokens from the portal.
+- MCP resources (`zabbix://<server>/hosts`, `/problems`, `/hostgroups`, `/templates`) run the same token authorization check as the tools (server binding and scope) since v1.37.3; before, they bypassed it.
 - Jinja2 autoescape enabled on all templates - prevents XSS
 - Config write-back uses atomic file operations with `threading.RLock`
 
@@ -145,7 +147,8 @@ The route is served outside the MCP endpoint's `TransportSecuritySettings`, so i
 
 | Version | Supported |
 |---|---|
-| 1.37.2 (latest) | Yes |
+| 1.37.3 (latest) | Yes |
+| 1.37.2 | Yes - upgrade, see advisory below |
 | 1.37.1 | Yes |
 | 1.37 | Yes |
 | 1.36.2 | Yes |

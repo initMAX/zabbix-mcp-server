@@ -1099,7 +1099,7 @@ What you get:
 - **Discovery** - RFC 8414 `/.well-known/oauth-authorization-server`, RFC 9728 `/.well-known/oauth-protected-resource`, `WWW-Authenticate: Bearer ... resource_metadata="..."` on 401.
 - **Dynamic client registration** - RFC 7591 `/register`. ChatGPT's "Advanced OAuth settings" auto-detects everything from the discovery documents.
 - **Authorization code + PKCE S256**, refresh-token rotation, RFC 7009 revocation, RFC 8707 audience binding.
-- **Two-step consent screen** (v1.29) - operator credentials check, then per-scope checkbox grant. Wildcard `*` and concrete groups are mutually exclusive. Role caps the grant: `admin` may grant any scope, `operator` is limited to `monitoring / data_collection / alerts / extensions`, `viewer` to `monitoring / extensions`.
+- **Two-step consent screen** (v1.29) - operator credentials check, then per-scope checkbox grant. Wildcard `*` and concrete groups are mutually exclusive. Role caps the grant: `admin` may grant any scope, `operator` is limited to `monitoring / data_collection / alerts / extensions`, `viewer` to `monitoring / extensions`, and a viewer's token is read-only at the server (v1.37.3).
 - **Refresh-token reuse detection** (RFC 6819 §5.2.2.3) - replaying an already-rotated refresh token revokes the entire token family and writes an audit row.
 - **Per-client IP allowlist + TTL override** in `[oauth_clients.<id>]`, editable from the OAuth Clients page in the admin portal.
 - **Login uses the existing admin-portal users** ([admin.users.*], scrypt-hashed) - operators do not maintain a second identity store. Login + consent UI mirrors the admin portal theme.

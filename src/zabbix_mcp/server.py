@@ -2736,6 +2736,73 @@ class _IPAllowlistMiddleware:
         await self._app(scope, receive, send)
 
 
+def _register_resources(mcp: MCPServer, client_manager: ClientManager) -> None:
+    """Expose the default server's hosts / problems / host groups /
+    templates as browsable MCP resources.
+
+    Lived inline in run_server until v1.37.3; pulled out so the
+    authorization guard on each resource can be tested without
+    starting a transport.
+    """
+    from mcp.server.mcpserver.exceptions import ResourceError
+    from zabbix_mcp.token_store import check_token_authorization
+
+    default_srv = client_manager.default_server
+
+    def _resource_guard(prefix: str) -> None:
+        # Resources went straight to the Zabbix API; a token scoped to
+        # another server, or without the scope that covers the data,
+        # could still read it here. Same check the tools run.
+        err = check_token_authorization(default_srv, tool_prefix=prefix)
+        if err:
+            # ResourceError reaches the client with its message; any
+            # other exception is masked as "Error reading resource".
+            raise ResourceError(err)
+
+    if default_srv:
+        @mcp.resource(f"zabbix://{default_srv}/hosts")
+        async def resource_hosts() -> str:
+            """List of all monitored hosts."""
+            _resource_guard("host")
+            result = await asyncio.to_thread(
+                client_manager.call, default_srv, "host.get",
+                {"output": ["hostid", "host", "name", "status"], "sortfield": "name"},
+            )
+            return json.dumps(result, indent=2)
+
+        @mcp.resource(f"zabbix://{default_srv}/problems")
+        async def resource_problems() -> str:
+            """Currently active problems."""
+            _resource_guard("problem")
+            result = await asyncio.to_thread(
+                client_manager.call, default_srv, "problem.get",
+                {"output": "extend", "recent": True, "sortfield": ["eventid"], "sortorder": "DESC", "limit": 100},
+            )
+            return json.dumps(result, indent=2)
+
+        @mcp.resource(f"zabbix://{default_srv}/hostgroups")
+        async def resource_hostgroups() -> str:
+            """All host groups."""
+            _resource_guard("hostgroup")
+            result = await asyncio.to_thread(
+                client_manager.call, default_srv, "hostgroup.get",
+                {"output": ["groupid", "name"], "sortfield": "name"},
+            )
+            return json.dumps(result, indent=2)
+
+        @mcp.resource(f"zabbix://{default_srv}/templates")
+        async def resource_templates() -> str:
+            """All templates."""
+            _resource_guard("template")
+            result = await asyncio.to_thread(
+                client_manager.call, default_srv, "template.get",
+                {"output": ["templateid", "host", "name"], "sortfield": "name"},
+            )
+            return json.dumps(result, indent=2)
+
+        logger.info("Registered MCP resources (zabbix://%s/...)", default_srv)
+
+
 def run_server(
     config: AppConfig,
     *,
@@ -3203,49 +3270,7 @@ def run_server(
     else:
         logger.info("Registered %d tools", tool_count)
 
-    # ------------------------------------------------------------------
-    # MCP Resources — expose Zabbix data as browsable resources
-    # ------------------------------------------------------------------
-    default_srv = client_manager.default_server
-
-    if default_srv:
-        @mcp.resource(f"zabbix://{default_srv}/hosts")
-        async def resource_hosts() -> str:
-            """List of all monitored hosts."""
-            result = await asyncio.to_thread(
-                client_manager.call, default_srv, "host.get",
-                {"output": ["hostid", "host", "name", "status"], "sortfield": "name"},
-            )
-            return json.dumps(result, indent=2)
-
-        @mcp.resource(f"zabbix://{default_srv}/problems")
-        async def resource_problems() -> str:
-            """Currently active problems."""
-            result = await asyncio.to_thread(
-                client_manager.call, default_srv, "problem.get",
-                {"output": "extend", "recent": True, "sortfield": ["eventid"], "sortorder": "DESC", "limit": 100},
-            )
-            return json.dumps(result, indent=2)
-
-        @mcp.resource(f"zabbix://{default_srv}/hostgroups")
-        async def resource_hostgroups() -> str:
-            """All host groups."""
-            result = await asyncio.to_thread(
-                client_manager.call, default_srv, "hostgroup.get",
-                {"output": ["groupid", "name"], "sortfield": "name"},
-            )
-            return json.dumps(result, indent=2)
-
-        @mcp.resource(f"zabbix://{default_srv}/templates")
-        async def resource_templates() -> str:
-            """All templates."""
-            result = await asyncio.to_thread(
-                client_manager.call, default_srv, "template.get",
-                {"output": ["templateid", "host", "name"], "sortfield": "name"},
-            )
-            return json.dumps(result, indent=2)
-
-        logger.info("Registered MCP resources (zabbix://%s/...)", default_srv)
+    _register_resources(mcp, client_manager)
 
 
     # HTTP health endpoint (unauthenticated, returns minimal info only)

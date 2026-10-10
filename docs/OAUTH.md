@@ -367,6 +367,8 @@ portal already enforces elsewhere.
 | `operator` | `monitoring`, `data_collection`, `alerts`, `extensions` |
 | `viewer`   | `monitoring`, `extensions` (read-only) |
 
+Since v1.37.3 "read-only" is enforced by the server, not only implied by the cap: the role of the user who consented travels on the access and refresh tokens, and a `viewer`'s token is refused every write tool (`host_create`, `item_update`, `action_confirm`, ...) the way a `[tokens.X]` entry with `read_only = true` is. Before 1.37.3 the cap limited the scopes a viewer could grant, but `monitoring` contains write tools, so the token itself was writable.
+
 Rows outside the operator's cap render disabled with a
 "not available to your role (<role>); ask an admin" hint.
 Server-side check at consent-grant time intersects the form-posted

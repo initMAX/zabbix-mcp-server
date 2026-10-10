@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.37.3 - 2026-10-10
+
+Security release. One authorization bug in OAuth, reported privately through `SECURITY.md`, plus a related gap in the MCP resources. Please upgrade if you have `[oauth] enabled = true`.
+
+**Thank you, kta1kri.** The report arrived the way `SECURITY.md` asks for and better than we had any right to expect: exact file and line references, a reproduction against the real authorization check, a CVSS vector we agree with, and the related resources gap found in the same pass. Every point was correct. Reports like this are why the policy exists, and we are grateful for the time it took.
+
+### Security
+
+- **OAuth tokens were never read-only, so a `viewer` got write tools** (reported privately on 2026-10-07 by kta1kri, following `SECURITY.md`; affects v1.28 - v1.37.2). Every OAuth access token was published to the authorization layer with `read_only=False`, whatever the portal role of the user who consented. The consent screen caps a `viewer` to the `monitoring` and `extensions` scopes - but `monitoring` contains host, item, trigger, discovery rule and web scenario create / update / delete, so a user documented as read-only could create, change and delete those on every configured server not set `read_only = true`. Needs OAuth enabled, a portal account with the `viewer` role, and a writable server; CVSS 4.0 6.0 (medium) as scored by the reporter, which we agree with. Now the role rides on the authorization code, the access token and the refresh token; `load_access_token` derives `read_only` from it (`viewer` and anything unknown or missing are read-only, `operator` and `admin` may write), a refresh after the access token expired keeps it, and `docs/OAUTH.md`, README and `SECURITY.md` say what "read-only" means. Demoting a user does not shrink tokens already issued; revoke the client from the portal.
+- **MCP resources bypassed the token authorization check** (same report). `zabbix://<server>/hosts`, `/problems`, `/hostgroups` and `/templates` called the Zabbix API directly, so a token bound to another server, or without the scope that covers the data, could read them. Each resource now runs the same `check_token_authorization` as the tools. Registration moved out of `run_server` into `_register_resources` so this is testable.
+
+### Verified
+
+- 511 unit + e2e tests, all passing. 14 new: the role-to-read-only rule (viewer, operator, admin, unknown, missing, case), the reporter's reproduction against the real `check_token_authorization` with the token the provider now builds, the role surviving a refresh after the access token is gone (in both directions - an operator must not become read-only either), the role riding from consent through the authorization code to the token, and the four resources refusing a token bound to another server or lacking the scope while a wildcard token and the no-token (stdio) path still read. Four of them boot the real server and run the real authorization code flow (register, authorize, login, consent, token) for a `viewer` and an `operator` account against a writable placeholder Zabbix: the viewer's `host_create` is refused as read-only while its `host_get` reaches Zabbix, the operator's `host_create` reaches Zabbix, the viewer stays read-only after a refresh, the scope cap still refuses a viewer `users`, and `resources/read` refuses an `alerts`-only token while a `monitoring` token gets through (on MCP SDK 2.2+ the refusal carries the reason; SDK 2.0 masks it as a generic "Error reading resource" and logs the reason server-side - the refusal itself is the same). The reporter's reproduction was re-run against the pre-fix provider as a proof: a viewer token came back `read_only=False` and `host` write allowed; on the fixed code the same token is read-only and the write is refused.
+- **Live on a public HTTPS deployment** (student-postgresql-01, behind Apache, MCP SDK 2.0.0, writable Zabbix 7.4): the real authorization code flow for a `viewer` and an `operator` account; the viewer's `host_create`, `item_delete` and `action_prepare` refused as read-only, its `host_get` and `zabbix://main/hosts` returning real data, still read-only after a refresh, still unable to grant `users`; the operator's `host_create` created a host in Zabbix and `host_delete` removed it, `user_get` refused by scope, and an `alerts`-only token refused the hosts resource.
+- CRUD smoke against live Zabbix 7.4; installer matrix 18/18.
+
 ## v1.37.2 - 2026-10-06
 
 One contributed fix for a case we had never thought to test: a Zabbix upgrade behind the same URL.
