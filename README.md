@@ -34,7 +34,7 @@
   <b>Install:</b> <a href="#quick-start">Quick Start</a> · <a href="#installation">Installation</a> · <a href="#upgrade">Upgrade</a> · <a href="#first-time-admin-portal-access">First-time admin access</a><br>
   <b>Configure:</b> <a href="#configuration-reference">Reference</a> · <a href="#oauth-21-authorization-server">OAuth 2.1</a> · <a href="#public-url-and-reverse-proxy-deployments">Public URL</a> · <a href="#tls--https">TLS / HTTPS</a> · <a href="#token-budget">Token Budget</a><br>
   <b>Use:</b> <a href="#client-mcp-wizard-beta">Client Wizard</a> · <a href="#connecting-ai-clients">AI Clients</a> · <a href="#example-prompts">Prompts</a> · <a href="#available-tools">Tools</a> · <a href="#common-parameters-get-methods">Parameters</a> · <a href="#time-zones">Time zones</a> · <a href="#pdf-reports-beta">PDF Reports</a><br>
-  <b>Operate:</b> <a href="#installer-cli">Installer CLI</a> · <a href="#update-notifications">Update notifications</a> · <a href="#zabbix-compatibility">Compatibility</a> · <a href="#development">Development</a> · <a href="#related-projects">Related Projects</a> · <a href="#license">License</a>
+  <b>Operate:</b> <a href="#backups-for-zabbix-configuration-changes">Change backups</a> · <a href="#installer-cli">Installer CLI</a> · <a href="#update-notifications">Update notifications</a> · <a href="#zabbix-compatibility">Compatibility</a> · <a href="#development">Development</a> · <a href="#related-projects">Related Projects</a> · <a href="#license">License</a>
 </p>
 
 <br>
@@ -895,6 +895,22 @@ Once connected, you can ask your AI assistant things like:
 
 The AI chains multiple tools automatically when needed.
 
+## Backups for Zabbix configuration changes
+
+Keep `read_only = true` unless the operator has authorized configuration changes to a specific Zabbix instance. Before making those changes, agree on their scope, verification and recovery procedure. Existing Zabbix permissions, token restrictions and write confirmations still apply.
+
+For one approved set of related configuration changes:
+
+1. **Before the first write**, create a recovery backup covering the affected Zabbix deployment. Wait for successful completion, check that the backup is readable, and record its identifier, target, timestamp and restore procedure. If adequate backup or a usable recovery procedure is unavailable, stop before changing configuration.
+2. Apply the approved changes. Read back the affected configuration and verify the intended monitoring or notification behavior. A successful tool response or MCP `health_check` alone does not prove the change worked.
+3. **After verification succeeds**, create and check a separate post-change backup of the verified state. Retain both backups; do not overwrite the pre-change backup. If verification fails, stop further changes and follow the agreed recovery procedure instead of marking the result successful.
+
+Use the backup method appropriate to the deployment. For a VM or container on an accessible hypervisor, use its native full-guest backup together with a database-specific consistency or quiescing procedure; a successful hypervisor job alone does not establish database consistency. Include any external database, volumes and configuration that the guest backup does not cover. For other deployments, use a database-consistent backup plus the Zabbix configuration files and other files required for recovery. Zabbix's [upgrade backup guidance](https://www.zabbix.com/documentation/current/en/manual/installation/upgrade/sources) identifies the database, configuration files, PHP files and binaries as recovery components; follow the guidance for your installed Zabbix and database versions.
+
+[`configuration_export`](https://www.zabbix.com/documentation/current/en/manual/api/reference/configuration/export) exports selected supported objects, not the complete Zabbix database, history or deployment files. It can supplement recovery evidence, but it does not replace a full recovery backup. Backing up only this MCP server's `config.toml` does not back up Zabbix either.
+
+These are operator steps, not automatic MCP backup or restore features. Plan one pre-change and one verified post-change backup for the approved set, rather than repeating a full backup for every tool call; reassess coverage if the scope changes. Read-only queries do not need change backups. Protect backup contents as sensitive data. Restore, backup deletion and retention changes require separate operator authorization.
+
 ## Available Tools
 
 All tools accept an optional `server` parameter to target a specific Zabbix instance (defaults to the first configured server).
@@ -911,7 +927,7 @@ All tools accept an optional `server` parameter to target a specific Zabbix inst
 <tr><td><code>template_*</code> / <code>templategroup_*</code></td><td>Manage monitoring templates and template groups</td></tr>
 <tr><td><code>maintenance_*</code></td><td>Schedule and manage maintenance periods to suppress alerts</td></tr>
 <tr><td><code>discoveryrule_*</code> / <code>*prototype_*</code></td><td>Low-level discovery rules and item/trigger/graph prototypes</td></tr>
-<tr><td><code>configuration_export</code> / <code>_import</code></td><td>Export or import full Zabbix configuration (YAML, XML, JSON)</td></tr>
+<tr><td><code>configuration_export</code> / <code>_import</code></td><td>Export or import supported Zabbix configuration objects (YAML, XML, JSON); not a full database backup</td></tr>
 <tr><td rowspan="3"><strong>Alerts</strong></td><td><code>action_*</code> / <code>mediatype_*</code></td><td>Configure automated alert actions and notification channels (email, Slack, webhook, ...)</td></tr>
 <tr><td><code>alert_get</code></td><td>Query the history of sent notifications and remote commands</td></tr>
 <tr><td><code>script_execute</code></td><td>Execute global scripts on hosts (SSH, IPMI, custom commands)</td></tr>

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- Document recovery backups before approved Zabbix configuration changes and after verification, including deployment-specific coverage, retention and the limits of configuration exports.
+
 ## v1.39 - 2026-10-17
 
 The tool-schema release. [#98](https://github.com/initMAX/zabbix-mcp-server/issues/98) ([@Amelkahil](https://github.com/Amelkahil)) and [#79](https://github.com/initMAX/zabbix-mcp-server/issues/79) ([@TPoussCap](https://github.com/TPoussCap)) described the same gap from two sides: a model building a call from `tools/list` alone cannot know which properties `output`, `filter`, `search` and `sortfield` take on *this* method, or which `selectXxx` and native parameters `extra_params` may carry, so it guesses. Checked against Zabbix 7.4.14, guessing fails in a quiet way: an unknown `selectXxx` or top-level parameter, an unknown `output` property and a `filter` on a `text` property are silently ignored (the model believes it filtered), a wrong `sortfield` or a restricted `filter` key is an API error, and that error never reached the model because the server replaced it with "check server logs" (a v1.11 hardening against stack traces that also swallowed Zabbix's own validation message). Thank you both for the precise reports.

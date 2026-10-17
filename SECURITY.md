@@ -110,6 +110,8 @@ When `public_url`, `allowed_origins`, and `allowed_hosts` are all unset on a non
 - Two-step action approval (`action_prepare` + `action_confirm`) for write operations — 5-minute confirmation window
 - Set `read_only = false` only on servers where you explicitly need write access
 
+Before approved Zabbix configuration changes, follow the [backup and verification procedure](README.md#backups-for-zabbix-configuration-changes): retain a checked pre-change recovery backup and a separate post-change backup after verification. These are operator responsibilities; write protection and confirmation do not create backups.
+
 ### File Access and Uploads
 
 - The `source_file` feature (for `configuration.import`) is disabled by default
