@@ -41,6 +41,11 @@ write, one ``unexpected parameter`` at a time (measured on 6.0.48, 7.0.30 and
   service, ``update_operations`` to trigger / service; the others return
   them anyway and refuse them back.
 
+The documented action object contract also marks the ``opconditions`` entries'
+``opconditionid`` / ``operationid`` and command targets' ``opcommand_hstid`` /
+``opcommand_grpid`` as read-only. These nested IDs are stripped too, with
+offline regression tests covering the write payloads.
+
 ``strip_for_write`` removes exactly those, and nothing a caller could have
 meant: a non-empty ``value2``, a custom-expression formula, an explicit
 ``recovery_operations: []`` on a trigger action (which clears them) all stay.
@@ -99,6 +104,17 @@ def _strip_operation(op: dict, *, main: bool, source: str | None) -> None:
     if not main or (source is not None and source != TRIGGER):
         op.pop("evaltype", None)
         op.pop("opconditions", None)
+    for field, read_only in (
+        ("opconditions", ("opconditionid", "operationid")),
+        ("opcommand_hst", ("opcommand_hstid",)),
+        ("opcommand_grp", ("opcommand_grpid",)),
+    ):
+        rows = op.get(field)
+        if isinstance(rows, list):
+            for row in rows:
+                if isinstance(row, dict):
+                    for key in read_only:
+                        row.pop(key, None)
     msg = op.get("opmessage")
     if isinstance(msg, dict):
         if _s(msg.get("default_msg")) == "1":
