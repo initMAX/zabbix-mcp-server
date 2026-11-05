@@ -61,10 +61,14 @@ class TestForwardedHandling(unittest.TestCase):
         self.assertIsNone(seen["base"])
         self.assertEqual(seen["ip"], "203.0.113.9")
 
-    def test_client_ip_still_comes_from_the_first_xff_entry(self):
-        # Opposite end of the chain from X-Forwarded-Host, deliberately:
-        # here the original client is what an IP allowlist wants.
-        seen = _observe(_scope(x_forwarded_for="198.51.100.7, 10.0.0.1"))
+    def test_client_ip_comes_from_the_end_the_proxy_writes(self):
+        # The same end of the chain as X-Forwarded-Host: a proxy that appends
+        # leaves the client's own value in front. Until v1.41 the first entry
+        # was taken, so "198.51.100.7" here was whatever the client sent.
+        seen = _observe(_scope(x_forwarded_for="198.51.100.7, 203.0.113.9"))
+        self.assertEqual(seen["ip"], "203.0.113.9")
+        # behind two proxies of ours the client is the entry before them
+        seen = _observe(_scope(x_forwarded_for="198.51.100.7, 10.0.0.1"), trusted_proxies=("127.0.0.1", "10.0.0.0/24"))
         self.assertEqual(seen["ip"], "198.51.100.7")
 
     def test_no_forwarded_headers_means_no_base(self):

@@ -119,6 +119,9 @@
      "type": "integer",
      "default": "0"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -266,6 +269,10 @@
      "type": "integer",
      "since": "8.0"
     },
+    "severity_numbers": {
+     "type": "integer/array",
+     "since": "8.0"
+    },
     "spanids": {
      "type": "string/array",
      "since": "8.0"
@@ -295,7 +302,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "New in 8.0."
+    "New in 8.0.",
+    "severity_numbers (0 to 24): validated by CApmLog::get in the 8.0.0rc2 and 8.0.0 source; the reference page does not list it (not verified live: no APM database on the test server)"
    ]
   },
   "apmmetric.get": {
@@ -925,6 +933,9 @@
    "params": {
     "correlationids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -942,7 +953,8 @@
   "dashboard.get": {
    "object": "dashboard",
    "sortfield": [
-    "dashboardid"
+    "dashboardid",
+    "name"
    ],
    "sortfield_versions": {},
    "common": [
@@ -984,7 +996,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "selectWidgets listed only on 5.0 (replaced by selectPages from 6.0, dashboard pages introduced in 5.4). sortfield identical 5.0-8.0: dashboardid."
+    "selectWidgets listed only on 5.0 (replaced by selectPages from 6.0, dashboard pages introduced in 5.4). sortfield identical 5.0-8.0: dashboardid.",
+    "sort field 'name': $sortColumns of CDashboardGeneral is ['dashboardid', 'name'] in every source from 6.0 to 8.0, verified live; the reference page lists dashboardid only"
    ]
   },
   "dcheck.get": {
@@ -1018,6 +1031,12 @@
     },
     "dserviceids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
+    },
+    "limitSelects": {
+     "type": "integer"
     }
    },
    "selects": {
@@ -1029,7 +1048,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "selectDRules is listed on the 6.0, 7.0, 7.2, 7.4 and 8.0 get pages but absent from the 6.2 and 6.4 pages; since set to 6.0 (not on the 5.0 page)"
+    "selectDRules is listed on the 6.0, 7.0, 7.2, 7.4 and 8.0 get pages but absent from the 6.2 and 6.4 pages; since set to 6.0 (not on the 5.0 page)",
+    "limitSelects: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it"
    ]
   },
   "device.get": {
@@ -1119,6 +1139,9 @@
     "dserviceids": {
      "type": "ID/array"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "limitSelects": {
      "type": "integer"
     }
@@ -1164,6 +1187,9 @@
     "startSearch"
    ],
    "params": {
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -1198,6 +1224,10 @@
      "removed": "6.0"
     },
     "selectDiscoveryData": {
+     "type": "query",
+     "since": "7.4"
+    },
+    "selectDiscoveryRule": {
      "type": "query",
      "since": "7.4"
     },
@@ -1236,7 +1266,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host"
+    "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host",
+    "selectDiscoveryRule (7.4+): validated by CDiscoveryRule::validateGet in the 7.4.14 and 8.0.0 source, verified live (returns discoveryRule); the reference page does not list it"
    ]
   },
   "discoveryruleprototype.get": {
@@ -1247,7 +1278,8 @@
     "key_",
     "delay",
     "type",
-    "status"
+    "status",
+    "discover"
    ],
    "sortfield_versions": {},
    "common": [
@@ -1268,7 +1300,10 @@
    "params": {
     "discoveryids": {
      "type": "ID/array",
-     "since": "8.0"
+     "since": "7.4"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "groupids": {
      "type": "ID/array",
@@ -1308,6 +1343,10 @@
     }
    },
    "selects": {
+    "selectDiscoveryData": {
+     "type": "query",
+     "since": "7.4"
+    },
     "selectDiscoveryRule": {
      "type": "query",
      "since": "7.4"
@@ -1363,7 +1402,8 @@
     "get page does not exist for versions: 5.0, 6.0, 6.2, 6.4, 7.0, 7.2; everything marked since 7.4",
     "sortfield values first documented: itemid (7.4), name (7.4), key_ (7.4), delay (7.4), type (7.4), status (7.4)",
     "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host",
-    "object introduced in 7.4; discoveryids parameter added on the 8.0 page"
+    "object introduced in 7.4; discoveryids parameter added on the 8.0 page",
+    "selectDiscoveryData and the sort field 'discover': in the 7.4.14 and 8.0.0 source, verified live; the reference page does not list them. discoveryids: on the 8.0 page only, but the 7.4.14 source takes it and a live 7.4.14 filters by it"
    ]
   },
   "drule.get": {
@@ -1397,6 +1437,9 @@
     },
     "dserviceids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "limitSelects": {
      "type": "integer"
@@ -1451,6 +1494,9 @@
     },
     "dserviceids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "limitSelects": {
      "type": "integer"
@@ -1538,6 +1584,10 @@
      "values": {
       "objectid": "objectid"
      }
+    },
+    "groupCount": {
+     "type": "flag",
+     "removed": "7.0"
     },
     "groupids": {
      "type": "ID/array"
@@ -1659,6 +1709,9 @@
     "graphids": {
      "type": "ID/array"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -1687,7 +1740,9 @@
      "type": "query"
     },
     "selectGraphDiscovery": {
-     "type": "query"
+     "type": "query",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectGraphItems": {
      "type": "query"
@@ -1791,6 +1846,9 @@
     },
     "graphids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "groupids": {
      "type": "ID/array"
@@ -2008,6 +2066,9 @@
     "graphids": {
      "type": "ID/array"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -2115,7 +2176,9 @@
      "since": "6.0"
     },
     "selectDiscoveries": {
-     "type": "query"
+     "type": "query",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryRules"
     },
     "selectDiscoveryData": {
      "type": "query",
@@ -2136,7 +2199,9 @@
      "removed": "7.2"
     },
     "selectHostDiscovery": {
-     "type": "query"
+     "type": "query",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectHostGroups": {
      "type": "query",
@@ -2286,6 +2351,10 @@
     "graphids": {
      "type": "ID/array"
     },
+    "groupCount": {
+     "type": "flag",
+     "removed": "6.2"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -2382,9 +2451,15 @@
     },
     "selectGroupDiscoveries": {
      "type": "query",
-     "since": "7.0"
+     "since": "7.0",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectGroupDiscovery": {
+     "type": "query",
+     "removed": "7.0"
+    },
+    "selectHostPrototype": {
      "type": "query",
      "removed": "7.0"
     },
@@ -2408,7 +2483,8 @@
     "with_* parameters are typed boolean on the 7.4 page (host.get uses flag for the same names)",
     "monitored_hosts: marked deprecated on pages 6.2-7.0 (deprecated, please use `with_monitored_hosts` instead.)",
     "real_hosts: marked deprecated on pages 6.2-7.0 (deprecated, please use `with_hosts` instead.)",
-    "selectGroupDiscoveries: marked deprecated on pages 7.4-8.0 (deprecated, please use `selectDiscoveryData` instead.)"
+    "selectGroupDiscoveries: marked deprecated on pages 7.4-8.0 (deprecated, please use `selectDiscoveryData` instead.)",
+    "selectHostPrototype: the 6.0-6.4 source takes it (verified live on 6.0.48, 6.2.9, 6.4.21: returns hostPrototype); 7.0 answers 'unexpected parameter' and has selectHostPrototypes"
    ]
   },
   "hostinterface.get": {
@@ -2435,6 +2511,9 @@
     "startSearch"
    ],
    "params": {
+    "groupCount": {
+     "type": "flag"
+    },
     "hostids": {
      "type": "ID/array"
     },
@@ -2494,6 +2573,9 @@
    "params": {
     "discoveryids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "hostids": {
      "type": "ID/array"
@@ -2600,6 +2682,9 @@
      "type": "flag"
     },
     "expandStepName": {
+     "type": "flag"
+    },
+    "groupCount": {
      "type": "flag"
     },
     "groupids": {
@@ -2779,6 +2864,9 @@
     "group": {
      "type": "string"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -2856,7 +2944,9 @@
      "type": "query"
     },
     "selectItemDiscovery": {
-     "type": "query"
+     "type": "query",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectPreprocessing": {
      "type": "query"
@@ -2917,6 +3007,9 @@
     },
     "graphids": {
      "type": "ID/array"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "hostids": {
      "type": "ID/array"
@@ -3022,6 +3115,9 @@
     "startSearch"
    ],
    "params": {
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -3030,9 +3126,17 @@
     },
     "maintenanceids": {
      "type": "ID/array"
+    },
+    "triggerids": {
+     "type": "ID/array",
+     "since": "8.0"
     }
    },
    "selects": {
+    "selectEventNames": {
+     "type": "query",
+     "since": "8.0"
+    },
     "selectGroups": {
      "type": "query",
      "removed": "7.2"
@@ -3049,6 +3153,10 @@
     },
     "selectTimeperiods": {
      "type": "query"
+    },
+    "selectTriggers": {
+     "type": "query",
+     "since": "8.0"
     }
    },
    "filter_props": null,
@@ -3147,6 +3255,9 @@
     "startSearch"
    ],
    "params": {
+    "groupCount": {
+     "type": "flag"
+    },
     "mediaids": {
      "type": "ID/array"
     },
@@ -3245,15 +3356,15 @@
    "params": {
     "moduleids": {
      "type": "ID/array",
-     "since": "6.4"
+     "since": "6.0"
     }
    },
    "selects": {},
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "documentation pages for module do not exist before 6.4 (checked ['5.0', '5.2', '5.4', '6.0', '6.2'] where fetched); everything present on the 6.4 page is marked since 6.4",
-    "module.get does not list editable"
+    "module.get does not list editable",
+    "On the reference pages since 6.4; the API exists and answers on 6.0.48 and 6.2.9 (scripts/audit_api_frontend.py), so it is dated 6.0."
    ]
   },
   "problem.get": {
@@ -3506,7 +3617,6 @@
    "sortfield_versions": {},
    "common": [
     "countOutput",
-    "editable",
     "excludeSearch",
     "filter",
     "limit",
@@ -3534,7 +3644,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "documentation pages for regexp do not exist before 6.0 (checked ['5.0', '5.2', '5.4'] where fetched); everything present on the 6.0 page is marked since 6.0"
+    "documentation pages for regexp do not exist before 6.0 (checked ['5.0', '5.2', '5.4'] where fetched); everything present on the 6.0 page is marked since 6.0",
+    "editable: listed among the common parameters on the reference page, but CRegexp::get validates its options and answers 'unexpected parameter \"editable\"' on every release from 6.0 to 8.0"
    ]
   },
   "report.get": {
@@ -3946,6 +4057,18 @@
     "startSearch"
    ],
    "params": {
+    "evaltype": {
+     "type": "integer",
+     "since": "6.0",
+     "values": {
+      "0": "And/Or",
+      "2": "Or"
+     }
+    },
+    "service_tags": {
+     "type": "object/array",
+     "since": "6.0"
+    },
     "serviceids": {
      "type": "ID/array",
      "since": "6.0"
@@ -3973,7 +4096,8 @@
    "search_props": null,
    "notes": [
     "Documentation page for this method does not exist on 5.0; first documented release among the checked ones is 6.0, all items marked since 6.0.",
-    "SLA object introduced in Zabbix 6.0 (no 5.0 page). sortfield identical 6.0-8.0: slaid, name, period, slo, effective_date, timezone, status, description. selectSchedule/selectExcludedDowntimes/selectServiceTags support count."
+    "SLA object introduced in Zabbix 6.0 (no 5.0 page). sortfield identical 6.0-8.0: slaid, name, period, slo, effective_date, timezone, status, description. selectSchedule/selectExcludedDowntimes/selectServiceTags support count.",
+    "evaltype and service_tags (the SLAs whose service tags match: tag, value, operator): validated by CSla::get in every source from 6.0 to 8.0, accepted live; the reference page does not list them"
    ]
   },
   "sla.getsli": {
@@ -4065,6 +4189,9 @@
     "graphids": {
      "type": "ID/array"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -4116,7 +4243,9 @@
      "since": "6.0"
     },
     "selectDiscoveries": {
-     "type": "query"
+     "type": "query",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryRules"
     },
     "selectDiscoveryRules": {
      "type": "query",
@@ -4206,6 +4335,9 @@
     "dashboardids": {
      "type": "ID/array",
      "since": "6.0"
+    },
+    "groupCount": {
+     "type": "flag"
     },
     "templateids": {
      "type": "ID/array",
@@ -4455,6 +4587,9 @@
     "group": {
      "type": "string"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -4485,6 +4620,10 @@
     },
     "maintenance": {
      "type": "boolean"
+    },
+    "maintenanceids": {
+     "type": "ID/array",
+     "since": "8.0"
     },
     "min_severity": {
      "type": "integer"
@@ -4563,7 +4702,9 @@
      "since": "6.2"
     },
     "selectTriggerDiscovery": {
-     "type": "query"
+     "type": "query",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     }
    },
    "filter_props": null,
@@ -4621,6 +4762,9 @@
     "group": {
      "type": "string"
     },
+    "groupCount": {
+     "type": "flag"
+    },
     "groupids": {
      "type": "ID/array"
     },
@@ -4632,6 +4776,9 @@
     },
     "inherited": {
      "type": "boolean"
+    },
+    "itemids": {
+     "type": "ID/array"
     },
     "limitSelects": {
      "type": "integer"
@@ -4705,7 +4852,8 @@
     "sortfield values first documented: discovered (7.0)",
     "selectGroups deprecated since 6.2 (use selectHostGroups / selectTemplateGroups), removed in 7.2",
     "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host, hostid",
-    "sortfield: the 7.0-8.0 pages say 'discovered' but Zabbix 7.4.14 only accepts 'discover' (verified live)"
+    "sortfield: the 7.0-8.0 pages say 'discovered' but Zabbix 7.4.14 only accepts 'discover' (verified live)",
+    "itemids: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it"
    ]
   },
   "user.get": {
@@ -4714,7 +4862,12 @@
     "userid",
     "username"
    ],
-   "sortfield_versions": {},
+   "sortfield_versions": {
+    "alias": {
+     "type": "",
+     "removed": "6.4"
+    }
+   },
    "common": [
     "countOutput",
     "editable",
@@ -4731,6 +4884,10 @@
     "startSearch"
    ],
    "params": {
+    "current": {
+     "type": "boolean",
+     "since": "8.0"
+    },
     "getAccess": {
      "type": "flag"
     },
@@ -4768,7 +4925,8 @@
     "sortfield possible values on 5.0 page: userid, alias; from 6.0 on: userid, username",
     "filter/search are not restricted for Super admin; for Admin and User type users requesting data on users in their user group the 7.4 page limits filter to userid, name, surname, username and search to name, surname, username",
     "output for Admin/User type users is limited (see 7.4 page); selectRole appears from 6.0 page (roles introduced in 5.2, 5.2 page not fetched for user)",
-    "filter is listed before output on 7.4 page; common list keeps the page order"
+    "filter is listed before output on 7.4 page; common list keeps the page order",
+    "current (8.0+, only the calling user): validated by CUser::get in the 8.0.0 source, verified live; 7.4 answers 'unexpected parameter', older releases ignore it. Sort field 'alias': still in $sortColumns of the 6.0 and 6.2 source and accepted there, refused from 6.4"
    ]
   },
   "userdirectory.get": {
@@ -4776,7 +4934,13 @@
    "sortfield": [
     "name"
    ],
-   "sortfield_versions": {},
+   "sortfield_versions": {
+    "host": {
+     "type": "",
+     "since": "6.2",
+     "removed": "6.4"
+    }
+   },
    "common": [
     "countOutput",
     "excludeSearch",
@@ -4823,7 +4987,8 @@
    "notes": [
     "documentation pages for userdirectory do not exist before 6.2 (checked ['5.0', '5.2', '5.4', '6.0'] where fetched); everything present on the 6.2 page is marked since 6.2",
     "sortfield possible values on 6.2 page: name, host; from 6.4 on: name",
-    "filter/search restrictions taken from 7.4 page; 8.0 page lists the same"
+    "filter/search restrictions taken from 7.4 page; 8.0 page lists the same",
+    "sort field 'host': $sortColumns of the 6.2 source is ['name', 'host'] (the LDAP host was a property of the directory then), accepted live on 6.2.9; 6.4 answers 'value must be \"name\"'"
    ]
   },
   "usergroup.get": {
@@ -4849,9 +5014,6 @@
     "startSearch"
    ],
    "params": {
-    "limitSelects": {
-     "type": "integer"
-    },
     "mfa_status": {
      "type": "integer",
      "since": "7.0"
@@ -4879,6 +5041,10 @@
     }
    },
    "selects": {
+    "selectApmFilters": {
+     "type": "query",
+     "since": "8.0"
+    },
     "selectHostGroupRights": {
      "type": "query",
      "since": "6.2"
@@ -4912,7 +5078,8 @@
     "parameter selectRights marked (deprecated) on pages ['6.2', '6.4', '7.0']",
     "selectRights deprecated on 6.2-7.0 pages, no longer listed on 7.2 page",
     "selectProxies and selectProxyGroups are documented with type ID/array (not query) on the 8.0 page; both marked supported for Super admin type users only",
-    "limitSelects is a method-specific parameter here (not in the reference-commentary common set), so it is recorded in params"
+    "limitSelects is a method-specific parameter here (not in the reference-commentary common set), so it is recorded in params",
+    "limitSelects: on the reference page of every release, but no source from 6.0 to 8.0 reads it and a live server returns every user of the group whatever its value; left out, because a parameter Zabbix ignores is refused here"
    ]
   },
   "usermacro.get": {
@@ -4955,6 +5122,9 @@
     "inherited": {
      "type": "boolean",
      "since": "6.0"
+    },
+    "templateids": {
+     "type": "ID/array"
     }
    },
    "selects": {
@@ -4983,7 +5153,8 @@
     "Returns host/template macros by default; globalmacro flag switches to global macros (object globalmacro)",
     "selectGroups replaced by selectHostGroups/selectTemplateGroups in 6.2 (deprecated 6.2-7.0, gone from 7.2 page); inherited parameter added in 6.0",
     "sortfield description says 'Possible value: macro' (singular) on 5.0-6.2 pages",
-    "selectGroups: marked deprecated on pages 6.2-7.0 (deprecated, please use `selectHostGroups` or `selectTemplateGroups` instead.)"
+    "selectGroups: marked deprecated on pages 6.2-7.0 (deprecated, please use `selectHostGroups` or `selectTemplateGroups` instead.)",
+    "templateids: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it. itemids and triggerids are in the class's option table too, but nothing reads them (a live server returns every macro)"
    ]
   },
   "valuemap.get": {
@@ -5009,6 +5180,9 @@
     "startSearch"
    ],
    "params": {
+    "hostids": {
+     "type": "ID/array"
+    },
     "valuemapids": {
      "type": "ID/array"
     }
@@ -5021,7 +5195,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "valuemapids is the only method-specific parameter on all pages 5.0-8.0; value maps are host/template-level since 5.2 (hostid property appears from the 6.0 page)"
+    "valuemapids is the only method-specific parameter on all pages 5.0-8.0; value maps are host/template-level since 5.2 (hostid property appears from the 6.0 page)",
+    "hostids: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it"
    ]
   }
  },
@@ -5473,6 +5648,11 @@
      "since": "8.0",
      "readonly": true
     },
+    "has_root_span": {
+     "type": "integer",
+     "since": "8.0",
+     "readonly": true
+    },
     "links": {
      "type": "array",
      "since": "8.0",
@@ -5550,7 +5730,8 @@
     }
    },
    "notes": [
-    "New in 8.0."
+    "New in 8.0.",
+    "has_root_span (1 when the trace has its root span among the stored spans): an output field of CApmTrace in the 8.0.0 source, added after the release candidate; the reference page does not list it"
    ]
   },
   "auditlog": {
@@ -6086,6 +6267,11 @@
      "type": "ID",
      "since": "8.0"
     },
+    "enrollment_token_expires_at": {
+     "type": "timestamp",
+     "since": "8.0",
+     "readonly": true
+    },
     "lastaccess": {
      "type": "timestamp",
      "since": "8.0"
@@ -6108,7 +6294,8 @@
     }
    },
    "notes": [
-    "New in 8.0."
+    "New in 8.0.",
+    "enrollment_token_expires_at: in OUTPUT_FIELDS of CDevice in the 8.0.0rc2 and 8.0.0 source, which device.get validates output against; the reference page does not list it (not seen live: no paired device on the test server)"
    ]
   },
   "dhost": {
@@ -6265,7 +6452,8 @@
     "query": {
      "type": "array",
      "observed": "8.0",
-     "since": "8.0"
+     "since": "8.0",
+     "no_filter": true
     },
     "query_fields": {
      "type": "array",
@@ -6298,11 +6486,6 @@
     },
     "status_codes": {
      "type": "string"
-    },
-    "storage_mode": {
-     "type": "integer",
-     "observed": "8.0",
-     "since": "8.0"
     },
     "templateid": {
      "type": "ID",
@@ -6363,7 +6546,6 @@
     "logtimefmt: not on the reference page, returned by Zabbix 6.0, 6.2, 6.4, 7.0, 7.2, 7.4, 8.0",
     "lookback_limit: not on the reference page, returned by Zabbix 8.0",
     "query: not on the reference page, returned by Zabbix 8.0",
-    "storage_mode: not on the reference page, returned by Zabbix 8.0",
     "time_shift: not on the reference page, returned by Zabbix 8.0",
     "trends: not on the reference page, returned by Zabbix 6.0, 6.2, 6.4, 7.0, 7.2, 7.4, 8.0",
     "units: not on the reference page, returned by Zabbix 6.0, 6.2, 6.4, 7.0, 7.2, 7.4, 8.0",
@@ -6532,7 +6714,8 @@
     "query": {
      "type": "array",
      "observed": "8.0",
-     "since": "8.0"
+     "since": "8.0",
+     "no_filter": true
     },
     "query_fields": {
      "type": "array",
@@ -6582,11 +6765,6 @@
     "status_codes": {
      "type": "string",
      "since": "7.4"
-    },
-    "storage_mode": {
-     "type": "integer",
-     "observed": "8.0",
-     "since": "8.0"
     },
     "templateid": {
      "type": "ID",
@@ -6661,7 +6839,6 @@
     "logtimefmt: not on the reference page, returned by Zabbix 7.4, 8.0",
     "lookback_limit: not on the reference page, returned by Zabbix 8.0",
     "query: not on the reference page, returned by Zabbix 8.0",
-    "storage_mode: not on the reference page, returned by Zabbix 8.0",
     "time_shift: not on the reference page, returned by Zabbix 8.0",
     "trends: not on the reference page, returned by Zabbix 7.4, 8.0",
     "units: not on the reference page, returned by Zabbix 7.4, 8.0",
@@ -8537,28 +8714,28 @@
    "props": {
     "config": {
      "type": "object",
-     "since": "6.4"
+     "since": "6.0"
     },
     "id": {
      "type": "string",
-     "since": "6.4"
+     "since": "6.0"
     },
     "moduleid": {
      "type": "ID",
-     "since": "6.4",
+     "since": "6.0",
      "readonly": true
     },
     "relative_path": {
      "type": "string",
-     "since": "6.4"
+     "since": "6.0"
     },
     "status": {
      "type": "integer",
-     "since": "6.4"
+     "since": "6.0"
     }
    },
    "notes": [
-    "object page does not exist before 6.4; properties present on 6.4 page are marked since 6.4"
+    "Documented since 6.4, present since 6.0."
    ]
   },
   "problem": {

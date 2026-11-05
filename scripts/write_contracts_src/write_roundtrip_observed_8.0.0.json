@@ -465,275 +465,294 @@
    "stuck": []
   },
   "discoveryrule": {
-   "samples": 47,
-   "rows": 507,
-   "ok": 47,
+   "samples": 62,
+   "rows": 608,
+   "ok": 62,
    "paths": {
     "discover": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "discoveryData": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
+    },
+    "discoveryRule": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 42,
+       "present": 42
+      },
+      "dependent": {
+       "refused": 14,
+       "present": 14
+      },
+      "templated": {
+       "refused": 6,
+       "present": 6
+      }
+     },
+     "count": 62,
+     "present": 62
     },
     "discoveryRulePrototypes": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "error": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "filter.conditions[].formulaid": {
      "kind": "value must be empty",
      "categories": {
       "dependent": {
-       "refused": 1,
-       "present": 1
+       "refused": 10,
+       "present": 10
       },
       "plain": {
-       "refused": 22,
-       "present": 24
+       "refused": 24,
+       "present": 27
       },
       "templated": {
        "refused": 3,
        "present": 4
       }
      },
-     "count": 26,
-     "present": 29
+     "count": 37,
+     "present": 41
     },
     "filter.eval_formula": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "flags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "graphs": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "history": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "hostPrototypes": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "hostid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "hosts": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "inventory_link": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "items": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "key_": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"key_\" of inherited object.",
@@ -761,20 +780,20 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "master_itemid": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"master_itemid\" of inherited object.",
@@ -813,23 +832,31 @@
      "kind": "value must be empty",
      "categories": {
       "plain": {
-       "refused": 7,
-       "present": 7
+       "refused": 9,
+       "present": 9
+      },
+      "dependent": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 7,
-     "present": 7
+     "count": 11,
+     "present": 11
     },
     "overrides[].filter.eval_formula": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 7,
-       "present": 7
+       "refused": 9,
+       "present": 9
+      },
+      "dependent": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 7,
-     "present": 7
+     "count": 11,
+     "present": 11
     },
     "preprocessing": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"preprocessing\" of inherited object.",
@@ -842,62 +869,54 @@
      "count": 6,
      "present": 6
     },
+    "query.filter.eval_formula": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
     "state": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
-    },
-    "storage_mode": {
-     "kind": "unexpected",
-     "categories": {
-      "plain": {
-       "refused": 38,
-       "present": 38
-      },
-      "dependent": {
-       "refused": 3,
-       "present": 3
-      },
-      "templated": {
-       "refused": 6,
-       "present": 6
-      }
-     },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "templateid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "timeout": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"timeout\" of inherited object.",
@@ -914,39 +933,39 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "triggers": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "type": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"type\" of inherited object.",
@@ -963,20 +982,20 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "uuid": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"uuid\" of inherited object.",
@@ -993,48 +1012,67 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     },
     "valuemapid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 38,
-       "present": 38
+       "refused": 42,
+       "present": 42
       },
       "dependent": {
-       "refused": 3,
-       "present": 3
+       "refused": 14,
+       "present": 14
       },
       "templated": {
        "refused": 6,
        "present": 6
       }
      },
-     "count": 47,
-     "present": 47
+     "count": 62,
+     "present": 62
     }
    },
    "stuck": []
   },
   "discoveryruleprototype": {
    "samples": 22,
-   "rows": 45,
+   "rows": 46,
    "ok": 22,
    "paths": {
+    "discoveryData": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 10,
+       "present": 10
+      },
+      "dependent": {
+       "refused": 11,
+       "present": 11
+      },
+      "templated": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 22,
+     "present": 22
+    },
     "discoveryRule": {
      "kind": "unexpected",
      "categories": {
@@ -1378,25 +1416,6 @@
      "count": 1,
      "present": 1
     },
-    "storage_mode": {
-     "kind": "unexpected",
-     "categories": {
-      "plain": {
-       "refused": 10,
-       "present": 10
-      },
-      "dependent": {
-       "refused": 11,
-       "present": 11
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
-      }
-     },
-     "count": 22,
-     "present": 22
-    },
     "templateid": {
      "kind": "unexpected",
      "categories": {
@@ -1567,38 +1586,65 @@
    "stuck": []
   },
   "graph": {
-   "samples": 2,
-   "rows": 509,
-   "ok": 1,
+   "samples": 4,
+   "rows": 609,
+   "ok": 2,
    "paths": {
     "discoveryData": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "discoveryRule": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "flags": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
+      },
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
+      "templated": {
+       "refused": 0,
+       "present": 0
+      }
+     },
+     "count": 4,
+     "present": 2
+    },
+    "gitems": {
+     "kind": "opaque: Cannot update a discovered graph.",
+     "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
       },
       "templated": {
        "refused": 0,
@@ -1606,179 +1652,243 @@
       }
      },
      "count": 2,
-     "present": 1
-    },
-    "gitems": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
-     "categories": {
-      "templated": {
-       "refused": 0,
-       "present": 0
-      }
-     },
-     "count": 1,
      "present": 0
     },
     "graphDiscovery": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "graphtype": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "height": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "hostgroups": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "hosts": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "items": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "name": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "percent_left": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "percent_right": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "show_3d": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "show_legend": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "show_triggers": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "show_work_period": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "templategroups": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "templateid": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
+      },
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
+      "templated": {
+       "refused": 0,
+       "present": 0
+      }
+     },
+     "count": 4,
+     "present": 2
+    },
+    "templates": {
+     "kind": "opaque: Cannot update a discovered graph.",
+     "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
       },
       "templated": {
        "refused": 0,
@@ -1786,109 +1896,166 @@
       }
      },
      "count": 2,
-     "present": 1
-    },
-    "templates": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
-     "categories": {
-      "templated": {
-       "refused": 0,
-       "present": 0
-      }
-     },
-     "count": 1,
      "present": 0
     },
     "uuid": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "width": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "yaxismax": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "yaxismin": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "ymax_itemid": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "ymax_type": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "ymin_itemid": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     },
     "ymin_type": {
-     "kind": "opaque: Cannot update a templated graph \"Linux: CPU jumps\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
+      "discovered": {
+       "refused": 0,
+       "present": 0
+      },
       "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 1,
+     "count": 2,
      "present": 0
     }
    },
    "stuck": [
+    {
+     "id": "5346",
+     "category": "discovered",
+     "name": "Interface eth0: Network traffic",
+     "error": "Cannot update a discovered graph.",
+     "dropped": [
+      "name",
+      "width",
+      "height",
+      "yaxismin",
+      "yaxismax",
+      "templateid",
+      "show_work_period",
+      "show_triggers",
+      "graphtype",
+      "show_legend",
+      "show_3d",
+      "percent_left",
+      "percent_right",
+      "ymin_type",
+      "ymax_type",
+      "ymin_itemid",
+      "ymax_itemid",
+      "flags",
+      "uuid",
+      "gitems",
+      "hostgroups",
+      "templategroups",
+      "hosts",
+      "templates",
+      "items",
+      "discoveryRule",
+      "graphDiscovery",
+      "discoveryData"
+     ]
+    },
     {
      "id": "2230",
      "category": "templated",
@@ -1928,31 +2095,31 @@
    ]
   },
   "graphprototype": {
-   "samples": 5,
-   "rows": 508,
-   "ok": 5,
+   "samples": 7,
+   "rows": 608,
+   "ok": 7,
    "paths": {
     "flags": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "templateid": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     }
    },
    "stuck": []
@@ -2090,69 +2257,6 @@
      },
      "count": 2,
      "present": 2
-    }
-   },
-   "stuck": []
-  },
-  "hostinterface": {
-   "samples": 5,
-   "rows": 36,
-   "ok": 5,
-   "paths": {
-    "available": {
-     "kind": "opaque: Incorrect arguments passed to function.",
-     "categories": {
-      "plain": {
-       "refused": 5,
-       "present": 5
-      }
-     },
-     "count": 5,
-     "present": 5
-    },
-    "disable_until": {
-     "kind": "opaque: Incorrect arguments passed to function.",
-     "categories": {
-      "plain": {
-       "refused": 5,
-       "present": 5
-      }
-     },
-     "count": 5,
-     "present": 5
-    },
-    "error": {
-     "kind": "opaque: Incorrect arguments passed to function.",
-     "categories": {
-      "plain": {
-       "refused": 5,
-       "present": 5
-      }
-     },
-     "count": 5,
-     "present": 5
-    },
-    "errors_from": {
-     "kind": "opaque: Incorrect arguments passed to function.",
-     "categories": {
-      "plain": {
-       "refused": 5,
-       "present": 5
-      }
-     },
-     "count": 5,
-     "present": 5
-    },
-    "hosts": {
-     "kind": "opaque: Incorrect arguments passed to function.",
-     "categories": {
-      "plain": {
-       "refused": 5,
-       "present": 5
-      }
-     },
-     "count": 5,
-     "present": 5
     }
    },
    "stuck": []
@@ -2897,561 +3001,572 @@
    "stuck": []
   },
   "item": {
-   "samples": 25,
-   "rows": 579,
-   "ok": 25,
+   "samples": 30,
+   "rows": 691,
+   "ok": 30,
    "paths": {
     "description": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"description\" of discovered object.",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "discoveryData": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "discoveryRule": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "enabled_lifetime": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "enabled_lifetime_type": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "error": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "evaltype": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "flags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "formula": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "graphs": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "history": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"history\" of discovered object.",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "hostid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "hosts": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "inheritedTags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "interfaces": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "inventory_link": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"inventory_link\" of discovered object.",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "itemDiscovery": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "key_": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"key_\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"key_\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "lastclock": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "lastns": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "lastvalue": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "lifetime": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "lifetime_type": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "logtimefmt": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"logtimefmt\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"logtimefmt\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "master_itemid": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"master_itemid\" of discovered object.",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "name": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"name\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"name\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "name_resolved": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "preprocessing": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"preprocessing\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"preprocessing\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "prevvalue": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
+    },
+    "query.filter.eval_formula": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
     },
     "state": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "tags": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"tags\" of discovered object.",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "templateid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "timeout": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"timeout\" of inherited object.",
@@ -3468,133 +3583,133 @@
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"trends\" of discovered object.",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 6,
+       "present": 6
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 6,
+     "present": 6
     },
     "triggers": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "type": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"type\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"type\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "units": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"units\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"units\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "uuid": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"uuid\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"uuid\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "value_type": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"value_type\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"value_type\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     },
     "valuemap": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 17,
+       "present": 17
+      },
+      "discovered": {
+       "refused": 6,
+       "present": 6
       },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 25,
-     "present": 25
+     "count": 30,
+     "present": 30
     },
     "valuemapid": {
-     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"valuemapid\" of inherited object.",
+     "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"valuemapid\" of discovered object.",
      "categories": {
+      "discovered": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 7,
        "present": 7
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 13,
+     "present": 13
     }
    },
    "stuck": []
   },
   "itemprototype": {
-   "samples": 31,
-   "rows": 555,
-   "ok": 31,
+   "samples": 37,
+   "rows": 655,
+   "ok": 37,
    "paths": {
     "discoveryData": {
      "kind": "unexpected",
@@ -3603,13 +3718,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "discoveryRule": {
      "kind": "unexpected",
@@ -3618,13 +3737,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "discoveryRulePrototype": {
      "kind": "unexpected",
@@ -3633,13 +3756,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "enabled_lifetime": {
      "kind": "unexpected",
@@ -3648,13 +3775,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "enabled_lifetime_type": {
      "kind": "unexpected",
@@ -3663,13 +3794,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "evaltype": {
      "kind": "unexpected",
@@ -3678,13 +3813,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "flags": {
      "kind": "unexpected",
@@ -3693,13 +3832,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "formula": {
      "kind": "unexpected",
@@ -3708,13 +3851,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "graphs": {
      "kind": "unexpected",
@@ -3723,13 +3870,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "hostid": {
      "kind": "unexpected",
@@ -3738,13 +3889,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "hosts": {
      "kind": "unexpected",
@@ -3753,13 +3908,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "inheritedTags": {
      "kind": "unexpected",
@@ -3768,13 +3927,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "inventory_link": {
      "kind": "unexpected",
@@ -3783,13 +3946,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "key_": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"key_\" of inherited object.",
@@ -3809,13 +3976,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "lifetime_type": {
      "kind": "unexpected",
@@ -3824,13 +3995,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "logtimefmt": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"logtimefmt\" of inherited object.",
@@ -3883,13 +4058,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "triggers": {
      "kind": "unexpected",
@@ -3898,13 +4077,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "type": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"type\" of inherited object.",
@@ -3957,13 +4140,17 @@
        "refused": 23,
        "present": 23
       },
+      "dependent": {
+       "refused": 6,
+       "present": 6
+      },
       "templated": {
        "refused": 8,
        "present": 8
       }
      },
-     "count": 31,
-     "present": 31
+     "count": 37,
+     "present": 37
     },
     "valuemapid": {
      "kind": "opaque: Invalid parameter \"/1\": cannot update readonly parameter \"valuemapid\" of inherited object.",
@@ -3980,20 +4167,20 @@
    "stuck": []
   },
   "maintenance": {
-   "samples": 1,
-   "rows": 1,
-   "ok": 1,
+   "samples": 2,
+   "rows": 2,
+   "ok": 2,
    "paths": {
     "hostgroups": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 1,
-     "present": 1
+     "count": 2,
+     "present": 2
     },
     "hosts[].active_available": {
      "kind": "unexpected",
@@ -4329,59 +4516,290 @@
      "kind": "row-dependent",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 1,
-     "present": 1
+     "count": 2,
+     "present": 2
     },
     "timeperiods[].dayofweek": {
      "kind": "row-dependent",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 1,
-     "present": 1
+     "count": 2,
+     "present": 2
     },
     "timeperiods[].every": {
      "kind": "row-dependent",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 1,
-     "present": 1
+     "count": 2,
+     "present": 2
     },
     "timeperiods[].month": {
      "kind": "row-dependent",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 1,
-     "present": 1
+     "count": 2,
+     "present": 2
     },
     "timeperiods[].start_date": {
      "kind": "row-dependent",
      "categories": {
       "plain": {
        "refused": 1,
+       "present": 2
+      }
+     },
+     "count": 1,
+     "present": 2
+    },
+    "timeperiods[].start_time": {
+     "kind": "row-dependent",
+     "categories": {
+      "plain": {
+       "refused": 2,
+       "present": 2
+      }
+     },
+     "count": 2,
+     "present": 2
+    },
+    "triggers[].comments": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
        "present": 1
       }
      },
      "count": 1,
      "present": 1
     },
-    "timeperiods[].start_time": {
-     "kind": "row-dependent",
+    "triggers[].correlation_mode": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].correlation_tag": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].description": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].error": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].event_name": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].expression": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].flags": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].lastchange": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].manual_close": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].opdata": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].priority": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].recovery_expression": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].recovery_mode": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].state": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].status": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].templateid": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].type": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].url": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].url_name": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "triggers[].value": {
+     "kind": "unexpected",
      "categories": {
       "plain": {
        "refused": 1,
@@ -4414,53 +4832,53 @@
    "stuck": []
   },
   "mediatype": {
-   "samples": 3,
-   "rows": 41,
-   "ok": 3,
+   "samples": 4,
+   "rows": 42,
+   "ok": 4,
    "paths": {
     "actions": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 3,
-       "present": 3
+       "refused": 4,
+       "present": 4
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "passwd": {
      "kind": "opaque: Invalid parameter \"/1/passwd\": cannot be empty.",
      "categories": {
       "plain": {
        "refused": 1,
-       "present": 3
+       "present": 4
       }
      },
      "count": 1,
-     "present": 3
+     "present": 4
     },
     "username": {
      "kind": "opaque: Invalid parameter \"/1/username\": cannot be empty.",
      "categories": {
       "plain": {
        "refused": 1,
-       "present": 3
+       "present": 4
       }
      },
      "count": 1,
-     "present": 3
+     "present": 4
     },
     "users": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 3,
-       "present": 3
+       "refused": 4,
+       "present": 4
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     }
    },
    "stuck": []
@@ -5078,6 +5496,91 @@
    },
    "stuck": []
   },
+  "ceprule": {
+   "samples": 3,
+   "rows": 8,
+   "ok": 3,
+   "paths": {
+    "error": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 3,
+       "present": 3
+      }
+     },
+     "count": 3,
+     "present": 3
+    },
+    "filter.conditions[].formulaid": {
+     "kind": "value must be empty",
+     "categories": {
+      "plain": {
+       "refused": 2,
+       "present": 3
+      }
+     },
+     "count": 2,
+     "present": 3
+    },
+    "filter.eval_formula": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 3,
+       "present": 3
+      }
+     },
+     "count": 3,
+     "present": 3
+    },
+    "operations[].filter.conditions[].formulaid": {
+     "kind": "value must be empty",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "operations[].filter.eval_formula": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 3,
+       "present": 3
+      }
+     },
+     "count": 3,
+     "present": 3
+    },
+    "operations[].scope_filter.conditions[].formulaid": {
+     "kind": "value must be empty",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "operations[].scope_filter.eval_formula": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 3,
+       "present": 3
+      }
+     },
+     "count": 3,
+     "present": 3
+    }
+   },
+   "stuck": []
+  },
   "settings": {
    "samples": 1,
    "rows": 1,
@@ -5116,361 +5619,361 @@
    "stuck": []
   },
   "template": {
-   "samples": 14,
-   "rows": 100,
-   "ok": 14,
+   "samples": 27,
+   "rows": 391,
+   "ok": 27,
    "paths": {
     "custom_interfaces": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "dashboards": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "discoveries": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "discoveryRules": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "flags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "graphs": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "hosts": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "httpTests": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "inheritedTags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "ipmi_authtype": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "ipmi_password": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "ipmi_privilege": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "ipmi_username": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "items": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "maintenance_from": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "maintenance_status": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "maintenance_type": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "maintenanceid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "monitored_by": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "parentTemplates": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "proxy_groupid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "proxyid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "status": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "templategroups": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "tls_accept": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "tls_connect": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "tls_issuer": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "tls_psk": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "tls_psk_identity": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "tls_subject": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "triggers": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     },
     "valuemaps": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 14,
-       "present": 14
+       "refused": 27,
+       "present": 27
       }
      },
-     "count": 14,
-     "present": 14
+     "count": 27,
+     "present": 27
     }
    },
    "stuck": []
@@ -5515,7 +6018,7 @@
   },
   "token": {
    "samples": 1,
-   "rows": 2,
+   "rows": 1,
    "ok": 1,
    "paths": {
     "created_at": {
@@ -5566,9 +6069,9 @@
    "stuck": []
   },
   "trigger": {
-   "samples": 8,
-   "rows": 570,
-   "ok": 8,
+   "samples": 11,
+   "rows": 660,
+   "ok": 11,
    "paths": {
     "comments": {
      "kind": "cannot be updated",
@@ -5584,11 +6087,11 @@
     "correlation_mode": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -5599,11 +6102,11 @@
     "correlation_tag": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -5626,428 +6129,428 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].correlation_mode": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].correlation_tag": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].description": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].error": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].event_name": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].expression": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].flags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].lastchange": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].manual_close": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].opdata": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].priority": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].recovery_expression": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].recovery_mode": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].state": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].status": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].templateid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].type": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].url": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].url_name": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].uuid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "dependencies[].value": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
-      },
-      "templated": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
       "discovered": {
        "refused": 1,
        "present": 1
+      },
+      "templated": {
+       "refused": 2,
+       "present": 2
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 5,
+     "present": 5
     },
     "description": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -6059,58 +6562,58 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "discoveryRule": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "error": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "event_name": {
      "kind": "cannot be updated",
@@ -6126,11 +6629,11 @@
     "expression": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -6142,162 +6645,162 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "functions": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "hostgroups": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "hosts": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "inheritedTags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "items": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "lastEvent": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "lastchange": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 5,
+       "present": 5
       },
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "manual_close": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -6330,11 +6833,11 @@
     "recovery_expression": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -6345,11 +6848,11 @@
     "recovery_mode": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -6361,96 +6864,96 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "tags[].automatic": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
        "refused": 3,
        "present": 3
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "templategroups": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "templateid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "triggerDiscovery": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     },
     "type": {
      "kind": "cannot be updated",
@@ -6488,11 +6991,11 @@
     "uuid": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 3,
        "present": 3
       },
-      "discovered": {
+      "templated": {
        "refused": 3,
        "present": 3
       }
@@ -6504,28 +7007,28 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
-      },
-      "templated": {
-       "refused": 3,
-       "present": 3
+       "refused": 5,
+       "present": 5
       },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 3,
+       "present": 3
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 11,
+     "present": 11
     }
    },
    "stuck": []
   },
   "triggerprototype": {
-   "samples": 8,
-   "rows": 522,
-   "ok": 8,
+   "samples": 9,
+   "rows": 622,
+   "ok": 9,
    "paths": {
     "correlation_mode": {
      "kind": "cannot be updated",
@@ -6553,286 +7056,286 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].correlation_mode": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].correlation_tag": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].description": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].discover": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].event_name": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].expression": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].flags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].manual_close": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].opdata": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].priority": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].recovery_expression": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].recovery_mode": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].status": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].templateid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].type": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].url": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].url_name": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "dependencies[].uuid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 2,
-       "present": 2
+       "refused": 3,
+       "present": 3
       },
       "templated": {
        "refused": 1,
        "present": 1
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "description": {
      "kind": "cannot be updated",
@@ -6849,46 +7352,46 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "discoveryRule": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "discoveryRulePrototype": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "expression": {
      "kind": "cannot be updated",
@@ -6905,91 +7408,91 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "functions": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "hostgroups": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "hosts": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "inheritedTags": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "items": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "manual_close": {
      "kind": "cannot be updated",
@@ -7028,31 +7531,31 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "templateid": {
      "kind": "unexpected",
      "categories": {
       "plain": {
-       "refused": 6,
-       "present": 6
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 2,
        "present": 2
       }
      },
-     "count": 8,
-     "present": 8
+     "count": 9,
+     "present": 9
     },
     "uuid": {
      "kind": "cannot be updated",
@@ -7286,11 +7789,11 @@
    "stuck": []
   },
   "userdirectory": {
-   "samples": 1,
-   "rows": 1,
-   "ok": 1,
+   "samples": 2,
+   "rows": 2,
+   "ok": 2,
    "paths": {
-    "usrgrps": {
+    "idp_certificate_hash": {
      "kind": "unexpected",
      "categories": {
       "plain": {
@@ -7300,14 +7803,47 @@
      },
      "count": 1,
      "present": 1
+    },
+    "sp_certificate_hash": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "sp_private_key_hash": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 1,
+       "present": 1
+      }
+     },
+     "count": 1,
+     "present": 1
+    },
+    "usrgrps": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 2,
+       "present": 2
+      }
+     },
+     "count": 2,
+     "present": 2
     }
    },
    "stuck": []
   },
   "usergroup": {
-   "samples": 3,
-   "rows": 7,
-   "ok": 3,
+   "samples": 4,
+   "rows": 8,
+   "ok": 4,
    "paths": {
     "users[].attempt_clock": {
      "kind": "unexpected",
@@ -7523,7 +8059,7 @@
   },
   "usermacro": {
    "samples": 6,
-   "rows": 7814,
+   "rows": 7811,
    "ok": 6,
    "paths": {
     "hostgroups": {
@@ -7599,69 +8135,6 @@
      },
      "count": 1,
      "present": 1
-    }
-   },
-   "stuck": []
-  },
-  "ceprule": {
-   "samples": 4,
-   "rows": 8,
-   "ok": 4,
-   "paths": {
-    "error": {
-     "kind": "unexpected",
-     "categories": {
-      "plain": {
-       "refused": 4,
-       "present": 4
-      }
-     },
-     "count": 4,
-     "present": 4
-    },
-    "filter.conditions[].formulaid": {
-     "kind": "value must be empty",
-     "categories": {
-      "plain": {
-       "refused": 3,
-       "present": 4
-      }
-     },
-     "count": 3,
-     "present": 4
-    },
-    "filter.eval_formula": {
-     "kind": "unexpected",
-     "categories": {
-      "plain": {
-       "refused": 4,
-       "present": 4
-      }
-     },
-     "count": 4,
-     "present": 4
-    },
-    "operations[].filter.conditions[].formulaid": {
-     "kind": "value must be empty",
-     "categories": {
-      "plain": {
-       "refused": 2,
-       "present": 2
-      }
-     },
-     "count": 2,
-     "present": 2
-    },
-    "operations[].filter.eval_formula": {
-     "kind": "unexpected",
-     "categories": {
-      "plain": {
-       "refused": 4,
-       "present": 4
-      }
-     },
-     "count": 4,
-     "present": 4
     }
    },
    "stuck": []

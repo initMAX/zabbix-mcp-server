@@ -15,10 +15,10 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-"""The admin portal's Tools section carries the three catalog switches
-(``register_write_tools``, ``strip_write_params``, ``validate_get_params``)
-as checkboxes: present = true, absent = false, and ``load_config`` reads
-back what the form wrote."""
+"""The admin portal's Tools section carries the five catalog switches
+(``register_write_tools``, ``strip_write_params``, ``validate_get_params``,
+``schema_constraints``, ``reject_unknown_arguments``) as checkboxes: present = true,
+absent = false, and ``load_config`` reads back what the form wrote."""
 
 import sys
 import unittest
@@ -31,7 +31,8 @@ from test_admin_timezone import _Base, _Req, _run  # noqa: E402
 from zabbix_mcp.admin.views import settings as settings_views  # noqa: E402
 from zabbix_mcp.config import load_config  # noqa: E402
 
-KEYS = ("register_write_tools", "strip_write_params", "validate_get_params")
+KEYS = ("register_write_tools", "strip_write_params", "validate_get_params", "schema_constraints",
+        "reject_unknown_arguments")
 
 
 class TestCatalogSwitches(_Base):
@@ -53,11 +54,16 @@ class TestCatalogSwitches(_Base):
         self.assertFalse(cfg.server.register_write_tools)
         self.assertFalse(cfg.server.strip_write_params)
         self.assertFalse(cfg.server.validate_get_params)
-        self._save(register_write_tools="true", strip_write_params="true", validate_get_params="true")
+        self.assertFalse(cfg.server.schema_constraints)
+        self.assertFalse(cfg.server.reject_unknown_arguments)
+        self._save(register_write_tools="true", strip_write_params="true", validate_get_params="true",
+                   schema_constraints="true", reject_unknown_arguments="true")
         cfg = load_config(self.path)
         self.assertTrue(cfg.server.register_write_tools)
         self.assertTrue(cfg.server.strip_write_params)
         self.assertTrue(cfg.server.validate_get_params)
+        self.assertTrue(cfg.server.schema_constraints)
+        self.assertTrue(cfg.server.reject_unknown_arguments)
 
     def test_settings_view_exposes_the_switches(self):
         self._save(register_write_tools="true")

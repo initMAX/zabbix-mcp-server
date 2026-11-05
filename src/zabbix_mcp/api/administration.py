@@ -461,7 +461,8 @@ _AUDITLOG_METHODS: list[MethodDef] = [
             "values. Essential for security auditing, compliance, and forensic "
             "investigation. Use time_from/time_till to limit the time window and "
             "userids to focus on a specific user's activity. Results can be large "
-            "-- always use limit or time filters."
+            "-- always use limit or time filters. The newest entries come first "
+            "unless a sort is given, so 'limit' keeps the latest ones."
         ),
         read_only=True,
         compact_fields=("auditid", "userid", "action", "resourcetype", "clock"),
@@ -512,10 +513,6 @@ _PROXY_GET_EXTRA: list[ParamDef] = [
         "proxyids", "list[str]",
         "Return only proxies with the given IDs.",
     ),
-    ParamDef(
-        "with_hosts", "bool",
-        "Return only proxies that have at least one host assigned to them.",
-    ),
 ]
 
 _PROXY_METHODS: list[MethodDef] = [
@@ -527,9 +524,8 @@ _PROXY_METHODS: list[MethodDef] = [
             "of the Zabbix server, enabling distributed monitoring across network "
             "segments, firewalls, and geographic regions. Each proxy has a mode "
             "(0=active, 1=passive), connection settings, and a list of assigned "
-            "hosts. Use selectHosts to include assigned hosts, selectInterface "
-            "for connection details. Filter with with_hosts to find proxies that "
-            "are actively monitoring hosts."
+            "hosts. Use selectHosts to include assigned hosts (extra_params), "
+            "selectInterface for connection details on releases before 7.0."
         ),
         read_only=True,
         compact_fields=("proxyid", "name", "operating_mode", "state"),
@@ -545,7 +541,11 @@ _PROXY_METHODS: list[MethodDef] = [
             "For passive proxies, provide 'address' and 'port'. "
             "Optional: 'tls_connect' and 'tls_accept' for encryption, "
             "'proxy_groupid' for proxy group membership, 'hosts' to assign "
-            "hosts at creation time."
+            "hosts at creation time. Zabbix 8.0+: 'apm' ({'data_collection_status': 0/1, "
+            "'max_messages_per_second', 'additional_resource_attributes': [{'key', 'value', "
+            "'signal_type': 0 traces / 1 metrics / 2 logs}]}) turns the proxy into an OpenTelemetry "
+            "collector, and 'timeout_telemetry_query' joins the per-proxy timeouts "
+            "(with custom_timeouts = 1)."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -585,6 +585,7 @@ _PROXYGROUP_GET_EXTRA: list[ParamDef] = [
     ParamDef(
         "proxygroupids", "list[str]",
         "Return only proxy groups with the given IDs.",
+        api_name="proxy_groupids",
     ),
 ]
 

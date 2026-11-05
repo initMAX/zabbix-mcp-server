@@ -249,13 +249,18 @@
     "offset": {
      "type": "integer",
      "since": "8.0"
+    },
+    "severity_numbers": {
+     "type": "integer/array",
+     "since": "8.0"
     }
    },
    "selects": {},
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "New in 8.0."
+    "New in 8.0.",
+    "severity_numbers (0 to 24): validated by CApmLog::get in the 8.0.0rc2 and 8.0.0 source; the reference page does not list it (not verified live: no APM database on the test server)"
    ]
   },
   "apmmetric.get": {
@@ -1193,6 +1198,11 @@
      "readonly": true,
      "since": "8.0"
     },
+    "has_root_span": {
+     "type": "integer",
+     "readonly": true,
+     "since": "8.0"
+    },
     "span_count": {
      "type": "integer",
      "readonly": true,
@@ -1205,7 +1215,8 @@
     }
    },
    "notes": [
-    "New in 8.0."
+    "New in 8.0.",
+    "has_root_span (1 when the trace has its root span among the stored spans): an output field of CApmTrace in the 8.0.0 source, added after the release candidate; the reference page does not list it"
    ]
   },
   "device": {
@@ -1244,10 +1255,16 @@
      "type": "timestamp",
      "readonly": false,
      "since": "8.0"
+    },
+    "enrollment_token_expires_at": {
+     "type": "timestamp",
+     "readonly": true,
+     "since": "8.0"
     }
    },
    "notes": [
-    "New in 8.0."
+    "New in 8.0.",
+    "enrollment_token_expires_at: in OUTPUT_FIELDS of CDevice in the 8.0.0rc2 and 8.0.0 source, which device.get validates output against; the reference page does not list it (not seen live: no paired device on the test server)"
    ]
   },
   "serverinfo": {

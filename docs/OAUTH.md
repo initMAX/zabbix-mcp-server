@@ -204,7 +204,12 @@ For production you have two equally good options:
    Whichever proxy you pick, set `[server].trusted_proxies = ["127.0.0.1"]`
    (or your proxy's IP) in `config.toml` so the OAuth login rate
    limiter and token IP allowlists honour the `X-Forwarded-For` the
-   proxy injects.
+   proxy injects. The server takes the address the proxy itself wrote
+   (the right-most entry that is not a trusted proxy), not what a client
+   sent in front of it; with more than one proxy in front of the server,
+   list each of them. The line is required since v1.42, for a proxy on
+   the same host too: a proxy that is not listed is not believed, and
+   every client behind it is then seen as the proxy.
 
 ### Internal-only hostnames: DNS-01 instead of HTTP-01
 

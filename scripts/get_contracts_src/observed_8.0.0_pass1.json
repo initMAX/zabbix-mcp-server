@@ -14,10 +14,6 @@
     "type": "array",
     "observed": "8.0.0"
    },
-   "storage_mode": {
-    "type": "integer",
-    "observed": "8.0.0"
-   },
    "time_shift": {
     "type": "string",
     "observed": "8.0.0"
@@ -34,10 +30,6 @@
    },
    "query": {
     "type": "array",
-    "observed": "8.0.0"
-   },
-   "storage_mode": {
-    "type": "integer",
     "observed": "8.0.0"
    },
    "time_shift": {
@@ -152,6 +144,16 @@
   "autoregistration": [
    "tls_accept"
   ],
+  "ceprule": [
+   "cep_ruleid",
+   "description",
+   "error",
+   "name",
+   "sortorder",
+   "status",
+   "stop",
+   "window_type"
+  ],
   "dashboard": [
    "auto_start",
    "dashboardid",
@@ -227,7 +229,6 @@
    "state",
    "status",
    "status_codes",
-   "storage_mode",
    "templateid",
    "time_shift",
    "timeout",
@@ -288,7 +289,6 @@
    "ssl_key_password",
    "status",
    "status_codes",
-   "storage_mode",
    "templateid",
    "time_shift",
    "timeout",
@@ -438,6 +438,14 @@
    "vendor_name",
    "vendor_version",
    "wizard_ready"
+  ],
+  "hostdashboard": [
+   "auto_start",
+   "dashboardid",
+   "display_period",
+   "hostid",
+   "name",
+   "templateid"
   ],
   "hostgroup": [
    "flags",
@@ -777,6 +785,10 @@
    "username",
    "usrgrpid"
   ],
+  "serverinfo": [
+   "lastaccess",
+   "serverid"
+  ],
   "settings": [
    "alert_usrgrpid",
    "apm_global_db",
@@ -910,6 +922,14 @@
    "tokenid",
    "userid"
   ],
+  "trend": [
+   "clock",
+   "itemid",
+   "num",
+   "value_avg",
+   "value_max",
+   "value_min"
+  ],
   "trigger": [
    "comments",
    "correlation_mode",
@@ -1022,65 +1042,17 @@
    "sendto": true,
    "status": true
   },
-  "apmlog.get": {
-   "timestamp": false,
-   "traceid": false,
-   "spanid": false,
-   "trace_flags": false,
-   "severity_text": false,
-   "severity_number": false,
-   "service_name": false,
-   "resource_schema_url": false,
-   "scope_schema_url": false,
-   "scope_name": false,
-   "scope_version": false,
-   "event_name": false
-  },
-  "apmmetric.get": {
-   "type": false,
-   "resource_schema_url": false,
-   "scope_schema_url": false,
-   "scope_name": false,
-   "scope_version": false,
-   "service_name": false,
-   "metric_name": false,
-   "metric_unit": false,
-   "start_time_unix": false,
-   "time_unix": false
-  },
-  "apmspan.get": {
-   "timestamp": false,
-   "traceid": false,
-   "spanid": false,
-   "parent_spanid": false,
-   "trace_state": false,
-   "span_name": false,
-   "span_kind": false,
-   "service_name": false,
-   "scope_name": false,
-   "scope_version": false,
-   "duration": false,
-   "status_code": false,
-   "status_message": false
-  },
-  "apmtrace.get": {
-   "timestamp": false,
-   "traceid": false,
-   "spanid": false,
-   "trace_state": false,
-   "span_name": false,
-   "span_kind": false,
-   "service_name": false,
-   "scope_name": false,
-   "scope_version": false,
-   "duration": false,
-   "status_code": false,
-   "status_message": false
-  },
   "auditlog.get": {
    "auditid": true,
    "userid": true,
    "clock": true
+  },
+  "ceprule.get": {
+   "cep_ruleid": true,
+   "name": true,
+   "stop": true,
+   "sortorder": true,
+   "status": true
   },
   "connector.get": {
    "connectorid": true,
@@ -1167,6 +1139,11 @@
    "host": true,
    "name": true,
    "status": true
+  },
+  "hostdashboard.get": {
+   "hostid": true,
+   "dashboardid": true,
+   "name": true
   },
   "hostgroup.get": {
    "groupid": true,

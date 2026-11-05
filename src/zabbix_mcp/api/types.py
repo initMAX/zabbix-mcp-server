@@ -28,10 +28,26 @@ class ParamDef:
     """Definition of a single tool parameter."""
 
     name: str
-    param_type: str  # "str", "int", "timestamp" (int | ISO 8601 str), "bool", "list[str]", "list", "dict"
+    # "str", "int", "timestamp" (int | ISO 8601 str), "bool", "list[str]", "list", "dict",
+    # "str|list[str]" (one name or a list of names)
+    param_type: str
     description: str
     required: bool = False
     default: Any = None
+    # JSON Schema of the value, when the contract knows more than the type
+    # (api/schema_constraints.py); None keeps what the type generates.
+    schema: dict[str, Any] | None = field(default=None, compare=False)
+    # The name Zabbix has for this parameter, where the tool's own name
+    # differs (proxygroup_get "proxygroupids" is proxygroup.get
+    # "proxy_groupids"). The value is sent under this name.
+    # "filter.<property>" sends it as that key of the method's "filter"
+    # (action.get has no "eventsource" parameter, the property is filterable).
+    api_name: str | None = None
+
+    @property
+    def sent_as(self) -> str:
+        """The key this parameter travels under in the API call."""
+        return self.api_name or self.name
 
 
 @dataclass(frozen=True)

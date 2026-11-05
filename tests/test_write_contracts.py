@@ -30,6 +30,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from mcp.server.mcpserver import MCPServer  # noqa: E402
+from mcp.server.mcpserver.exceptions import ToolError  # noqa: E402
 
 from zabbix_mcp.api import ALL_METHODS  # noqa: E402
 from zabbix_mcp.api import write_contracts as wc  # noqa: E402
@@ -175,7 +176,8 @@ class TestShippedContract(unittest.TestCase):
         self.assertNotIn("users[].userid", paths["usergroup.update"])
         # the interface quartet is refused from 7.0 on, 6.x ignores it
         rules = {".".join(r.path): r for r in wc.WRITE_CONTRACTS["hostinterface.update"]}
-        self.assertEqual(rules["available"].releases, ("7.0", "7.2", "7.4", "8.0"))
+        # 8.0.0 has no hostinterface.update any more, so nothing was measured there
+        self.assertEqual(rules["available"].releases, ("7.0", "7.2", "7.4"))
         # a documented writable property is never stripped on an "unexpected" alone
         self.assertNotIn("username", paths.get("script.update", set()))
         self.assertNotIn("filter", paths["discoveryrule.update"])
@@ -251,15 +253,233 @@ class TestThroughRegisteredTools(_Harness):
 
 
 class TestHandRules(_Harness):
-    def test_trigger_get_expands_the_expression_by_default(self):
+    def test_trigger_get_does_not_ask_zabbix_to_expand(self):
+        # v1.40 and v1.41 did by default, and Zabbix's expansion puts the value
+        # of every user macro in; the editable form is rebuilt after the call
+        # (tests/test_trigger_expressions.py). The harness server is 7.4.
         sent = self._call("trigger_get", {"triggerids": ["1"]}, result=[])
-        self.assertTrue(sent[0][1].get("expandExpression"))
-        sent = self._call("trigger_get", {"triggerids": ["1"], "extra_params": {"expandExpression": False}}, result=[])
-        self.assertFalse(sent[0][1]["expandExpression"])
+        self.assertNotIn("expandExpression", sent[0][1])
         sent = self._call("triggerprototype_get", {"discoveryids": ["1"]}, result=[])
-        self.assertTrue(sent[0][1].get("expandExpression"))
+        self.assertNotIn("expandExpression", sent[0][1])
+        # the caller's own choice is the caller's: Zabbix's expansion, or the stored form.
+        # expandExpression is a Zabbix flag: sent as false it still expands
+        # (measured on 6.0, 7.0 and 8.0), so the stored form is the key left out.
+        sent = self._call("trigger_get", {"triggerids": ["1"], "extra_params": {"expandExpression": True}}, result=[])
+        self.assertIs(sent[0][1].get("expandExpression"), True)
+        sent = self._call("trigger_get", {"triggerids": ["1"], "extra_params": {"expandExpression": False}}, result=[])
+        self.assertNotIn("expandExpression", sent[0][1])
         sent = self._call("item_get", {"itemids": ["1"]}, result=[])
         self.assertNotIn("expandExpression", sent[0][1])
+
+    def test_empty_uuid_is_dropped_everywhere(self):
+        # 6.2: Invalid parameter "/1/uuid": cannot be empty (an item on a host has none)
+        for tool, key in (("item_update", "itemid"), ("trigger_update", "triggerid"), ("discoveryrule_update", "itemid"),
+                          ("graphprototype_update", "graphid"), ("host_update", "hostid")):
+            with self.subTest(tool=tool):
+                for version in ("6.2.9", "7.4.14"):
+                    sent = self._call(tool, {"params": {key: "1", "name": "x", "uuid": ""}}, version=version)
+                    self.assertNotIn("uuid", sent[0][1])
+        # a real uuid is the caller's business (a template object keeps it)
+        sent = self._call("template_update", {"params": {"templateid": "1", "uuid": "a" * 32}})
+        self.assertEqual(sent[0][1]["uuid"], "a" * 32)
+        sent = self._call("item_create", {"params": {"hostid": "1", "name": "n", "key_": "k", "type": 2,
+                                                     "value_type": 3, "uuid": ""}})
+        self.assertNotIn("uuid", sent[0][1])
+
+    def _template_call(self, tool, params, children, version="7.4.14", lookup=None):
+        """Send *params* through a template write tool on a server where the
+        template has *children* (templates inheriting from it). Returns the
+        write that reached Zabbix, or None when the tool refused; the
+        refusal text, the result text and the lookups made are kept on self."""
+        sent = []
+        self.lookups = []
+        self.refusal = self.result_text = None
+
+        def fake_call(server, method, p, *a, **k):
+            if method == "template.get":
+                self.lookups.append(copy.deepcopy(p))
+                if lookup is not None:
+                    return lookup(p)
+                return [{"templateid": p["templateids"][0], "templates": [{"templateid": c} for c in children]}]
+            sent.append((method, copy.deepcopy(p)))
+            return {"templateids": ["10"]}
+
+        with patch.object(self.mgr, "call", side_effect=fake_call), \
+                patch.object(self.mgr, "get_version", return_value=version):
+            try:
+                result = asyncio.run(self.mcp.call_tool(tool, {"params": params}))
+            except ToolError as exc:
+                self.refusal = str(exc)
+                self.assertEqual(sent, [], "a refused call must not reach Zabbix")
+                return None
+        self.result_text = "".join(getattr(c, "text", "") for c in getattr(result, "content", result))
+        return sent[0][1]
+
+    def test_a_template_read_from_get_goes_back_without_relinking(self):
+        # template.get "templates" = the templates that inherit from this one;
+        # template.update "templates" = what this one inherits from. Verified live
+        # on 6.4.21 and 8.0.0: sent back, an empty list unlinks every parent
+        # silently, a list of children is refused (circular linkage / key by key).
+        parents = [{"templateid": "5", "host": "base", "name": "base"}]
+        for version in ("6.4.21", "7.4.14", "8.0.0"):
+            # a child template: inherits from 5, nothing inherits from it
+            sent = self._template_call("template_update", {
+                "templateid": "10", "name": "child", "parentTemplates": parents, "templates": []}, [], version)
+            self.assertNotIn("templates", sent)          # not "unlink everything"
+            self.assertNotIn("parentTemplates", sent)    # the measured strip
+            self.assertEqual(sent["name"], "child")
+            # the children were looked up for THIS template, ids only
+            self.assertEqual(self.lookups, [{"output": ["templateid"], "templateids": ["10"],
+                                             "selectTemplates": ["templateid"]}])
+            # a parent template: its children come back as full objects, or as ids
+            for echo in ([{"templateid": "20", "host": "c", "name": "c", "proxyid": "0", "status": "3"}],
+                         [{"templateid": "20"}], [{"templateid": 20}]):
+                sent = self._template_call("template_update", {
+                    "templateid": "10", "name": "parent", "parentTemplates": [], "templates": echo}, ["20"], version)
+                self.assertNotIn("templates", sent)
+
+    def test_leaving_linkage_alone_is_said_in_the_result(self):
+        # An echo with an empty 'templates' and a wish to unlink every parent are
+        # the same payload, and an edited 'parentTemplates' is dropped as
+        # read-only: "success" alone would hide that nothing was (un)linked.
+        self._template_call("template_update", {
+            "templateid": "10", "parentTemplates": [{"templateid": "5"}], "templates": []}, [])
+        self.assertIn("Template linkage was left as it is", self.result_text)
+        self.assertIn("without 'parentTemplates'", self.result_text)
+        self.assertIn('"templateids"', self.result_text)   # the result itself is still there
+        # 'parentTemplates' alone (read with selectParentTemplates only, perhaps edited)
+        sent = self._template_call("template_update", {"templateid": "10", "parentTemplates": []}, [])
+        self.assertNotIn("parentTemplates", sent)
+        self.assertEqual(self.lookups, [])    # nothing to compare
+        self.assertIn("Template linkage was left as it is", self.result_text)
+        # the caller's own payload gets no note
+        self._template_call("template_update", {"templateid": "10", "templates": [{"templateid": "5"}]}, [])
+        self.assertNotIn("_note", self.result_text)
+        self._template_call("template_update", {"templateid": "10", "name": "x"}, [])
+        self.assertNotIn("_note", self.result_text)
+
+    def test_a_changed_templates_list_in_a_get_object_is_refused_not_dropped(self):
+        ambiguous = "cannot be told which relation is meant"
+        # the model read the template, put a parent into 'templates' and sent it
+        # all back: dropping it would report success with nothing linked
+        self.assertIsNone(self._template_call("template_update", {
+            "templateid": "10", "parentTemplates": [{"templateid": "5"}], "templates": [{"templateid": "7"}]}, []))
+        self.assertIn(ambiguous, self.refusal)
+        self.assertIn("without 'parentTemplates'", self.refusal)
+        self.assertIn("inherit FROM", self.refusal)
+        # emptied on purpose while the template has children: not the echo either
+        self.assertIsNone(self._template_call("template_update", {
+            "templateid": "10", "parentTemplates": [], "templates": []}, ["20"]))
+        self.assertIn(ambiguous, self.refusal)
+        # one child dropped from the list, one added
+        for edited in ([{"templateid": "20"}], [{"templateid": "20"}, {"templateid": "21"}, {"templateid": "22"}]):
+            self.assertIsNone(self._template_call("template_update", {
+                "templateid": "10", "parentTemplates": [], "templates": edited}, ["20", "21"]))
+            self.assertIn(ambiguous, self.refusal)
+        # entries without an id cannot be compared
+        self.assertIsNone(self._template_call("template_update", {
+            "templateid": "10", "parentTemplates": [], "templates": [{"name": "Linux by Zabbix agent"}]}, []))
+        self.assertIn(ambiguous, self.refusal)
+        self.assertEqual(self.lookups, [])
+
+    def test_a_failed_lookup_is_reported_as_such(self):
+        # not as "this is not what template_get returns", which would be untrue
+        def boom(params):
+            raise RuntimeError("connection reset by secret.internal")
+
+        payload = {"templateid": "10", "parentTemplates": [], "templates": []}
+        self.assertIsNone(self._template_call("template_update", dict(payload), [], lookup=boom))
+        self.assertIn("the check of which templates inherit from template 10 failed", self.refusal)
+        self.assertIn("Nothing was changed", self.refusal)
+        self.assertNotIn("secret.internal", self.refusal)
+        self.assertNotIn("cannot be told", self.refusal)
+        # the template is gone, or not readable with these credentials
+        self.assertIsNone(self._template_call("template_update", dict(payload), [], lookup=lambda p: []))
+        self.assertIn("template 10 was not found", self.refusal)
+        # a rate limit keeps its own message
+        from zabbix_mcp.client import RateLimitError
+
+        def limited(params):
+            raise RateLimitError("Rate limit exceeded")
+
+        self.assertIsNone(self._template_call("template_update", dict(payload), [], lookup=limited))
+        self.assertIn("Rate limit exceeded", self.refusal)
+
+    def test_the_callers_own_templates_list_is_never_touched(self):
+        # no 'parentTemplates': not an object from template_get, so the words are the caller's
+        for linked in ([{"templateid": "5"}], [], [{"templateid": "5", "name": "Linux"}]):
+            sent = self._template_call("template_update", {"templateid": "10", "templates": linked}, ["20"])
+            self.assertEqual(sent["templates"], linked)
+            self.assertEqual(self.lookups, [])
+        sent = self._template_call("template_create", {"host": "t", "groups": [{"groupid": "1"}],
+                                                       "templates": [{"templateid": "5"}]}, [])
+        self.assertEqual(sent["templates"], [{"templateid": "5"}])
+        # a host's "templates" is not a get echo of anything
+        sent = self._call("host_update", {"params": {"hostid": "1", "templates": [{"templateid": "5", "name": "x"}]}})
+        self.assertIn("templates", sent[0][1])
+
+    def test_template_get_never_returns_templates_without_parent_templates(self):
+        from zabbix_mcp.api import ALL_METHODS
+        from zabbix_mcp.server import _build_zabbix_params
+        template_get = next(m for m in ALL_METHODS if m.tool_name == "template_get")
+        sent = _build_zabbix_params(template_get, {"extra_params": {"selectTemplates": "extend"}}, "7.4.0")
+        self.assertEqual(sent["selectParentTemplates"], ["templateid"])
+        # the caller's own select wins, and nothing is added when 'templates' is not asked for
+        sent = _build_zabbix_params(template_get, {"extra_params": {
+            "selectTemplates": ["templateid"], "selectParentTemplates": "extend"}}, "7.4.0")
+        self.assertEqual(sent["selectParentTemplates"], "extend")
+        self.assertNotIn("selectParentTemplates", _build_zabbix_params(template_get, {}, "7.4.0"))
+        # a null select does not switch the pairing off
+        sent = _build_zabbix_params(template_get, {"extra_params": {
+            "selectTemplates": "extend", "selectParentTemplates": None}}, "7.4.0")
+        self.assertEqual(sent["selectParentTemplates"], ["templateid"])
+        host_get = next(m for m in ALL_METHODS if m.tool_name == "host_get")
+        self.assertNotIn("selectParentTemplates",
+                         _build_zabbix_params(host_get, {"extra_params": {"selectTags": "extend"}}, "7.4.0"))
+
+    def test_a_count_of_children_is_not_a_request(self):
+        sent = self._template_call("template_update", {
+            "templateid": "10", "name": "x", "parentTemplates": [], "templates": "3"}, ["1", "2", "3"])
+        self.assertNotIn("templates", sent)
+        self.assertIn("Template linkage was left as it is", self.result_text)
+
+    def test_a_copy_made_from_a_get_object(self):
+        # template_create from an object read with template_get, id removed: the
+        # source's children are not parents of the copy, and the copy does not
+        # inherit what the source inherits from - which the result says
+        sent = self._template_call("template_create", {
+            "host": "copy", "groups": [{"groupid": "1"}],
+            "parentTemplates": [{"templateid": "5", "name": "base"}], "templates": []}, [])
+        self.assertNotIn("templates", sent)
+        self.assertNotIn("parentTemplates", sent)
+        self.assertIn("The new template does not inherit from any template", self.result_text)
+        self.assertIn("without 'parentTemplates'", self.result_text)
+        # children of the source cannot be checked without its id: refused, not guessed
+        self.assertIsNone(self._template_call("template_create", {
+            "host": "copy", "groups": [{"groupid": "1"}], "parentTemplates": [],
+            "templates": [{"templateid": "20"}]}, ["20"]))
+        self.assertIn("cannot be told which relation is meant", self.refusal)
+
+    def test_graph_items_go_back_without_the_graph_id(self):
+        # graph.get returns gitems[].graphid; sent back on a template's graph it
+        # makes Zabbix hang the inherited graphs' items on the template's graph
+        # (raw API, 6.2.9 / 6.4.21 / 8.0.0). The key is taken out, gitemid stays.
+        gitems = [{"gitemid": "7", "graphid": "100", "itemid": "1", "color": "00AA00", "sortorder": "0"},
+                  {"gitemid": "8", "graphid": "100", "itemid": "2", "color": "AA0000", "sortorder": "1"}]
+        for tool, key in (("graph_update", "graphid"), ("graphprototype_update", "graphid"),
+                          ("graph_create", None), ("graphprototype_create", None)):
+            params = {"name": "g", "gitems": copy.deepcopy(gitems)}
+            if key:
+                params[key] = "100"
+            for version in ("6.2.9", "7.4.14", "8.0.0"):
+                sent = self._call(tool, {"params": copy.deepcopy(params)}, version=version)[0][1]
+                self.assertEqual([sorted(g) for g in sent["gitems"]],
+                                 [["color", "gitemid", "itemid", "sortorder"]] * 2, (tool, version))
+                if key:
+                    self.assertEqual(sent["graphid"], "100")   # the graph itself is still named
+        # nothing else has its graphid touched
+        sent = self._call("graph_update", {"params": {"graphid": "100", "name": "x"}})[0][1]
+        self.assertEqual(sent, {"graphid": "100", "name": "x"})
 
     def test_lld_filter_formulaid_only_without_custom_expression(self):
         params = {"itemid": "1", "filter": {"evaltype": "0", "eval_formula": "A and B", "formula": "",

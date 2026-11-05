@@ -26,6 +26,11 @@
      "releases": [
       "8.0"
      ]
+    },
+    "operations[].scope_filter.eval_formula": {
+     "releases": [
+      "8.0"
+     ]
     }
    }
   },
@@ -45,6 +50,11 @@
      "releases": [
       "8.0"
      ]
+    },
+    "operations[].scope_filter.eval_formula": {
+     "releases": [
+      "8.0"
+     ]
     }
    }
   },
@@ -56,6 +66,12 @@
   "discoveryrule.create": {
    "strip": {
     "discoveryData": {
+     "releases": [
+      "7.4",
+      "8.0"
+     ]
+    },
+    "discoveryRule": {
      "releases": [
       "7.4",
       "8.0"
@@ -116,13 +132,9 @@
       "8.0"
      ]
     },
-    "overrides[].filter.eval_formula": {
+    "overrides[].filter.eval_formula": {},
+    "query.filter.eval_formula": {
      "releases": [
-      "6.0",
-      "6.2",
-      "7.0",
-      "7.2",
-      "7.4",
       "8.0"
      ]
     },
@@ -149,6 +161,12 @@
      ]
     },
     "discoveryData": {
+     "releases": [
+      "7.4",
+      "8.0"
+     ]
+    },
+    "discoveryRule": {
      "releases": [
       "7.4",
       "8.0"
@@ -241,22 +259,13 @@
       "8.0"
      ]
     },
-    "overrides[].filter.eval_formula": {
+    "overrides[].filter.eval_formula": {},
+    "query.filter.eval_formula": {
      "releases": [
-      "6.0",
-      "6.2",
-      "7.0",
-      "7.2",
-      "7.4",
       "8.0"
      ]
     },
     "state": {},
-    "storage_mode": {
-     "releases": [
-      "8.0"
-     ]
-    },
     "templateid": {},
     "trends": {
      "releases": [
@@ -302,6 +311,12 @@
   },
   "discoveryruleprototype.create": {
    "strip": {
+    "discoveryData": {
+     "releases": [
+      "7.4",
+      "8.0"
+     ]
+    },
     "discoveryRule": {
      "releases": [
       "7.4",
@@ -378,6 +393,12 @@
   },
   "discoveryruleprototype.update": {
    "strip": {
+    "discoveryData": {
+     "releases": [
+      "7.4",
+      "8.0"
+     ]
+    },
     "discoveryRule": {
      "releases": [
       "7.4",
@@ -459,11 +480,6 @@
     "overrides[].filter.eval_formula": {
      "releases": [
       "7.4",
-      "8.0"
-     ]
-    },
-    "storage_mode": {
-     "releases": [
       "8.0"
      ]
     },
@@ -779,6 +795,13 @@
       "6.4"
      ]
     },
+    "hostPrototype": {
+     "releases": [
+      "6.0",
+      "6.2",
+      "6.4"
+     ]
+    },
     "hostPrototypes": {
      "releases": [
       "7.0",
@@ -839,6 +862,13 @@
       "6.4"
      ]
     },
+    "hostPrototype": {
+     "releases": [
+      "6.0",
+      "6.2",
+      "6.4"
+     ]
+    },
     "hostPrototypes": {
      "releases": [
       "7.0",
@@ -866,8 +896,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -875,8 +904,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -884,8 +912,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -893,8 +920,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -902,8 +928,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     }
@@ -915,8 +940,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -924,8 +948,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -933,8 +956,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -942,8 +964,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     },
@@ -951,8 +972,7 @@
      "releases": [
       "7.0",
       "7.2",
-      "7.4",
-      "8.0"
+      "7.4"
      ],
      "kind": "opaque: Incorrect arguments passed to function."
     }
@@ -1442,6 +1462,11 @@
       "8.0"
      ]
     },
+    "query.filter.eval_formula": {
+     "releases": [
+      "8.0"
+     ]
+    },
     "state": {},
     "templateid": {},
     "triggers": {
@@ -1633,6 +1658,11 @@
       "7.0",
       "7.2",
       "7.4",
+      "8.0"
+     ]
+    },
+    "query.filter.eval_formula": {
+     "releases": [
       "8.0"
      ]
     },
@@ -2029,6 +2059,111 @@
       "7.4",
       "8.0"
      ]
+    },
+    "triggers[].comments": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].correlation_mode": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].correlation_tag": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].description": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].error": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].event_name": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].expression": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].flags": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].lastchange": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].manual_close": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].opdata": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].priority": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].recovery_expression": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].recovery_mode": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].state": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].status": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].templateid": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].type": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].url": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].url_name": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].value": {
+     "releases": [
+      "8.0"
+     ]
     }
    }
   },
@@ -2191,6 +2326,111 @@
       "7.4",
       "8.0"
      ]
+    },
+    "triggers[].comments": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].correlation_mode": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].correlation_tag": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].description": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].error": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].event_name": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].expression": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].flags": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].lastchange": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].manual_close": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].opdata": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].priority": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].recovery_expression": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].recovery_mode": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].state": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].status": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].templateid": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].type": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].url": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].url_name": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "triggers[].value": {
+     "releases": [
+      "8.0"
+     ]
     }
    }
   },
@@ -2273,24 +2513,8 @@
   },
   "module.update": {
    "strip": {
-    "id": {
-     "releases": [
-      "6.4",
-      "7.0",
-      "7.2",
-      "7.4",
-      "8.0"
-     ]
-    },
-    "relative_path": {
-     "releases": [
-      "6.4",
-      "7.0",
-      "7.2",
-      "7.4",
-      "8.0"
-     ]
-    }
+    "id": {},
+    "relative_path": {}
    }
   },
   "proxy.create": {
@@ -3979,6 +4203,21 @@
   },
   "userdirectory.create": {
    "strip": {
+    "idp_certificate_hash": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "sp_certificate_hash": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "sp_private_key_hash": {
+     "releases": [
+      "8.0"
+     ]
+    },
     "usrgrps": {
      "releases": [
       "6.2",
@@ -3993,6 +4232,21 @@
   },
   "userdirectory.update": {
    "strip": {
+    "idp_certificate_hash": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "sp_certificate_hash": {
+     "releases": [
+      "8.0"
+     ]
+    },
+    "sp_private_key_hash": {
+     "releases": [
+      "8.0"
+     ]
+    },
     "usrgrps": {
      "releases": [
       "6.2",

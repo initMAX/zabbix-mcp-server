@@ -119,6 +119,26 @@ compact_output = true
 # zabbix_raw_api_call is never validated.
 # validate_get_params = true
 
+# State the same contract in the JSON Schema of tools/list, not only in the
+# descriptions (default: true): sortfield and sortorder as enums, output as
+# 'extend' / 'count' or a list of the object's properties, filter / search /
+# extra_params as objects whose keys are limited to what the method takes.
+# A client that feeds the schemas to a structured-output decoder or a JSON
+# Schema validator then cannot build a call the server would refuse. The
+# server itself stays as lenient as before (a comma-separated string still
+# works). Set to false if a client cannot digest the propertyNames keyword.
+# schema_constraints = true
+
+# Refuse a tool call that carries an argument the tool does not have
+# (default: true). Without this the argument is dropped and the rest of the
+# call runs: host_get with hostid instead of hostids returned every host, and
+# a selectXxx passed next to the typed parameters instead of inside
+# extra_params was ignored. The refusal says where the value belongs. With
+# schema_constraints on, the tool schemas state it too (additionalProperties:
+# false). Set to false only for a client that adds keys of its own to every
+# call.
+# reject_unknown_arguments = true
+
 # Drop, before every create / update tool call, the keys the matching get
 # tool returns but Zabbix refuses on write (default: true): read-only
 # properties (templateid, flags, state, error, lastclock), row identifiers
@@ -221,6 +241,35 @@ compact_output = true
 # Supports individual IPs and CIDR notation.
 #
 # allowed_hosts = ["127.0.0.1", "10.0.0.0/24", "192.168.1.100"]
+
+# ---------------------------------------------------------------------------
+# Reverse proxies
+# ---------------------------------------------------------------------------
+# Addresses of the reverse proxies in front of this server (a network is
+# taken too, but every host inside it is then believed like a proxy: list
+# proxies, not the networks clients live in). A peer listed here is believed
+# when it sends X-Forwarded-For (the client address that allowed_hosts, a
+# token's IP allowlist, the login limits and the audit log go by),
+# X-Forwarded-Proto (the scheme, which the Secure flag of the portal cookie
+# goes by) and X-Forwarded-Host (the address of report download links while
+# public_url is empty).
+#
+# Not set (default): the TCP peer is the client and these headers are not
+# believed, from a proxy on this host either. A proxy on this host therefore
+# has to be listed ("127.0.0.1", and "::1" when it connects over IPv6; until
+# v1.41 the HTTP server underneath believed every loopback peer on its own).
+# What an unlisted local proxy forwards is refused by allowed_hosts and by
+# tokens with allowed_ips: the client behind it is unknown.
+#
+# The client is the right-most X-Forwarded-For entry that is not one of the
+# proxies listed here, so list every proxy between the clients and this
+# server (a load balancer in front of nginx as well). What a client puts in
+# front of the proxy's own entry is not believed. The proxy has to set or
+# append the header itself
+# (nginx: proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;).
+#
+# trusted_proxies = ["127.0.0.1"]
+# trusted_proxies = ["127.0.0.1", "::1", "10.0.0.5"]
 
 # ---------------------------------------------------------------------------
 # Origin allowlist (DNS rebinding protection - MCP 2025-11-25)
@@ -671,6 +720,12 @@ read_only = true
 # or test environments. Should always be true in production.
 # Default: true.
 verify_ssl = true
+
+# Seconds to wait for an answer of this Zabbix server. Default: 300, the
+# max_execution_time of the Zabbix frontend, so a large export or a long
+# history read can finish. After a timeout a read is asked again; a write
+# is not repeated.
+# request_timeout = 300
 
 # Time zone for this server's timestamps. Overrides [server].timezone;
 # a token's timezone overrides this. IANA name, "UTC" or "system".

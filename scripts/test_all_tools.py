@@ -56,6 +56,8 @@ class Suite:
     created_ids: dict[str, str] = field(default_factory=dict)
     results: list[ToolResult] = field(default_factory=list)
     suffix: str = ""
+    # tool name -> the parameters its schema has (from tools/list)
+    params: dict[str, set[str]] = field(default_factory=dict)
 
     def record(self, name: str, status: str, detail: str = "", elapsed_ms: int = 0) -> None:
         self.results.append(ToolResult(name, status, detail, elapsed_ms))
@@ -64,6 +66,12 @@ class Suite:
             print(f"  {marker} {name:55s} {detail[:80] if status == 'error' else ''}")
         else:
             print(f"  {marker} {name}")
+
+
+# An error that describes the server under test, not the tool: a skip with the reason.
+_ENVIRONMENT = {
+    "APM DB is not configured": "the OpenTelemetry tools need the APM database, which this server does not have",
+}
 
 
 async def call_tool(s: ClientSession, name: str, args: dict, suite: Suite) -> tuple[bool, str]:
@@ -89,16 +97,37 @@ async def call_tool(s: ClientSession, name: str, args: dict, suite: Suite) -> tu
             elif v is not None:
                 merged.append(str(v))
         args = {"ids": merged}
+    # ``server`` goes to every tool that has it, and the generic ``limit`` /
+    # ``output`` of the default get call only to a tool that takes them (a
+    # singleton get such as settings_get has no ``limit``). The server refuses
+    # an argument a tool does not have, so the adaptation happens here, where
+    # it can be seen, and only for these three generic names.
     args = {**args, "server": suite.server}
+    known = suite.params.get(name)
+    if known is not None:
+        args = {k: v for k, v in args.items() if k in known or k not in ("server", "limit", "output")}
     t0 = time.time()
     try:
         result = await asyncio.wait_for(s.call_tool(name, args), timeout=20)
+        # script.execute on the host this run created seconds ago: the Zabbix
+        # server does not know a new host until its next configuration sync
+        # (about ten seconds on 8.0.0) and answers "Unknown host identifier".
+        for _ in range(4):
+            text = result.content[0].text if result.is_error and result.content else ""
+            if name != "script_execute" or "Unknown host identifier" not in text:
+                break
+            await asyncio.sleep(5)
+            result = await asyncio.wait_for(s.call_tool(name, args), timeout=20)
     except asyncio.TimeoutError:
         suite.record(name, "error", "timeout 20s", int((time.time() - t0) * 1000))
         return False, "timeout"
     elapsed = int((time.time() - t0) * 1000)
     if result.is_error:
         text = result.content[0].text if result.content else ""
+        for marker, why in _ENVIRONMENT.items():
+            if marker in text:
+                suite.record(name, "skip", why, elapsed)
+                return False, text
         suite.record(name, "error", text[:160], elapsed)
         return False, text
     text = result.content[0].text if result.content else ""
@@ -165,6 +194,13 @@ async def discover_sample_ids(s: ClientSession, suite: Suite) -> None:
             suite.sample_ids[semantic_key] = data[0].get(zbx_field)
 
     # Recent event / problem may need a time window
+    try:   # Zabbix 8.0: settings carry the server's UUID, which serverinfo_get needs
+        result = await asyncio.wait_for(s.call_tool("settings_get", {"server": suite.server, "output": "extend"}), timeout=20)
+        settings = parse_payload(result.content[0].text) if result.content and not result.is_error else None
+        if isinstance(settings, dict) and settings.get("serverid"):
+            suite.sample_ids["serverid"] = settings["serverid"]
+    except Exception:  # noqa: BLE001 - optional, older releases have no serverid
+        pass
     ok, payload = await call_tool(s, "problem_get", {"recent": True, "limit": 1}, suite)
     if ok:
         data = parse_payload(payload)
@@ -178,7 +214,9 @@ async def discover_sample_ids(s: ClientSession, suite: Suite) -> None:
     # signal we have without booting an actual agent process.
     ok, payload = await call_tool(s, "item_get", {
         "filter": {"type": [0, 7], "status": 0, "state": 0},
-        "monitored": True,
+        # a native item.get parameter the tool does not type; as a top-level
+        # argument it used to be dropped without a word
+        "extra_params": {"monitored": True},
         "output": "extend",
         "limit": 5,
     }, suite)
@@ -227,6 +265,14 @@ def build_args(tool_name: str, suite: Suite):
         "item_history_summary_get", "problem_active_get",
         "graph_render", "anomaly_detect", "capacity_forecast", "item_threshold_search",
     }
+    if n in ("apmtrace_get", "apmspan_get", "apmlog_get", "apmmetric_get"):
+        return {"time_from": "now-1h", "time_till": "now", "limit": 2}
+    if n == "hostdashboard_get":
+        return {"hostids": [s["hostid"]]} if "hostid" in s else None
+    if n == "serverinfo_get":
+        if "serverid" not in s:
+            return _SKIP("needs the server's UUID, which settings_get returns on Zabbix 8.0")
+        return {"serverid": s["serverid"]}
     if n.endswith("_get") and n not in _CUSTOM_GETS:
         # Default: small limit, common output filter to keep responses tiny.
         # ``output`` must be a string ("extend" or comma-separated field list)
@@ -588,7 +634,7 @@ def build_args(tool_name: str, suite: Suite):
             "username": f"smoketest-user-{suf}",
             "passwd": "Tr@ilbl4z3r-Quark-2026",
             "usrgrps": [{"usrgrpid": ugid}],
-            "roleid": s.get("roleid", "1"),
+            "roleid": cid.get("role") or s.get("roleid", "1"),
         }
     if n == "mediatype_create":
         # Zabbix 7.0+ replaced ``content_type`` (int) with ``message_format``
@@ -686,12 +732,23 @@ def build_args(tool_name: str, suite: Suite):
     if n == "role_create":
         # Minimal role definition - just a name and a base type. Type
         # 1 = User, 2 = Admin, 3 = Super-admin.
-        return {"params": {"name": f"smoketest-role-{suf}", "type": 1}}
+        # API access is stated, not assumed: a new Zabbix 8.0 installation creates
+        # every role except Super admin with it off, and the session tier below
+        # (user_login -> user_logout as the smoke user) needs it.
+        return {"params": {"name": f"smoketest-role-{suf}", "type": 1, "rules": {"api.access": 1}}}
     if n == "service_create":
         # IT service tree node. Algorithm 1 = problem if at least one
         # child has problem; sortorder is required.
         return {"params": {
             "name": f"smoketest-svc-{suf}", "algorithm": "1", "sortorder": "0",
+        }}
+    if n == "ceprule_create":
+        # Zabbix 8.0 complex event processing: a disabled rule that can match nothing real.
+        return {"params": {
+            "name": f"smoketest-cep-{suf}", "sortorder": 900, "window_type": 0, "status": 1,
+            "filter": {"evaltype": 0, "conditions": [
+                {"type": 3, "operator": 2, "event_name": f"smoketest-{suf}"}]},
+            "operations": [{"sortorder": 1, "type": 4, "execute_when": 0, "severity": 3}],
         }}
     if n == "sla_create":
         # SLA needs schedule + service-tag filter; minimal weekly schedule.
@@ -969,6 +1026,14 @@ def build_args(tool_name: str, suite: Suite):
         return {"serviceid": cid.get("service"), "name": f"smoketest-svc-{suf}-renamed"} if cid.get("service") else None
     if n == "service_delete":
         return {"ids": [cid.get("service")]} if cid.get("service") else None
+    if n == "ceprule_update":
+        return {"cep_ruleid": cid.get("ceprule"), "description": "smoke"} if cid.get("ceprule") else None
+    if n == "ceprule_resettimewindows":
+        return {"cep_ruleid": cid.get("ceprule")} if cid.get("ceprule") else None
+    if n == "ceprule_delete":
+        return {"ids": [cid.get("ceprule")]} if cid.get("ceprule") else None
+    if n == "device_offboard":
+        return _SKIP("needs a mobile device paired with a user (Zabbix 8.0)")
     if n == "sla_update":
         return {"slaid": cid.get("sla"), "description": "smoke"} if cid.get("sla") else None
     if n == "sla_delete":
@@ -1201,6 +1266,7 @@ CREATE_TO_KEY = {
     "role_create": "role",
     "service_create": "service",
     "sla_create": "sla",
+    "ceprule_create": "ceprule",
     "mfa_create": "mfa",
     "correlation_create": "correlation",
     "connector_create": "connector",
@@ -1247,6 +1313,7 @@ CREATE_RESPONSE_KEY = {
     "role_create": "roleids",
     "service_create": "serviceids",
     "sla_create": "slaids",
+    "ceprule_create": "cep_ruleids",
     "mfa_create": "mfaids",
     "correlation_create": "correlationids",
     "connector_create": "connectorids",
@@ -1308,6 +1375,7 @@ _CREATE_ORDER = {
     "report_create": 6,           # depends on dashboard + user
     "service_create": 1,
     "sla_create": 2,              # may reference services later
+    "ceprule_create": 0,
     "role_create": 0,
     "mfa_create": 0,
     "correlation_create": 1,
@@ -1362,7 +1430,7 @@ _DELETE_ORDER = {
     "hostgroup_delete": 3,
     "templategroup_delete": 3,
     # Stand-alone fixtures with no parent to wait for
-    "role_delete": 0,
+    "role_delete": 2,             # after user_delete: the smoke user carries the smoke role
     "service_delete": 0,
     "sla_delete": 0,
     "mfa_delete": 0,
@@ -1392,7 +1460,7 @@ def tool_priority(name: str) -> tuple[int, int]:
     # AFTER the corresponding _create. Treat them as update-tier so
     # they pick up the create-time fixtures.
     if (name.endswith("_propagate") or name.endswith("_getsli")
-            or name.endswith("_generate")):
+            or name.endswith("_generate") or name.endswith("_resettimewindows")):
         return (3, 0)
     # ``hostinterface_replacehostinterfaces`` swaps out the primary
     # agent interface created by host_create. Run it BEFORE
@@ -1459,6 +1527,7 @@ async def run_suite(url: str, token: str, server: str, report_path: str) -> int:
             print(f"  protocol: {init.protocol_version}, server: {init.server_info.name} {init.server_info.version}")
             tools = (await s.list_tools()).tools
             print(f"  registered tools: {len(tools)}")
+            suite.params = {t.name: set((t.input_schema or {}).get("properties", {})) for t in tools}
 
             await discover_sample_ids(s, suite)
 

@@ -61,6 +61,9 @@
     "templateids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -112,12 +115,17 @@
     "selectTriggers": {
      "type": "query",
      "since": null
+    },
+    "selectDiscoveryRule": {
+     "type": "query",
+     "since": "7.4"
     }
    },
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host"
+    "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host",
+    "selectDiscoveryRule (7.4+): validated by CDiscoveryRule::validateGet in the 7.4.14 and 8.0.0 source, verified live (returns discoveryRule); the reference page does not list it"
    ]
   },
   "itemprototype.get": {
@@ -188,6 +196,9 @@
     "triggerids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -343,6 +354,13 @@
     "triggerids": {
      "type": "ID/array",
      "since": null
+    },
+    "itemids": {
+     "type": "ID/array",
+     "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -402,7 +420,8 @@
     "sortfield values first documented: discovered (7.0)",
     "selectGroups deprecated since 6.2 (use selectHostGroups / selectTemplateGroups), removed in 7.2",
     "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host, hostid",
-    "sortfield: the 7.0-8.0 pages say 'discovered' but Zabbix 7.4.14 only accepts 'discover' (verified live)"
+    "sortfield: the 7.0-8.0 pages say 'discovered' but Zabbix 7.4.14 only accepts 'discover' (verified live)",
+    "itemids: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it"
    ]
   },
   "graphprototype.get": {
@@ -460,6 +479,9 @@
     "templateids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -550,6 +572,9 @@
     "inherited": {
      "type": "boolean",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -613,7 +638,8 @@
     "key_",
     "delay",
     "type",
-    "status"
+    "status",
+    "discover"
    ],
    "common": [
     "filter",
@@ -633,7 +659,7 @@
    "params": {
     "discoveryids": {
      "type": "ID/array",
-     "since": "8.0"
+     "since": "7.4"
     },
     "groupids": {
      "type": "ID/array",
@@ -670,6 +696,9 @@
     "templateids": {
      "type": "ID/array",
      "since": "7.4"
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -720,6 +749,10 @@
     "selectTriggers": {
      "type": "query",
      "since": "7.4"
+    },
+    "selectDiscoveryData": {
+     "type": "query",
+     "since": "7.4"
     }
    },
    "filter_props": null,
@@ -728,7 +761,8 @@
     "get page does not exist for versions: 5.0, 6.0, 6.2, 6.4, 7.0, 7.2; everything marked since 7.4",
     "sortfield values first documented: itemid (7.4), name (7.4), key_ (7.4), delay (7.4), type (7.4), status (7.4)",
     "filter is not restricted; the get page states filter does not support properties of text data type and supports additional properties: host",
-    "object introduced in 7.4; discoveryids parameter added on the 8.0 page"
+    "object introduced in 7.4; discoveryids parameter added on the 8.0 page",
+    "selectDiscoveryData and the sort field 'discover': in the 7.4.14 and 8.0.0 source, verified live; the reference page does not list them. discoveryids: on the 8.0 page only, but the 7.4.14 source takes it and a live 7.4.14 filters by it"
    ]
   },
   "drule.get": {
@@ -768,6 +802,9 @@
     "limitSelects": {
      "type": "integer",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -819,6 +856,13 @@
     "dserviceids": {
      "type": "ID/array",
      "since": null
+    },
+    "limitSelects": {
+     "type": "integer",
+     "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -830,7 +874,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "selectDRules is listed on the 6.0, 7.0, 7.2, 7.4 and 8.0 get pages but absent from the 6.2 and 6.4 pages; since set to 6.0 (not on the 5.0 page)"
+    "selectDRules is listed on the 6.0, 7.0, 7.2, 7.4 and 8.0 get pages but absent from the 6.2 and 6.4 pages; since set to 6.0 (not on the 5.0 page)",
+    "limitSelects: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it"
    ]
   },
   "dhost.get": {
@@ -870,6 +915,9 @@
     "limitSelects": {
      "type": "integer",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -930,6 +978,9 @@
     "limitSelects": {
      "type": "integer",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -1026,6 +1077,9 @@
     "templateids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -1076,6 +1130,9 @@
     "correlationids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {

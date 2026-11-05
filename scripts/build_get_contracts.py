@@ -67,6 +67,11 @@ def _spec(raw: dict, where: str, *, prop: bool) -> dict:
         out["removed"] = removed
     if prop and raw.get("readonly"):
         out["readonly"] = True
+    deprecated = _version(raw.get("deprecated"), where)
+    if deprecated:
+        out["deprecated"] = deprecated
+        if raw.get("replaced_by"):
+            out["replaced_by"] = str(raw["replaced_by"])
     if raw.get("values"):
         out["values"] = {str(k): str(v) for k, v in raw["values"].items()}
     if raw.get("default") not in (None, ""):

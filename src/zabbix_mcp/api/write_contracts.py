@@ -149,7 +149,30 @@ def describe(api_method: str) -> str | None:
     rules = WRITE_CONTRACTS.get(api_method)
     if not rules:
         return None
-    top = sorted({r.path[0].rstrip("[]") for r in rules})
-    shown = ", ".join(top[:12]) + (", ..." if len(top) > 12 else "")
-    return (f"An object copied from the get tool can be sent as is: the server drops the read-only "
-            f"and sub-object keys {api_method} refuses ({shown}) before the call.")
+    # Four kinds, said apart: "drops (groups, tags)" would read as if
+    # host.update lost its groups, and "drops (rights)" as if a user group
+    # could not be given rights.
+    #   always     the key goes on every release, whatever else is sent
+    #   inside     the key stays, keys inside it go
+    #   dated      the key goes on the releases measured to refuse it
+    #   twins      the key goes only next to its successor (a deprecated name)
+    lone = [r for r in rules if len(r.path) == 1]
+    always = sorted({r.path[0] for r in lone if not r.releases and not r.only_with})
+    twins = sorted({(r.path[0], r.only_with) for r in lone if r.only_with and r.path[0] not in always})
+    dated = sorted({r.path[0] for r in lone if r.releases and not r.only_with} - set(always))
+    inside = sorted({r.path[0].rstrip("[]") for r in rules if len(r.path) > 1} - set(always))
+
+    def shown(names: list[str]) -> str:
+        return ", ".join(names[:12]) + (", ..." if len(names) > 12 else "")
+
+    parts = []
+    if always:
+        parts.append(shown(always))
+    if inside:
+        parts.append(f"inside {shown(inside)} only the keys refused there")
+    if dated:
+        parts.append(f"{shown(dated)} on the releases that refuse {'it' if len(dated) == 1 else 'them'}")
+    if twins:
+        parts.append(", ".join(f"{name} next to {twin}" for name, twin in twins))
+    return (f"An object copied from the get tool can be sent as is: before the call the server drops "
+            f"the read-only and sub-object keys {api_method} refuses ({'; '.join(parts)}).")

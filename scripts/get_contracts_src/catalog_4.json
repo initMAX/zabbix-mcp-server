@@ -41,6 +41,10 @@
     "getAccess": {
      "type": "flag",
      "since": null
+    },
+    "current": {
+     "type": "boolean",
+     "since": "8.0"
     }
    },
    "selects": {
@@ -67,8 +71,14 @@
     "sortfield possible values on 5.0 page: userid, alias; from 6.0 on: userid, username",
     "filter/search are not restricted for Super admin; for Admin and User type users requesting data on users in their user group the 7.4 page limits filter to userid, name, surname, username and search to name, surname, username",
     "output for Admin/User type users is limited (see 7.4 page); selectRole appears from 6.0 page (roles introduced in 5.2, 5.2 page not fetched for user)",
-    "filter is listed before output on 7.4 page; common list keeps the page order"
-   ]
+    "filter is listed before output on 7.4 page; common list keeps the page order",
+    "current (8.0+, only the calling user): validated by CUser::get in the 8.0.0 source, verified live; 7.4 answers 'unexpected parameter', older releases ignore it. Sort field 'alias': still in $sortColumns of the 6.0 and 6.2 source and accepted there, refused from 6.4"
+   ],
+   "sortfield_versions": {
+    "alias": {
+     "removed": "6.4"
+    }
+   }
   },
   "usergroup.get": {
    "object": "usergroup",
@@ -102,10 +112,6 @@
     },
     "usrgrpids": {
      "type": "ID/array",
-     "since": null
-    },
-    "limitSelects": {
-     "type": "integer",
      "since": null
     },
     "mfaids": {
@@ -154,6 +160,10 @@
     "selectProxyGroups": {
      "type": "ID/array",
      "since": "8.0"
+    },
+    "selectApmFilters": {
+     "type": "query",
+     "since": "8.0"
     }
    },
    "filter_props": null,
@@ -162,7 +172,8 @@
     "parameter selectRights marked (deprecated) on pages ['6.2', '6.4', '7.0']",
     "selectRights deprecated on 6.2-7.0 pages, no longer listed on 7.2 page",
     "selectProxies and selectProxyGroups are documented with type ID/array (not query) on the 8.0 page; both marked supported for Super admin type users only",
-    "limitSelects is a method-specific parameter here (not in the reference-commentary common set), so it is recorded in params"
+    "limitSelects is a method-specific parameter here (not in the reference-commentary common set), so it is recorded in params",
+    "limitSelects: on the reference page of every release, but no source from 6.0 to 8.0 reads it and a live server returns every user of the group whatever its value; left out, because a parameter Zabbix ignores is refused here"
    ]
   },
   "userdirectory.get": {
@@ -216,8 +227,15 @@
    "notes": [
     "documentation pages for userdirectory do not exist before 6.2 (checked ['5.0', '5.2', '5.4', '6.0'] where fetched); everything present on the 6.2 page is marked since 6.2",
     "sortfield possible values on 6.2 page: name, host; from 6.4 on: name",
-    "filter/search restrictions taken from 7.4 page; 8.0 page lists the same"
-   ]
+    "filter/search restrictions taken from 7.4 page; 8.0 page lists the same",
+    "sort field 'host': $sortColumns of the 6.2 source is ['name', 'host'] (the LDAP host was a property of the directory then), accepted live on 6.2.9; 6.4 answers 'value must be \"name\"'"
+   ],
+   "sortfield_versions": {
+    "host": {
+     "since": "6.2",
+     "removed": "6.4"
+    }
+   }
   },
   "role.get": {
    "object": "role",
@@ -460,7 +478,6 @@
    "common": [
     "sortfield",
     "countOutput",
-    "editable",
     "excludeSearch",
     "filter",
     "limit",
@@ -487,7 +504,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "documentation pages for regexp do not exist before 6.0 (checked ['5.0', '5.2', '5.4'] where fetched); everything present on the 6.0 page is marked since 6.0"
+    "documentation pages for regexp do not exist before 6.0 (checked ['5.0', '5.2', '5.4'] where fetched); everything present on the 6.0 page is marked since 6.0",
+    "editable: listed among the common parameters on the reference page, but CRegexp::get validates its options and answers 'unexpected parameter \"editable\"' on every release from 6.0 to 8.0"
    ]
   },
   "module.get": {
@@ -513,15 +531,15 @@
    "params": {
     "moduleids": {
      "type": "ID/array",
-     "since": "6.4"
+     "since": "6.0"
     }
    },
    "selects": {},
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "documentation pages for module do not exist before 6.4 (checked ['5.0', '5.2', '5.4', '6.0', '6.2'] where fetched); everything present on the 6.4 page is marked since 6.4",
-    "module.get does not list editable"
+    "module.get does not list editable",
+    "On the reference pages since 6.4; the API exists and answers on 6.0.48 and 6.2.9 (scripts/audit_api_frontend.py), so it is dated 6.0."
    ]
   },
   "connector.get": {
@@ -2017,31 +2035,31 @@
     "moduleid": {
      "type": "ID",
      "readonly": true,
-     "since": "6.4"
+     "since": "6.0"
     },
     "id": {
      "type": "string",
      "readonly": false,
-     "since": "6.4"
+     "since": "6.0"
     },
     "relative_path": {
      "type": "string",
      "readonly": false,
-     "since": "6.4"
+     "since": "6.0"
     },
     "status": {
      "type": "integer",
      "readonly": false,
-     "since": "6.4"
+     "since": "6.0"
     },
     "config": {
      "type": "object",
      "readonly": false,
-     "since": "6.4"
+     "since": "6.0"
     }
    },
    "notes": [
-    "object page does not exist before 6.4; properties present on 6.4 page are marked since 6.4"
+    "Documented since 6.4, present since 6.0."
    ]
   },
   "connector": {

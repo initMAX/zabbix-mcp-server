@@ -21,7 +21,7 @@ We will acknowledge your report within 48 hours and work with you on a fix.
 - Tokens stored as SHA-256 hashes — raw tokens shown only once at creation, never stored
 - **Scopes** — restrict which tool groups a token can access (e.g. `monitoring`, `alerts`)
 - **Server binding** — restrict which Zabbix servers a token can reach (`allowed_servers`)
-- **IP allowlist** — restrict token usage to specific IPs or CIDR ranges (`allowed_ips`)
+- **IP allowlist** - restrict token usage to specific IPs or CIDR ranges (`allowed_ips`); a token with a list is refused when the client address is unknown or is not an address
 - **Expiry** — set `expires_at` (ISO 8601) for automatic token expiration
 - **Read-only flag** — per-token write protection independent of server-level `read_only`
 - **Revocation** — tokens can be revoked instantly via the admin portal; revoked tokens are rejected immediately
@@ -51,7 +51,7 @@ Zabbix 5.0 and 5.2 have no API tokens (introduced in 5.4) and are out of upstrea
 - Session-based authentication with scrypt password hashing (n=16384, r=8, p=1)
 - Session cookies: `HttpOnly`, `SameSite=Strict`, `Secure` (on HTTPS) - prevents XSS and CSRF
 - Login rate limiting: 5 attempts per 5 minutes per IP, 30-second lockout
-- POST rate limiting: 30 requests per minute per session
+- POST rate limiting: 30 requests per minute per client address (the TCP peer, or the address forwarded by a proxy; see Network Security for which proxy is believed)
 - Password policy: minimum 10 characters, at least one uppercase letter and one digit
 - Role-based access control: admin (full), operator (tokens/templates), viewer (read-only)
 - OAuth-issued tokens carry the portal role of the user who consented: a `viewer`'s token is read-only at the MCP server (`TokenInfo.read_only`), whatever scopes were granted; `operator` and `admin` tokens may write. An unknown or missing role is treated as read-only. **Before v1.37.3 every OAuth token was writable** - the scope cap kept a viewer to `monitoring` / `extensions`, but `monitoring` includes host, item and trigger create / update / delete, so a viewer could write to any server not set `read_only = true`. Demoting a user does not shrink tokens already issued to them; revoke the client's tokens from the portal.
@@ -64,7 +64,7 @@ Zabbix 5.0 and 5.2 have no API tokens (introduced in 5.4) and are out of upstrea
 - Authorization Code grant + PKCE S256 (mandatory; non-PKCE clients refused at startup)
 - RFC 8707 audience binding: every issued access token's `aud` is bound to `[server].public_url`; tokens issued for one MCP deployment cannot be replayed against another
 - Dynamic client registration (RFC 7591) - off via `[oauth].dynamic_registration_enabled = false` if you do not want untrusted callers registering clients
-- Login rate limit on `/oauth/login`: 5 failed attempts per IP per 5-minute rolling window (parity with admin portal `/login`)
+- Login rate limit on `/oauth/login`: 5 failed attempts per client address per 5-minute rolling window (the same limits as the admin portal `/login`)
 - Login uses the existing `[admin.users.*]` table (scrypt-hashed) - no second identity store
 - Authorization codes are one-shot, 10-minute TTL, in-memory
 - Refresh tokens rotated on each use (OAuth 2.1 §4.3.1)
@@ -77,6 +77,8 @@ Zabbix 5.0 and 5.2 have no API tokens (introduced in 5.4) and are out of upstrea
 - If you bind to `0.0.0.0`, always configure MCP token authentication to protect the endpoint
 - Native TLS support — set `tls_cert_file` and `tls_key_file` in config, or use a reverse proxy (nginx, Caddy)
 - IP allowlist — set `allowed_hosts` to restrict access to specific IPs or CIDR ranges
+- Behind a reverse proxy listed in `[server].trusted_proxies`, the client address is the right-most `X-Forwarded-For` entry that is not itself a trusted proxy: what the nearest trusted hop wrote, never what the client put in front of it (v1.42; before, the first entry was taken, which a proxy that appends leaves to the client). Every proxy between the client and the server belongs in the list, and only proxies: every host inside a listed network is believed like one
+- **`X-Forwarded-*` is read from listed proxies only.** A peer that is not in `[server].trusted_proxies` is never believed, a proxy on the server's own host included: the HTTP server (uvicorn) runs without its own proxy handling, which believed every loopback peer whether it was listed or not (v1.42; before, a local proxy or relay that passed the client's header through let the client name its own address). `allowed_hosts`, a token's `allowed_ips`, the login limits, the audit log and the `Secure` flag of the portal cookie go by the address and the scheme a listed proxy reports. The proxy must set or append `X-Forwarded-For` itself (nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`): one that is listed and passes the client's header through still hands the client the choice of its address. A request from loopback that carries `X-Forwarded-For` while that address is not listed is a forwarded request whose client nobody vouched for: `allowed_hosts`, a token's `allowed_ips` and an OAuth client's allowlist refuse it, also where the list contains `127.0.0.1`. `allowed_hosts` goes by the client's address; a listed proxy on another host whose own address the list contains (by itself or inside a network) lets every client behind it through, as before v1.42
 - CORS control — set `cors_origins` to restrict which web origins may access the server; omit to disable CORS entirely
 - The `rate_limit` config option protects the Zabbix API from being overwhelmed (default: 300 calls/minute per client)
 - SSRF prevention — server test endpoint validates URL scheme and resolves DNS to block private/loopback/reserved IPs
@@ -147,7 +149,8 @@ The route is served outside the MCP endpoint's `TransportSecuritySettings`, so i
 
 | Version | Supported |
 |---|---|
-| 1.41 (latest) | Yes |
+| 1.42 (latest) | Yes |
+| 1.41 | Yes |
 | 1.40 | Yes |
 | 1.39 | Yes |
 | 1.38 | Yes |

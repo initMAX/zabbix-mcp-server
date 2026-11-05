@@ -183,6 +183,16 @@ _USER_METHODS: list[MethodDef] = [
                 "Session id whose validity should be checked. If omitted, "
                 "the auth_sessionid (the calling session) is checked instead.",
             ),
+            ParamDef(
+                "token", "str",
+                "A Zabbix API token to check instead of a session id (do not "
+                "send both).",
+            ),
+            ParamDef(
+                "extend", "bool",
+                "Whether checking a session also extends its lifetime "
+                "(Zabbix default: true). Not used with 'token'.",
+            ),
         ],
     ),
     MethodDef(
@@ -257,10 +267,6 @@ _USERGROUP_GET_EXTRA: list[ParamDef] = [
         "userids", "list[str]",
         "Return only user groups that contain the given user IDs.",
     ),
-    ParamDef(
-        "with_users", "bool",
-        "Return only user groups that have at least one user.",
-    ),
 ]
 
 _USERGROUP_METHODS: list[MethodDef] = [
@@ -285,7 +291,11 @@ _USERGROUP_METHODS: list[MethodDef] = [
             "Create a new user group. Required field: 'name'. Important optional "
             "fields: 'gui_access' (0=system default, 1=internal auth, 2=LDAP, "
             "3=disabled), 'users_status' (0=enabled, 1=disabled), 'hostgroup_rights' "
-            "and 'templategroup_rights' (arrays defining permissions per group)."
+            "and 'templategroup_rights' (arrays defining permissions per group). Zabbix 8.0+: "
+            "'proxies' ([{'proxyid': X}]) and 'proxy_groups' ([{'proxy_groupid': X}]) with "
+            "'proxy_mode' / 'proxy_group_mode' (0 deny list, 1 allow list), and 'apm_filters' "
+            "([{'key', 'value', 'signal_type': -1 all / 0 traces / 1 metrics / 2 logs}]) for access "
+            "to OpenTelemetry data by resource attribute."
         ),
         read_only=False,
         params=CREATE_PARAMS,
@@ -348,7 +358,11 @@ _USERDIRECTORY_METHODS: list[MethodDef] = [
             "for LDAP -- 'name', 'host', 'port', 'base_dn', 'search_attribute'; "
             "for SAML -- 'name', 'idp_entityid', 'sso_url', 'username_attribute', "
             "'sp_entityid'. Include 'provision_groups' to map external groups to "
-            "Zabbix user groups and roles."
+            "Zabbix user groups and roles. Zabbix 8.0 with $SSO['CERT_STORAGE'] = 'database' in the "
+            "frontend configuration (the default of a new installation) keeps the SAML certificates "
+            "in the object: 'idp_certificate' is then required, 'sp_certificate' and 'sp_private_key' "
+            "optional (PEM text, write-only; a get returns only their *_hash); with file storage "
+            "Zabbix refuses these parameters."
         ),
         read_only=False,
         params=CREATE_PARAMS,

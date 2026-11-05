@@ -49,6 +49,14 @@ _ATTR_DESC = (
 _EVALTYPE_DESC = "How the conditions in {} combine: 0 = And/Or (default), 2 = Or."
 
 
+# Every apm*.get of 8.0.0 does this for a caller who is not Super admin
+# (CApiUserGroupHelper::getApmFilterResourceAttributes).
+_APM_VISIBILITY = (
+    " For a user who is not Super admin the result is limited to the data whose resource "
+    "attributes match an APM filter of one of the user's groups (usergroup 'apm_filters')."
+)
+
+
 def _time_range(what: str) -> list[ParamDef]:
     return [
         ParamDef(
@@ -82,20 +90,22 @@ _APMTRACE_GET = MethodDef(
     api_method="apmtrace.get",
     tool_name="apmtrace_get",
     description=(
-        "Retrieve OpenTelemetry (OTel) APM traces (Zabbix 8.0+): one record per trace, described by its root "
-        "span (service_name, span_name, duration in nanoseconds, status_code, span_count, "
-        "resource and span attributes). time_from and time_till are required and bound the "
-        "root span start. Filter by traceids, resource_attributes / span_attributes "
-        "conditions, or min_duration / max_duration. Page with limit and offset. "
-        "Use apmspan_get for the spans of a trace and apmlog_get for its log records."
+        "Retrieve OpenTelemetry (OTel) APM traces (Zabbix 8.0+): one record per trace, with the "
+        "service_name and span_name of its root span, duration in nanoseconds (from the start of "
+        "its first span to the end of its last), status_code, span_count, error_count, "
+        "has_root_span, resource and span attributes. time_from and time_till are required and "
+        "bound the start of the trace: of its root span or, for a trace whose root span is not "
+        "stored (has_root_span 0), of its earliest span. Filter by traceids, resource_attributes "
+        "/ span_attributes conditions, or min_duration / max_duration. Page with limit and offset. "
+        "Use apmspan_get for the spans of a trace and apmlog_get for its log records." + _APM_VISIBILITY
     ),
     read_only=True,
     compact_fields=("timestamp", "traceid", "service_name", "span_name", "duration", "status_code", "span_count"),
-    params=_time_range("traces whose root span started") + [
+    params=_time_range("traces that started") + [
         ParamDef("traceids", "list[str]", "Return only traces with the given IDs."),
         *_attrs("resource_attributes", "span_attributes"),
-        ParamDef("min_duration", "int", "Return only traces whose root span lasted at least this many nanoseconds."),
-        ParamDef("max_duration", "int", "Return only traces whose root span lasted less than this many nanoseconds."),
+        ParamDef("min_duration", "int", "Return only traces whose root span (the whole trace, where it has no root span) lasted at least this many nanoseconds."),
+        ParamDef("max_duration", "int", "Return only traces whose root span (the whole trace, where it has no root span) lasted less than this many nanoseconds."),
         _OUTPUT, _FILTER, _SEARCH, _SORTFIELD, _SORTORDER, _LIMIT, _OFFSET, _EXTRA,
     ],
 )
@@ -108,7 +118,7 @@ _APMSPAN_GET = MethodDef(
         "parent_spanid, span_kind, duration in nanoseconds, status, events and links. "
         "time_from and time_till are required and bound the span start. Filter by traceids "
         "(all spans of a trace), spanids, parent_spanids, attribute conditions or duration. "
-        "Page with limit and offset."
+        "Page with limit and offset." + _APM_VISIBILITY
     ),
     read_only=True,
     compact_fields=("timestamp", "traceid", "spanid", "parent_spanid", "service_name", "span_name", "duration", "status_code"),
@@ -130,8 +140,9 @@ _APMLOG_GET = MethodDef(
         "Retrieve OpenTelemetry (OTel) APM log records (Zabbix 8.0+): logs with severity_text, "
         "severity_number, body, service_name, and the trace / span they were produced in. "
         "time_from and time_till are required. Filter by traceids, spanids, trace flags "
-        "(with_flags_on / with_flags_off, sum of flag values) or resource / scope / log "
-        "attribute conditions. Page with limit and offset."
+        "(with_flags_on / with_flags_off, sum of flag values), severity_numbers (0 to 24, through "
+        "extra_params) or resource / scope / log attribute conditions. Page with limit and offset."
+        + _APM_VISIBILITY
     ),
     read_only=True,
     compact_fields=("timestamp", "traceid", "spanid", "service_name", "severity_text", "body"),
@@ -150,16 +161,16 @@ _APMMETRIC_GET = MethodDef(
     tool_name="apmmetric_get",
     description=(
         "Retrieve OpenTelemetry (OTel) APM metric data points (Zabbix 8.0+): metrics by type "
-        "(gauge, sum, histogram, exponential histogram, summary) with metric_name, unit, "
+        "(0 gauge, 1 sum, 2 histogram, 3 exponential histogram) with metric_name, unit, "
         "service_name, value fields and attributes. time_from and time_till are required. "
         "Filter by types, flags (with_flags_on / with_flags_off) or resource / scope / "
         "data point attribute conditions. Page with limit and offset. For Zabbix item "
-        "history use history_get instead."
+        "history use history_get instead." + _APM_VISIBILITY
     ),
     read_only=True,
     compact_fields=("time_unix", "type", "service_name", "metric_name", "metric_unit", "value"),
     params=_time_range("data points whose time is") + [
-        ParamDef("types", "list[str]", "Return only data points of the given metric types (see the APM metric object reference)."),
+        ParamDef("types", "list[str]", "Return only data points of the given metric types: 0 gauge, 1 sum, 2 histogram, 3 exponential histogram."),
         ParamDef("with_flags_on", "int", "Return only data points that have all of these flags set (sum of flag values)."),
         ParamDef("with_flags_off", "int", "Return only data points that have none of these flags set (sum of flag values)."),
         *_attrs("resource_attributes", "scope_attributes", "attributes"),
@@ -187,7 +198,7 @@ _DEVICE_GET = MethodDef(
         ParamDef("userids", "list[str]", "Return only devices belonging to the given users."),
         ParamDef("roleids", "list[str]", "Return only devices belonging to users with the given roles."),
         ParamDef("usrgrpids", "list[str]", "Return only devices belonging to users in the given user groups."),
-        ParamDef("output", "str", "Only 'extend' is accepted by device.get (every field); use countOutput for a count."),
+        ParamDef("output", "str", "Device properties to return: 'extend' for all, or property names."),
         _FILTER, _SEARCH, _SORTFIELD, _SORTORDER, _LIMIT,
         ParamDef("countOutput", "bool", "Return the count of matching devices instead of the records."),
         _EXTRA,
@@ -245,9 +256,9 @@ _APIINFO_VERSION = MethodDef(
 )
 
 # ---------------------------------------------------------------------------
-# CEP rules (Zabbix 8.0+, complex event processing) - not on the reference
-# pages of 8.0.0rc2; the shape comes from the frontend's CCepRule.php and
-# was verified live (create, get with every select, update, reset, delete).
+# CEP rules (Zabbix 8.0+, complex event processing). Built for v1.41 from
+# the frontend's CCepRule.php while 8.0 was a release candidate without a
+# reference page; documented since 8.0.0 and checked against that page.
 # ---------------------------------------------------------------------------
 
 _CEP_CONDITIONS = (
@@ -256,6 +267,25 @@ _CEP_CONDITIONS = (
     "37 host group name (host_group_name); operator 0 equals, 1 does not equal, 2 contains, "
     "3 does not contain, 5 >=, 6 <=, 4 in, 7 not in (time period). evaltype 0 And/Or, 1 And, 2 Or, "
     "3 custom expression (formula + formulaid per condition)."
+)
+_CEP_OPERATION_CONDITIONS = (
+    "An operation's own 'filter' and "
+    "'scope_filter' use other condition types: 25 tag name, 26 tag value, and the event flags "
+    "30 problem opened, 31 first, 32 last, 33 symptom, 34 cloned, 35 suppressed (operator 10 true, "
+    "11 false); an operation with execute_when 0 takes neither 31 nor 32."
+)
+
+# CCepRule::validateOperations() and validateWindow() of the 8.0.0 frontend.
+# In the description of 'params' for ceprule_create: a client may cut a tool
+# description at 2 KB, and tools/list adds a note for a server below 8.0.
+_CEP_GOES_TOGETHER = (
+    "What goes together in 'operations': execute_when 0 takes types 1-8 and 11-17, 1 takes 1, 2, 4-8 "
+    "and 11-18, 2 takes 1, 2 and 4-18, 3 takes 1, 2 and 4-17, 4 takes all, 5 takes 1 and 4-18; "
+    "execute_when 0 takes scope 0 only, 3 and 4 take scope 2 only, 1, 2 and 5 take any scope; ordered "
+    "by 'sortorder', the operations must be grouped by execute_when in the order 0, 1, 2, 5, 3, 4. "
+    "A rule without a window (window_type 0) takes execute_when 0 only, window types 1 to 3 take "
+    "0, 1, 2, 3 and 5, a pattern match (4) takes all six and needs at least one operation with "
+    "execute_when 4."
 )
 
 _CEPRULE_GET = MethodDef(
@@ -266,9 +296,9 @@ _CEPRULE_GET = MethodDef(
         "problem events by name, tags, severity, host, host group or time period, collect them in a "
         "time or count window (window_type 0 none, 1 simple window, 2 cause / symptom, 3 simple window "
         "once, 4 pattern match) and run operations on them (close, discard, set or change severity, "
-        "suppress, add / set / rename / remove tags, clone, set cause, close the window). Use "
+        "suppress, add / set / rename / remove tags, copy as a new event, close the window). Use "
         "selectFilter, selectWindow and selectOperations in extra_params for the full rule; 'error' "
-        "carries the server's last processing error. Not documented in the API reference yet."
+        "carries the server's last processing error. Zabbix 8.0 deprecates event correlation (correlation_*) in favour of these rules."
     ),
     read_only=True,
     compact_fields=("cep_ruleid", "name", "status", "window_type", "stop", "sortorder"),
@@ -287,20 +317,25 @@ _CEPRULE_CREATE = MethodDef(
         "Create a CEP rule (Zabbix 8.0+). Required: 'name', 'sortorder' (evaluation order, 0 and up), "
         "'filter' ({'evaltype', 'conditions': [...]}) and 'operations' (each with 'sortorder', 'type' "
         "1 set name, 2 close event, 3 discard, 4 set severity, 5 increase severity, 6 decrease severity, "
-        "7 suppress (suppress_duration), 8 unsuppress, 9 clone first, 10 clone last, 11 add tag, 12 set tag, "
-        "13 set tag value, 14 increase tag value, 15 decrease tag value, 16 rename tag (tag + new_tag), "
-        "17 remove tag, 18 close window, 19 set cause; 'execute_when' 0 event occurred, 1 event added "
-        "to window, 2 event evicted, 3 window closed, 4 pattern matched; an optional per-operation "
-        "'filter'). Optional: 'window_type' (0 none, 1 simple window, 2 cause / symptom, 3 simple window "
-        "once, 4 pattern match) with 'window' ({'duration', 'capacity', 'group_by_host_group', "
-        "'group_by_host', 'group_by_tags', 'tags', 'event_count_tag', 'script'}), 'stop' (1 = stop "
-        "processing further rules), 'description', 'status' (0 enabled, 1 disabled). " + _CEP_CONDITIONS
+        "7 suppress (suppress_duration), 8 unsuppress, 9 copy first event as new, 10 copy last event "
+        "as new, 11 add tag, 12 set tag, 13 set tag value, 14 increase tag value, 15 decrease tag value, "
+        "16 rename tag (tag + new_tag), 17 remove tag, 18 close window; 'execute_when' 0 event occurred, "
+        "1 event added to window, 2 event evicted, 3 window closed, 4 pattern matched, 5 event closed; "
+        "'scope' 0 current event, 1 other events, 2 all events of the window, with an optional "
+        "'scope_filter' for scope 1 and 2 and an optional 'filter'). Optional: 'window_type' (0 none, "
+        "1 simple window, 2 cause / symptom, 3 simple window once, 4 pattern match) with 'window' ({'duration', 'capacity', 'group_by_host_group', "
+        "'group_by_host', 'group_by_tags', 'tags' (tag names), 'event_count_tag' (window type 2 only), "
+        "'script' (window type 4 only)}), 'stop' (1 = stop processing further rules), 'description', "
+        "'status' (0 enabled, 1 disabled). The conditions a filter takes, which operation type, scope "
+        "and window go with which execute_when, and the conditions of an operation's own filters are "
+        "in the description of 'params'."
     ),
     read_only=False,
     params=[
         ParamDef(
             "params", "dict",
-            "CEP rule definition as a JSON dictionary. Required: name, sortorder, filter, operations.",
+            "CEP rule definition as a JSON dictionary. Required: name, sortorder, filter, operations. "
+            + _CEP_CONDITIONS + " " + _CEP_GOES_TOGETHER + " " + _CEP_OPERATION_CONDITIONS,
             required=True,
         ),
     ],
@@ -311,7 +346,7 @@ _CEPRULE_UPDATE = MethodDef(
     tool_name="ceprule_update",
     description=(
         "Update a CEP rule (Zabbix 8.0+). The 'cep_ruleid' field is required; 'filter', 'window' and "
-        "'operations' replace the whole structure when given. " + _CEP_CONDITIONS
+        "'operations' replace the whole structure when given. " + _CEP_CONDITIONS + " " + _CEP_OPERATION_CONDITIONS
     ),
     read_only=False,
     params=UPDATE_PARAMS,

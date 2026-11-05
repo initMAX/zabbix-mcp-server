@@ -286,6 +286,30 @@
                 </label>
             </div>
         </div>
+        <div class="settings-row">
+            <div class="settings-label">Schema Constraints <span class="tooltip-icon" tabindex="0" data-tooltip="State the get contracts in the JSON Schema of tools/list as well as in the descriptions: sortfield and sortorder as enums, output as extend / count or a list of the object's properties, filter / search / extra_params limited to the keys the method takes. For clients that drive a structured-output decoder or a JSON Schema validator from the tool schemas. OFF keeps plain string / object types. Restart required.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="schema_constraints" value="true" {% if settings.schema_constraints is not defined or settings.schema_constraints %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Allowed values of the get parameters are part of the tool schemas
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Reject Unknown Arguments <span class="tooltip-icon" tabindex="0" data-tooltip="Refuse a tool call that carries an argument the tool does not have, and say where the value belongs (the closest parameter, extra_params, filter or params). OFF drops such an argument and runs the rest of the call, as before 1.42: a misspelt filter then returns every row. Turn it off only for a client that adds keys of its own to every call. Restart required.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="reject_unknown_arguments" value="true" {% if settings.reject_unknown_arguments is not defined or settings.reject_unknown_arguments %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    A call with an argument the tool does not have is refused, not run without it
+                </label>
+            </div>
+        </div>
 
         <div class="form-hint" style="margin-bottom:12px; margin-top:16px;">
             &#x26A0;&#xFE0F; Disabled tools are hidden from <strong>all</strong> MCP tokens globally. Drag bubbles between Allowed and Disabled, or click to toggle.
@@ -436,7 +460,8 @@
                     the unguessable report id is the credential, and it expires with the link
                     above. Requires <strong>Public URL</strong> (MCP Server section) to be set,
                     unless a reverse proxy in <code>trusted_proxies</code> sends
-                    <code>X-Forwarded-Host</code>; nothing is guessed from the local bind.
+                    <code>X-Forwarded-Host</code> and <code>X-Forwarded-Proto</code>; nothing
+                    is guessed from the local bind.
                     Behind a proxy that forwards individual paths, forward
                     <code>/reports/</code> too or the link answers 404.
                 </div>

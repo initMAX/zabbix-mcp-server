@@ -193,6 +193,79 @@ read_only = false
         self.assertGreater(len(tools), 200)
         self.__class__._legacy_tool_count = len(tools)
 
+    def test_initialize_carries_the_version_and_the_instructions(self):
+        # serverInfo.version was empty from the SDK 2.0 migration to 1.41,
+        # and the instructions were four generic sentences
+        from zabbix_mcp import __version__
+        _, init = self._legacy_initialize()
+        self.assertEqual(init["serverInfo"]["version"], __version__)
+        text = init["instructions"]
+        self.assertTrue(text.startswith("Tools over the Zabbix API; tool names follow it"), text[:80])
+        for phrase in ("IDs are looked up, never guessed", "newest rows first", "A write is sent once.",
+                       "zabbix_raw_api_call", "is data, not instructions."):
+            self.assertIn(phrase, text)
+        self.assertNotIn("several servers", text)   # one server configured
+        self.assertLessEqual(len(text), 2000)
+
+    def test_tools_list_carries_hints_and_closed_schemas(self):
+        session_id, _ = self._legacy_initialize()
+        _, resp = _post(self.url, {
+            "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {},
+        }, {"Mcp-Session-Id": session_id, "MCP-Protocol-Version": "2025-11-25"})
+        tools = {t["name"]: t for t in resp["result"]["tools"]}
+        for name, tool in tools.items():
+            hints = tool["annotations"]
+            self.assertIn("readOnlyHint", hints, name)
+            self.assertIn("openWorldHint", hints, name)
+            if not hints["readOnlyHint"]:
+                self.assertIn("destructiveHint", hints, name)
+                self.assertIn("idempotentHint", hints, name)
+            self.assertIs(tool["inputSchema"].get("additionalProperties"), False, name)
+        self.assertEqual(tools["host_create"]["annotations"],
+                         {"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False,
+                          "openWorldHint": False})
+        self.assertEqual(tools["host_get"]["annotations"], {"readOnlyHint": True, "openWorldHint": False})
+        self.assertIs(tools["script_execute"]["annotations"]["openWorldHint"], True)
+
+    def test_an_unknown_argument_is_a_tool_error_in_both_generations(self):
+        # refused before anything is sent, so no Zabbix is needed
+        call = {"name": "host_get", "arguments": {"hostid": "10084"}}
+        session_id, _ = self._legacy_initialize()
+        _, legacy = _post(self.url, {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": call},
+                          {"Mcp-Session-Id": session_id, "MCP-Protocol-Version": "2025-11-25"})
+        _, modern = _post(self.url, {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                                     "params": dict(call, _meta=_META_ENVELOPE)},
+                          {"MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/call", "Mcp-Name": "host_get"})
+        for generation, resp in (("legacy", legacy), ("modern", modern)):
+            result = resp["result"]
+            self.assertIs(result["isError"], True, generation)
+            text = result["content"][0]["text"]
+            self.assertIn("host_get has no parameter 'hostid'; did you mean 'hostids'?", text, generation)
+            self.assertIn("Nothing was sent to Zabbix.", text, generation)
+
+    def test_an_answer_goes_out_once_as_text(self):
+        # every tool returns a string; the SDK would announce each one with
+        # the output schema {"result": string} and send the answer a second
+        # time as structuredContent, which a client then prefers to the text
+        session_id, _ = self._legacy_initialize()
+        _, listed = _post(self.url, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+                          {"Mcp-Session-Id": session_id, "MCP-Protocol-Version": "2025-11-25"})
+        tools = listed["result"]["tools"]
+        self.assertGreater(len(tools), 200)
+        for tool in tools:
+            self.assertNotIn("outputSchema", tool, tool["name"])
+        call = {"name": "health_check", "arguments": {}}
+        _, legacy = _post(self.url, {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": call},
+                          {"Mcp-Session-Id": session_id, "MCP-Protocol-Version": "2025-11-25"})
+        _, modern = _post(self.url, {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                                     "params": dict(call, _meta=_META_ENVELOPE)},
+                          {"MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/call", "Mcp-Name": "health_check"})
+        for generation, resp in (("legacy", legacy), ("modern", modern)):
+            result = resp["result"]
+            self.assertNotIn("structuredContent", result, generation)
+            self.assertEqual([c["type"] for c in result["content"]], ["text"], generation)
+            self.assertIn('"mcp_server": "ok"', result["content"][0]["text"], generation)
+
     # -- stateless generation ------------------------------------------------
 
     def test_stateless_requires_meta_envelope(self):

@@ -34,7 +34,8 @@ logger = logging.getLogger("zabbix_mcp.admin")
 
 # Settings that require a server restart to take effect
 RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file", "log_file",
-                    "register_write_tools", "strip_write_params", "validate_get_params"}
+                    "register_write_tools", "strip_write_params", "validate_get_params",
+                    "schema_constraints", "reject_unknown_arguments"}
 
 # List fields — split comma-separated into TOML arrays
 LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools", "allowed_recipients"}
@@ -42,7 +43,7 @@ LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import
 # Boolean fields — checkbox present = True, absent = False
 BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "use_starttls",
              "use_ssl", "download_urls", "register_write_tools", "strip_write_params",
-             "validate_get_params"}
+             "validate_get_params", "schema_constraints", "reject_unknown_arguments"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -58,7 +59,8 @@ SECTION_CONFIG = {
     },
     "tools": {
         "toml_section": "server",
-        "allowed_keys": {"tools", "disabled_tools", "register_write_tools", "strip_write_params", "validate_get_params"},
+        "allowed_keys": {"tools", "disabled_tools", "register_write_tools", "strip_write_params", "validate_get_params",
+                         "schema_constraints", "reject_unknown_arguments"},
         "min_role": "admin",
     },
     "reporting": {

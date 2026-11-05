@@ -28,6 +28,7 @@ import jinja2
 from zabbix_mcp import __version__
 from zabbix_mcp.admin.audit_writer import write_audit
 from zabbix_mcp.admin.auth import SessionManager, LoginRateLimiter
+from zabbix_mcp.config import FORWARDED_BY, ignored_forwarded_warner, resolve_forwarded, trusted_proxy_matcher
 
 if TYPE_CHECKING:
     from zabbix_mcp.config import AppConfig
@@ -41,29 +42,54 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 
 def _peer_ip(scope: dict) -> str:
-    """Best-effort client IP from ASGI scope.
+    """The client address of a request, for the POST rate limit.
 
-    Respects an optional trusted-proxy list configured via the app state
-    (set in AdminApp._build_app). When the direct peer is in the trusted
-    list, read the first IP from X-Forwarded-For; otherwise use the raw
-    TCP peer. Never trust XFF from arbitrary peers - that would let any
-    client claim any IP.
+    The portal's outermost layer (``_ForwardedMiddleware``) has already put
+    the address a trusted proxy reports into the scope. A scope that did not
+    pass through it is resolved here the same way: for a peer in
+    ``[server].trusted_proxies`` the right-most ``X-Forwarded-For`` entry
+    that is not a trusted proxy, for anybody else the TCP peer. Never the
+    entries a client can put in front of the proxy's own - that would let
+    any client claim any IP.
     """
-    client = scope.get("client") or ("", 0)
-    raw = client[0] or "unknown"
-    admin_app = scope.get("app") and getattr(scope["app"], "state", None)
-    trusted = set()
-    if admin_app is not None:
-        adm = getattr(admin_app, "admin_app", None)
+    if scope.get(FORWARDED_BY) is None:
+        admin_state = scope.get("app") and getattr(scope["app"], "state", None)
+        adm = getattr(admin_state, "admin_app", None) if admin_state is not None else None
         if adm is not None:
-            trusted = set(getattr(adm, "trusted_proxies", []) or [])
-    if trusted and raw in trusted:
-        headers = dict(scope.get("headers", []))
-        xff = headers.get(b"x-forwarded-for", b"").decode()
-        if xff:
-            # First entry in XFF is the original client (others are hops).
-            return xff.split(",")[0].strip() or raw
-    return raw
+            # addresses and networks, as on the MCP endpoint: string equality
+            # never matched "10.0.0.0/24", so every user behind such a proxy
+            # shared the proxy's rate-limit bucket
+            is_trusted = getattr(adm, "is_trusted_proxy", None)
+            if is_trusted is None:
+                is_trusted = trusted_proxy_matcher(getattr(adm, "trusted_proxies", []) or [], warn=False)
+            scope = resolve_forwarded(scope, is_trusted)
+    client = scope.get("client") or ("", 0)
+    return client[0] or "unknown"
+
+
+class _ForwardedMiddleware:
+    """Outermost layer of the portal: who the client is and which scheme it used.
+
+    For a request through a proxy in ``[server].trusted_proxies`` the scope
+    carries the client and the scheme that proxy reports
+    (``config.resolve_forwarded``), so the login limit, the audit log, the
+    session and the ``Secure`` flag of the cookie all go by the same values
+    as the MCP endpoint. From anybody else ``X-Forwarded-*`` is not read:
+    uvicorn runs without its own proxy handling, which believed every
+    loopback peer whether it was listed or not.
+    """
+
+    def __init__(self, app, is_trusted) -> None:
+        self.app = app
+        self.state = app.state
+        self._is_trusted = is_trusted
+        self._note_ignored = ignored_forwarded_warner(is_trusted)
+
+    async def __call__(self, scope, receive, send):
+        resolved = resolve_forwarded(scope, self._is_trusted)
+        if resolved.get(FORWARDED_BY) is None:
+            self._note_ignored(scope)          # a local or private peer whose headers were not believed
+        await self.app(resolved, receive, send)
 
 
 class _PostRateLimitMiddleware:
@@ -343,10 +369,12 @@ class AdminApp:
         self.rate_limiter = LoginRateLimiter()
         self._flash_signing_key = secrets.token_bytes(32)
 
-        # Trusted reverse proxies from config; X-Forwarded-For is only
-        # honored when the direct peer is in this list.
+        # Trusted reverse proxies from config; X-Forwarded-* is only
+        # honored when the direct peer is in this list (_ForwardedMiddleware).
         trusted_cfg = getattr(config.server, "trusted_proxies", None) or []
         self.trusted_proxies = list(trusted_cfg)
+        # the MCP endpoint logs an entry that is not an address or a network
+        self.is_trusted_proxy = trusted_proxy_matcher(self.trusted_proxies, warn=False)
 
         # Track whether config changed and restart is needed.
         # Snapshot the serialized TOML at MCP startup so we can later
@@ -535,7 +563,9 @@ class AdminApp:
         tls_on = bool(getattr(self.config.server, "tls_cert_file", None))
         csrf_app = _CsrfMiddleware(app)
         rate_app = _PostRateLimitMiddleware(csrf_app)
-        return _SecurityHeadersMiddleware(rate_app, tls_enabled=tls_on)
+        headers_app = _SecurityHeadersMiddleware(rate_app, tls_enabled=tls_on)
+        #   4. outermost: the client and the scheme a trusted proxy reports
+        return _ForwardedMiddleware(headers_app, self.is_trusted_proxy)
 
     def render(self, template_name: str, request: Request, context: dict | None = None, status_code: int = 200) -> HTMLResponse:
         """Render a Jinja2 template with common context."""

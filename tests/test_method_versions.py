@@ -38,6 +38,12 @@ REMOVED_TOOLS = {
     "template_massupdate": {"params": {"templates": [{"templateid": "1"}], "groups": []}},
     "templategroup_massupdate": {"params": {"groups": [{"groupid": "1"}], "templates": []}},
     "hostinterface_replacehostinterfaces": {"params": {"hostid": "1", "interfaces": []}},
+    # 8.0.0 removed the write half of the host interface API (ZBXNEXT-10814)
+    "hostinterface_create": {"params": {"hostid": "1", "type": 1, "main": 1, "useip": 1, "ip": "127.0.0.1", "dns": "", "port": "10050"}},
+    "hostinterface_update": {"params": {"interfaceid": "1", "port": "10051"}},
+    "hostinterface_delete": {"ids": ["1"]},
+    "hostinterface_massadd": {"params": {"hosts": [{"hostid": "1"}], "interfaces": []}},
+    "hostinterface_massremove": {"params": {"hostids": ["1"], "interfaces": []}},
 }
 
 
@@ -45,7 +51,21 @@ class TestRefuseIfRemoved(unittest.TestCase):
     def test_table_matches_the_8_0_changes_page(self):
         self.assertEqual({m for m, (release, _) in METHOD_REMOVED.items() if release == "8.0"}, {
             "host.massupdate", "hostgroup.massupdate", "template.massupdate",
-            "templategroup.massupdate", "hostinterface.replacehostinterfaces"})
+            "templategroup.massupdate", "hostinterface.replacehostinterfaces",
+            "hostinterface.create", "hostinterface.update", "hostinterface.delete",
+            "hostinterface.massadd", "hostinterface.massremove"})
+
+    def test_host_interface_writes_point_at_the_host(self):
+        # the reference: "Please use methods of the host object instead"
+        for method in ("hostinterface.create", "hostinterface.update", "hostinterface.delete",
+                       "hostinterface.massadd", "hostinterface.massremove", "hostinterface.replacehostinterfaces"):
+            with self.subTest(method=method):
+                reason = unavailable_reason(method, "8.0.0")
+                self.assertIn("removed in Zabbix 8.0", reason)
+                self.assertIn("host.update", reason)
+                self.assertNotIn("hostinterface.update,", reason)
+                self.assertIsNone(unavailable_reason(method, "7.4.14"))
+        self.assertIsNone(unavailable_reason("hostinterface.get", "8.0.0"))
 
     def test_legacy_objects_are_dated_from_the_reference_index(self):
         # the 5.0 ... 8.0 reference index pages: last release with the object page + 1
@@ -263,8 +283,12 @@ class TestHealthCheckAndWarmup(unittest.TestCase):
         srv = body["zabbix_servers"]["server_1"]
         self.assertEqual(srv["zabbix_version"], "8.0.0")
         self.assertEqual(srv["unavailable_tools"], ["host_massupdate", "hostgroup_massupdate",
-                                                    "hostinterface_replacehostinterfaces",
+                                                    "hostinterface_create", "hostinterface_delete",
+                                                    "hostinterface_massadd", "hostinterface_massremove",
+                                                    "hostinterface_replacehostinterfaces", "hostinterface_update",
                                                     "template_massupdate", "templategroup_massupdate"])
+        self.assertEqual(srv["deprecated_tools"], ["correlation_create", "correlation_delete",
+                                                   "correlation_get", "correlation_update"])
 
     def test_warm_versions_never_raises_and_fills_the_cache(self):
         cfg = AppConfig(server=ServerConfig(), zabbix_servers={

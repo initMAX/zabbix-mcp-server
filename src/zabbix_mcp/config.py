@@ -28,6 +28,186 @@ from pathlib import Path
 
 logger = logging.getLogger("zabbix_mcp.config")
 
+
+def trusted_proxy_matcher(entries, *, warn: bool = True):
+    """``is_trusted(address)`` for a ``[server].trusted_proxies`` list.
+
+    An entry is an address or a network, so ``10.0.0.0/24`` and any spelling
+    of an IPv6 address match the peer; string equality matched neither. An
+    entry that is not one stays a literal, so nothing that worked stops.
+    The MCP endpoint and the admin portal both go by this.
+    """
+    import ipaddress
+
+    nets = []
+    literals = set()
+    for entry in entries or ():
+        if str(entry).strip().lower() == "localhost":
+            # the peer is always an address; until v1.41 uvicorn believed
+            # loopback by itself, so this entry never had to match anything
+            nets.extend((ipaddress.ip_network("127.0.0.0/8"), ipaddress.ip_network("::1/128")))
+            continue
+        try:
+            nets.append(ipaddress.ip_network(str(entry), strict=False))
+        except ValueError:
+            literals.add(entry)
+            if warn:
+                logger.warning(
+                    "trusted_proxies entry %r is not an IP address or network; it will "
+                    "only match an exact string.", entry)
+
+    def is_trusted(addr) -> bool:
+        if not addr:
+            return False
+        if addr in literals:
+            return True
+        try:
+            parsed = ipaddress.ip_address(addr)
+        except ValueError:
+            return False
+        return any(parsed in net for net in nets)
+
+    return is_trusted
+
+
+def _bare_address(entry: str) -> str:
+    """``203.0.113.9:51234`` and ``[2001:db8::1]:443`` without the port."""
+    entry = entry.strip()
+    if entry.startswith("["):
+        return entry[1:].split("]", 1)[0]
+    if entry.count(":") == 1:
+        return entry.split(":", 1)[0]
+    return entry
+
+
+def forwarded_client(header: str, is_trusted) -> str | None:
+    """The client a trusted proxy reports in ``X-Forwarded-For``.
+
+    The right-most entry that is not itself a trusted proxy. A proxy that
+    appends (nginx ``$proxy_add_x_forwarded_for``, Apache ``mod_proxy``)
+    leaves whatever the client sent in front, so the first entry is the
+    client's own claim. Taken at its word, anybody behind such a proxy could
+    name an address inside a token's IP allowlist, or a new one for every
+    login attempt. What the nearest trusted hop wrote is what this server can
+    vouch for; walking left past further trusted proxies reaches the client
+    behind a chain of them. Until v1.41 the first entry was used.
+
+    When every entry is a trusted proxy the client was one of them, and the
+    left-most entry is returned (what uvicorn's own handling did). None for a
+    header without an entry.
+    """
+    entries = [a for a in (_bare_address(e) for e in header.split(",")) if a]
+    for address in reversed(entries):
+        if not is_trusted(address):
+            return address
+    return entries[0] if entries else None
+
+
+# Where a request carries the address of the trusted proxy it came through
+# (set by resolve_forwarded, absent for a request that came directly).
+FORWARDED_BY = "zabbix_mcp.forwarded_by"
+# Set on a request that a local proxy forwarded without being listed: the
+# client's address is unknown, and whatever allows by address refuses.
+UNVOUCHED = "zabbix_mcp.unvouched"
+
+
+def _is_loopback(address) -> bool:
+    import ipaddress
+    try:
+        parsed = ipaddress.ip_address(address)
+    except (TypeError, ValueError):
+        return False
+    mapped = getattr(parsed, "ipv4_mapped", None)
+    return parsed.is_loopback or bool(mapped and mapped.is_loopback)
+
+
+def resolve_forwarded(scope: dict, is_trusted) -> dict:
+    """Make a request that came through a trusted proxy look like the client's own.
+
+    The one place where ``X-Forwarded-For`` and ``X-Forwarded-Proto`` are
+    read, for the MCP endpoint and for the admin portal. uvicorn is started
+    without its own proxy handling: that believes every peer on loopback,
+    whether or not ``[server].trusted_proxies`` lists it, so a local proxy
+    that passed the client's header through handed the client the choice of
+    its address (and with it ``allowed_hosts``, a token's ``allowed_ips`` and
+    the login limits).
+
+    For a peer in the list a copy of *scope* is returned with ``client`` set
+    to the address the proxy reports (``forwarded_client``), ``scheme`` to
+    what it reports in ``X-Forwarded-Proto`` and ``FORWARDED_BY`` to the
+    proxy's own address. For anybody else the headers are not believed: the
+    scope comes back as it is, or, for a loopback peer that sends
+    ``X-Forwarded-For`` (a local proxy nobody listed), marked ``UNVOUCHED``.
+    """
+    if scope.get("type") not in ("http", "websocket"):
+        return scope
+    client = scope.get("client")
+    peer = client[0] if client else None
+    headers = scope.get("headers") or []
+    if not is_trusted(peer):
+        if _is_loopback(peer) and any(k == b"x-forwarded-for" for k, _ in headers):
+            # A local process that forwards somebody else's request and is not
+            # listed: who that somebody is, nobody vouched for. Until v1.41
+            # uvicorn resolved such a proxy itself; taking it for a local
+            # client now would open every allowlist that contains 127.0.0.1.
+            # The address-based allow decisions refuse it (UNVOUCHED).
+            return dict(scope, **{UNVOUCHED: True})
+        return scope
+    # several header lines are one list, in the order they were sent
+    forwarded_for = b", ".join(v for k, v in headers if k == b"x-forwarded-for").decode("latin-1")
+    proto = b",".join(v for k, v in headers if k == b"x-forwarded-proto").decode("latin-1")
+    proto = proto.split(",")[-1].strip().lower()      # the nearest hop, as for the host
+    resolved = dict(scope)
+    resolved[FORWARDED_BY] = peer
+    address = forwarded_client(forwarded_for, is_trusted)
+    if address:
+        resolved["client"] = (address, 0)
+    if proto in ("http", "https"):
+        if scope["type"] == "websocket":
+            proto = "wss" if proto == "https" else "ws"
+        resolved["scheme"] = proto
+    return resolved
+
+
+_FORWARDED_HEADERS = frozenset({b"x-forwarded-for", b"x-forwarded-proto", b"x-forwarded-host"})
+
+
+def ignored_forwarded_warner(is_trusted, *, limit: int = 8):
+    """``note(scope)``: say once per peer that its ``X-Forwarded-*`` headers are ignored.
+
+    Only for a peer on loopback or a private address, which is where a
+    reverse proxy lives. After an upgrade from v1.41 this is how an operator
+    with a proxy on the same host learns that the proxy has to be listed.
+    """
+    import ipaddress
+
+    told: set[str] = set()
+
+    def note(scope: dict) -> None:
+        if scope.get("type") not in ("http", "websocket") or len(told) >= limit:
+            return
+        client = scope.get("client")
+        peer = client[0] if client else None
+        if not peer or peer in told or is_trusted(peer):
+            return
+        if not any(k in _FORWARDED_HEADERS for k, _ in scope.get("headers") or []):
+            return
+        try:
+            address = ipaddress.ip_address(peer)
+        except ValueError:
+            return
+        if not (address.is_loopback or address.is_private):
+            return
+        told.add(peer)
+        logger.warning(
+            "X-Forwarded-* headers from %s are ignored: it is not listed in [server].trusted_proxies. "
+            "If %s is your reverse proxy, add it to the list. Until then the clients behind it are not "
+            "known: rate limits and the audit log see %s, IP allowlists (allowed_hosts, a token's "
+            "allowed_ips) refuse what a local proxy forwards, and X-Forwarded-Proto / -Host are not used.",
+            peer, peer, peer)
+
+    return note
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
@@ -128,6 +308,13 @@ class ServerConfig:
     trusted_proxies: list[str] | None = None
     compact_output: bool = True
     validate_get_params: bool = True
+    # Put the get contracts into the JSON Schema of tools/list (enum,
+    # propertyNames) next to the descriptions (issue #106).
+    schema_constraints: bool = True
+    # Refuse a tool call that carries an argument the tool does not have
+    # (the MCP SDK drops it and runs the rest: a misspelt filter returned
+    # every row). False restores that, for a client that adds keys of its own.
+    reject_unknown_arguments: bool = True
     strip_write_params: bool = True
     response_max_chars: int = 50000
     # Freshness hint (seconds) attached to tools/list results as the
@@ -685,6 +872,14 @@ def load_config(path: str | Path) -> AppConfig:
     if not isinstance(validate_get_raw, bool):
         raise ConfigError("'validate_get_params' must be a boolean (true or false)")
 
+    schema_constraints_raw = server_raw.get("schema_constraints", True)
+    if not isinstance(schema_constraints_raw, bool):
+        raise ConfigError("'schema_constraints' must be a boolean (true or false)")
+
+    reject_unknown_raw = server_raw.get("reject_unknown_arguments", True)
+    if not isinstance(reject_unknown_raw, bool):
+        raise ConfigError("'reject_unknown_arguments' must be a boolean (true or false)")
+
     strip_write_raw = server_raw.get("strip_write_params", True)
     if not isinstance(strip_write_raw, bool):
         raise ConfigError("'strip_write_params' must be a boolean (true or false)")
@@ -724,6 +919,8 @@ def load_config(path: str | Path) -> AppConfig:
         trusted_proxies=trusted_proxies,
         compact_output=compact_output_raw,
         validate_get_params=validate_get_raw,
+        schema_constraints=schema_constraints_raw,
+        reject_unknown_arguments=reject_unknown_raw,
         strip_write_params=strip_write_raw,
         response_max_chars=response_max_chars_raw,
         tools_list_cache_ttl=tools_cache_ttl_raw,

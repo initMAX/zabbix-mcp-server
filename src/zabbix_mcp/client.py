@@ -111,6 +111,26 @@ class RateLimitError(Exception):
     """Raised when the rate limit is exceeded."""
 
 
+class UnknownOutcomeError(Exception):
+    """The connection broke after a method that changes something had been
+    sent: Zabbix may or may not have applied it, so it is not sent again."""
+
+
+# Methods a lost answer may simply be asked for again: they change nothing
+# in Zabbix. Everything else (create, update, delete, mass*, import,
+# execute, acknowledge, push, clear, generate ...) is sent once.
+_RESEND_SAFE_VERBS = frozenset({
+    "get", "version", "export", "importcompare", "getsli",
+    "getscriptsbyhosts", "getscriptsbyevents", "checkauthentication", "login", "test",
+})
+
+
+def resend_is_safe(method: str) -> bool:
+    """True when *method* can be sent a second time without changing
+    anything twice (``host.get``); False for a write (``script.execute``)."""
+    return str(method).rpartition(".")[2].lower() in _RESEND_SAFE_VERBS
+
+
 class _RateLimiter:
     """Per-client sliding window rate limiter (calls per minute).
 
@@ -477,7 +497,10 @@ class ClientManager:
         # the call would fail with "missing parameter sessionid".
         if method == "user.checkAuthentication":
             params = dict(params or {})
-            params.setdefault("sessionid", sessionid)
+            if not params.get("token"):
+                # an API token is checked instead of a session; Zabbix takes
+                # one of the two ("Session ID or token is expected")
+                params.setdefault("sessionid", sessionid)
         body = _json.dumps({
             "jsonrpc": "2.0",
             "method": method,
@@ -514,11 +537,18 @@ class ClientManager:
 
         Auto-reconnect now covers TWO error classes:
         - auth / session errors from ProcessingError (server bounced
-          us with re-login required)
+          us with re-login required): Zabbix refused the call, so it
+          is sent again after the new login, whatever the method
         - connection-class errors (ConnectionError, TimeoutError,
           OSError, ssl.SSLError) - these mean the cached TCP/TLS
           socket was killed (NAT idle timeout, server restart, TLS
           session expiry) and the next call needs a fresh connect.
+          They arrive after the request went out (zabbix_utils wraps
+          what fails before that into ProcessingError), most often as
+          a timeout while Zabbix is still working. A read is asked
+          again; a write is NOT: sending ``script.execute`` or
+          ``configuration.import`` a second time would run it twice.
+          The caller gets UnknownOutcomeError and checks first.
           Without this retry the cached broken client kept poisoning
           every subsequent call until process restart - reported as
           "validation flaky / sometimes OK sometimes fails".
@@ -534,7 +564,17 @@ class ClientManager:
                 client = self._reconnect(server)
                 return self._do_call(client, method, params)
             raise
-        except (ConnectionError, TimeoutError, ssl.SSLError, OSError):
+        except (ConnectionError, TimeoutError, ssl.SSLError, OSError) as e:
+            if not resend_is_safe(method):
+                try:
+                    self._reconnect(server)   # the next call starts on a fresh connection
+                except Exception:
+                    logger.debug("Reconnect to '%s' after a lost answer failed", server, exc_info=True)
+                raise UnknownOutcomeError(
+                    f"The connection to Zabbix broke while {method} was waiting for its answer "
+                    f"({type(e).__name__}: {e}). Zabbix may or may not have applied it, so the call "
+                    f"was not sent again. Read the object back with a get call before repeating it."
+                ) from e
             client = self._reconnect(server)
             return self._do_call(client, method, params)
 

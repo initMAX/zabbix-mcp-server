@@ -45,6 +45,27 @@ PNG_1X1 = (
 LINUX_TEMPLATE = "Linux by Zabbix agent"
 PAST_FROM = 1577836800  # 2020-01-01 00:00 UTC
 PAST_TILL = 1577923200  # 2020-01-02 00:00 UTC
+# A throwaway self-signed certificate (CN=rt-saml-idp.example.com, no key kept):
+# Zabbix 8.0 requires ``idp_certificate`` on a SAML user directory.
+SAML_TEST_CERT = """-----BEGIN CERTIFICATE-----
+MIIDJTCCAg2gAwIBAgIUWi9JjAKjVgYbNjbYvcvKt37PUCIwDQYJKoZIhvcNAQEL
+BQAwIjEgMB4GA1UEAwwXcnQtc2FtbC1pZHAuZXhhbXBsZS5jb20wHhcNMjYxMTA1
+MTAxMTI4WhcNMzYxMTAyMTAxMTI4WjAiMSAwHgYDVQQDDBdydC1zYW1sLWlkcC5l
+eGFtcGxlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMmC/WAD
+u630QHhpLIqG/uLBzM4qB10Spa2MCI23e7LetIEWA1fUf+FVor8yfmoJ3lk70l0t
+rjp37QseyYOG5BYC19sm1ePxefgbbe6iGCRwK9AfqE4JHE2hwpV9uQLp5wzGRlZ7
+fZqyOt/EWot5p8iSG1l/j53qwBGrMmDFT/jQxbdmDFf7w+tXWOBIxyEQehl+a3rL
+YV6vovoFF4JzGWjVKoKHF0Merruv3OvNhHbFOgagqx5wmkXrXYCwDe/1Xou+P4Xs
+77I5zT05RcK/DGafJlQIaFQNgBN4zVPXr5L4JgF7DbCcnvJ3vOUwu36K3mOU882Q
+CP8fQyWOJrO/l7MCAwEAAaNTMFEwHQYDVR0OBBYEFJJlmPiX/Dmy9mkaerz0YzWy
+JOBwMB8GA1UdIwQYMBaAFJJlmPiX/Dmy9mkaerz0YzWyJOBwMA8GA1UdEwEB/wQF
+MAMBAf8wDQYJKoZIhvcNAQELBQADggEBADCJMPpWA2aldo8M3eDZNxY6oDMCAU72
++FLKfAckv5fRONWIsN2ijLHLkMtpRm6iVLKdsSPBZsi/CeDBc+AkdbtJGEe2IT6h
+IKwZ3k5wEGWNQ5orRNaDf0fmjRMXJJTnnGsyUG63mPnuXdRryMjoJlfKcbb7W+Ar
+8AT2//9GuR6QjnfQmADQYTwkDeUuJNEOcFNObbVsdVrDg25NhwT6XgXx+s/SXvGf
+QKJ/11Txhjli5PXo6Of4hs2EHzS3iK1SFsU2g2gJ/49Fzc5nqcLg4nOqElUK3FwE
+EjvfApEJD5Xl5dOI5Oyv/aMW0tt8AUez/awHzaxmrhc+fdVM1OAJuEg=
+-----END CERTIFICATE-----"""
 
 
 def at_least(version: str, wanted: str) -> bool:
@@ -124,7 +145,10 @@ def _cep_rules(c: _Ctx) -> None:
                    "group_by_tags": 1, "tags": ["rt"]},
         "operations": [
             {"sortorder": 1, "type": 2, "execute_when": 2},
-            {"sortorder": 2, "type": 11, "execute_when": 3, "tag": "rt-window", "tag_value": "closed"},
+            # 8.0.0: an operation can reach beyond the current event (scope) and narrow that with scope_filter
+            {"sortorder": 2, "type": 11, "execute_when": 3, "tag": "rt-window", "tag_value": "closed",
+             "scope": 2, "scope_filter": {"evaltype": 0, "conditions": [
+                 {"type": 25, "operator": 0, "tag": "rt"}, {"type": 33, "operator": 10}]}},
         ]}], "ceprule.delete", "cep_ruleids")
 
 
@@ -145,13 +169,16 @@ def _images(c: _Ctx) -> None:
         img = c.lookup("image.get", {"output": ["imageid"], "filter": {"imagetype": 1}, "limit": 1},
                        "imageid")
     c.ids["image"] = img
-    c.create("regexp", "regexp.create", {
+    regexp = {
         "name": "rt-regexp", "test_string": "abc",
         "expressions": [
             {"expression": "abc", "expression_type": 0, "case_sensitive": 1},
             {"expression": "^a.*$", "expression_type": 3, "case_sensitive": 0},
             {"expression": "a,b", "expression_type": 1, "exp_delimiter": ",", "case_sensitive": 0},
-        ]}, "regexp.delete", "regexpids")
+        ]}
+    if c.v("8.0"):
+        regexp["description"] = "rt"
+    c.create("regexp", "regexp.create", regexp, "regexp.delete", "regexpids")
     if img:
         c.create("iconmap", "iconmap.create", {
             "name": "rt-iconmap", "default_iconid": img,
@@ -361,6 +388,12 @@ def _template(c: _Ctx) -> None:
     c.ids["template"] = tid
     if tid:
         _item_family(c, tid, "rt-template", "t")
+        # a template that inherits from rt-template: template.get then returns it
+        # under ``templates`` of rt-template (the reverse of what update calls so)
+        c.create("template-child", "template.create", {
+            "host": "rt-template-child", "name": "rt-template-child",
+            "groups": [{"groupid": c.ids.get("tgroup")}],
+            "templates": [{"templateid": tid}]}, "template.delete", "templateids")
 
 
 def _host(c: _Ctx) -> None:
@@ -418,6 +451,66 @@ def _maintenance(c: _Ctx) -> None:
             {"timeperiod_type": 4, "month": 1, "day": 1, "start_time": 3600, "period": 3600},
             {"timeperiod_type": 4, "month": 2, "dayofweek": 2, "every": 1, "start_time": 3600,
              "period": 3600}]}, "maintenance.delete", "maintenanceids")
+
+
+def _zabbix_8_0(c: _Ctx) -> None:
+    """What only 8.0 has outside the objects above: a maintenance scoped to
+    triggers and event names instead of hosts, a push media type, and
+    telemetry queries (an item with a plain filter, an item and an LLD rule
+    with a custom expression)."""
+    if not c.v("8.0"):
+        return
+    host = c.ids.get("host")
+    triggers = c.call("trigger.get", {"output": ["triggerid"], "hostids": [host], "limit": 2}) if host else []
+    if triggers:
+        c.create("maintenance-triggers", "maintenance.create", {
+            "name": "rt-maint-triggers", "active_since": PAST_FROM, "active_till": PAST_TILL,
+            "maintenance_type": 0, "description": "rt", "tags_evaltype": 2,
+            "tags": [{"tag": "rt", "operator": 1, "value": "1"}, {"tag": "rt2", "operator": 3, "value": "x"}],
+            "triggers": [{"triggerid": t["triggerid"]} for t in triggers],
+            "event_names": [{"value": "rt", "operator": 2}, {"value": "noise", "operator": 3}],
+            "timeperiods": [{"timeperiod_type": 0, "start_date": PAST_FROM, "period": 3600}]},
+            "maintenance.delete", "maintenanceids")
+    c.create("mediatype-push", "mediatype.create", {"name": "rt-media-push", "type": 5, "status": 1,
+                                                    "description": "rt push"},
+             "mediatype.delete", "mediatypeids")
+    if host:
+        telemetry = {"hostid": host, "type": 24, "value_type": 3, "delay": "1m", "time_shift": "30s",
+                     "lookback_limit": "5m", "granularity": "30s"}
+        # the query filter is the LLD filter again: eval_formula is read-only,
+        # formulaid belongs to a custom expression only
+        c.create("item-telemetry", "item.create", dict(
+            telemetry, name="rt-item-telemetry", key_="rt.telemetry.item",
+            query={"signal_type": 0, "columns": [],
+                   "aggregated_columns": [{"function": 4, "alias": "spans"}],
+                   "filter": {"evaltype": 0, "conditions": [
+                       {"column": "ServiceName", "operator": 0, "value": "rt"}]}}),
+            "item.delete", "itemids")
+        c.create("item-telemetry-formula", "item.create", dict(
+            telemetry, name="rt-item-telemetry-formula", key_="rt.telemetry.formula",
+            query={"signal_type": 0, "columns": [],
+                   "aggregated_columns": [{"function": 4, "alias": "spans"}],
+                   "filter": {"evaltype": 3, "formula": "A and B", "conditions": [
+                       {"column": "ServiceName", "operator": 0, "value": "rt", "formulaid": "A"},
+                       {"column": "SpanName", "operator": 2, "value": "rt", "formulaid": "B"}]}}),
+            "item.delete", "itemids")
+        # an LLD rule can be a telemetry query too (8.0.0; not on the reference page)
+        lld = {k: v for k, v in telemetry.items() if k != "value_type"}
+        c.create("lld-telemetry", "discoveryrule.create", dict(
+            lld, name="rt-lld-telemetry", key_="rt.telemetry.lld",
+            query={"signal_type": 0, "columns": [],
+                   "aggregated_columns": [{"function": 4, "alias": "spans"}],
+                   "filter": {"evaltype": 0, "conditions": [
+                       {"column": "ServiceName", "operator": 0, "value": "rt"}]}}),
+            "discoveryrule.delete", "itemids")
+        c.create("lld-telemetry-formula", "discoveryrule.create", dict(
+            lld, name="rt-lld-telemetry-formula", key_="rt.telemetry.lld.formula",
+            query={"signal_type": 0, "columns": [],
+                   "aggregated_columns": [{"function": 4, "alias": "spans"}],
+                   "filter": {"evaltype": 3, "formula": "A and B", "conditions": [
+                       {"column": "ServiceName", "operator": 0, "value": "rt", "formulaid": "A"},
+                       {"column": "SpanName", "operator": 2, "value": "rt", "formulaid": "B"}]}}),
+            "discoveryrule.delete", "itemids")
 
 
 def _msg(c: _Ctx, default: int, to_user: bool = False, **extra) -> dict:
@@ -639,10 +732,25 @@ def _connector_proxies(c: _Ctx) -> None:
                    "port": "10051", "tls_connect": 1, "description": "rt"}
         if c.v("8.0"):
             # 8.0 requires the telemetry query timeout on an active proxy
-            # (and refuses it on a passive one)
+            # (and refuses it on a passive one); a proxy can collect OpenTelemetry data
             active["timeout_telemetry_query"] = "5s"
+            active["apm"] = {"data_collection_status": 1, "max_messages_per_second": 100,
+                             "additional_resource_attributes": [
+                                 {"key": "rt.attribute", "value": "1", "signal_type": 0},
+                                 {"key": "rt.attribute", "value": "", "signal_type": 2}]}
         c.create("proxy", "proxy.create", active, "proxy.delete", "proxyids")
-        c.create("proxy-passive", "proxy.create", passive, "proxy.delete", "proxyids")
+        proxy = c.create("proxy-passive", "proxy.create", passive, "proxy.delete", "proxyids")
+        if c.v("8.0"):
+            # 8.0 user group permissions on proxies, proxy groups and APM resource attributes
+            extra = {"name": "rt-ugroup-80", "users_status": 1, "proxy_mode": 0, "proxy_group_mode": 0,
+                     "apm_filters": [{"key": "service.name", "value": "rt", "signal_type": -1},
+                                     {"key": "rt.attribute", "value": "", "signal_type": 0}]}
+            if proxy:
+                # a proxy outside a proxy group: access to a grouped one is managed by its group
+                extra["proxies"] = [{"proxyid": proxy}]
+            if pg:
+                extra["proxy_groups"] = [{"proxy_groupid": pg}]
+            c.create("usergroup-80", "usergroup.create", extra, "usergroup.delete", "usrgrpids")
     else:
         c.create("proxy", "proxy.create", {
             "host": "rt-proxy", "status": 5, "description": "rt", "tls_accept": 1,
@@ -677,15 +785,29 @@ def _userdirectories(c: _Ctx) -> None:
     c.create("userdirectory-ldap", "userdirectory.create", ldap,
              "userdirectory.delete", "userdirectoryids")
     if c.v("6.4"):
-        c.create("userdirectory-saml", "userdirectory.create", {
+        saml = {
             "idp_type": 2, "idp_entityid": "https://idp.example.com/rt",
             "sso_url": "https://idp.example.com/rt/sso", "slo_url": "https://idp.example.com/rt/slo",
             "username_attribute": "uid", "sp_entityid": "rt-saml",
             "nameid_format": "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
             "sign_messages": 1, "sign_assertions": 1, "sign_authn_requests": 1,
             "sign_logout_requests": 1, "sign_logout_responses": 1, "encrypt_nameid": 0,
-            "encrypt_assertions": 0, "scim_status": 0, **_provisioning(c)},
-            "userdirectory.delete", "userdirectoryids")
+            "encrypt_assertions": 0, "scim_status": 0, **_provisioning(c)}
+        created = None
+        if c.v("8.0"):
+            # 8.0 keeps the SAML certificates in the object when the frontend is
+            # configured with $SSO['CERT_STORAGE'] = 'database' (a new installation);
+            # with file storage (an upgraded one) the parameter is refused
+            # signing is off in this variant: with it on, the service provider's
+            # certificate AND private key are required, and a key has no place here
+            unsigned = {k: 0 for k in ("sign_messages", "sign_assertions", "sign_authn_requests",
+                                       "sign_logout_requests", "sign_logout_responses")}
+            created = c.create("userdirectory-saml-cert", "userdirectory.create",
+                               dict(saml, idp_certificate=SAML_TEST_CERT, **unsigned),
+                               "userdirectory.delete", "userdirectoryids")
+        if not created:
+            c.create("userdirectory-saml", "userdirectory.create", saml,
+                     "userdirectory.delete", "userdirectoryids")
     if c.v("7.0"):
         c.create("mfa", "mfa.create", {"type": 1, "name": "rt-mfa", "hash_function": 1,
                                        "code_length": 6}, "mfa.delete", "mfaids")
@@ -699,21 +821,34 @@ def create_fixtures(call, version: str) -> list[tuple[str, list[str]]]:
     (children before parents), e.g. [("action.delete", ["12"]), ..., ("host.delete", ["10500"])]."""
     c = _Ctx(call, version)
     for step in (_groups, _images, _mediatype, _scripts, _users, _template, _host, _maintenance,
-                 _actions, _correlation, _drule, _services, _cep_rules, _dashboards, _map, _token_report,
+                 _zabbix_8_0, _actions, _correlation, _drule, _services, _cep_rules, _dashboards, _map,
+                 _token_report,
                  _connector_proxies, _userdirectories):
         step(c)
     create_fixtures.last_summary = c.summary  # type: ignore[attr-defined]
     return c.cleanup
 
 
-def delete_fixtures(call, cleanup: list[tuple[str, list[str]]]) -> None:
-    """Delete in the given order; ignore an error on an object that is already gone."""
+def delete_fixtures(call, cleanup: list[tuple[str, list[str]]]) -> int:
+    """Delete in the given order; ignore an error on an object that is already
+    gone. Returns the number of delete calls that failed for another reason."""
+    failed = 0
     for method, ids in cleanup:
         try:
             call(method, ids)
         except RuntimeError as exc:
             if "does not exist" not in str(exc):
+                failed += 1
                 print(f"cleanup {method} {ids}: {exc}", file=sys.stderr)
+    return failed
+
+
+def deleted_report(failed: int) -> str:
+    """What to print after ``delete_fixtures``: the truth, with the way out."""
+    if not failed:
+        return "fixtures deleted"
+    return (f"fixtures NOT all deleted: {failed} delete call(s) failed (see above); "
+            f"run roundtrip_fixtures.py URL USER PASSWORD --purge")
 
 
 # (get method, search field, delete method, id field), parents last. Deleting a
@@ -757,6 +892,8 @@ def purge_leftovers(call, version: str) -> int:
     interrupted run left behind. Returns the number of objects deleted."""
     deleted = 0
     for get, field, delete, id_field in _PURGE_ORDER:
+        if get == "proxy.get" and not at_least(version, "7.0"):
+            field = "host"   # a proxy is named by "host" before 7.0; searching "name" finds nothing
         try:
             rows = call(get, {"output": [id_field, field], "search": {field: PREFIX}, "searchWildcardsEnabled": False})
         except RuntimeError:
@@ -836,8 +973,9 @@ def main(argv: list[str]) -> int:
     if keep:
         print(f"--keep given, {len(cleanup)} delete calls left undone")
     else:
-        delete_fixtures(call, cleanup)
-        print(f"deleted ({len(cleanup)} delete calls)")
+        failed = delete_fixtures(call, cleanup)
+        print(f"deleted ({len(cleanup)} delete calls)" if not failed else deleted_report(failed))
+        return 1 if failed else 0
     return 0
 
 

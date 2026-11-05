@@ -525,9 +525,9 @@
    "stuck": []
   },
   "discoveryrule": {
-   "samples": 23,
-   "rows": 505,
-   "ok": 23,
+   "samples": 25,
+   "rows": 605,
+   "ok": 25,
    "paths": {
     "error": {
      "kind": "cannot be updated",
@@ -536,13 +536,17 @@
        "refused": 19,
        "present": 19
       },
+      "dependent": {
+       "refused": 2,
+       "present": 2
+      },
       "templated": {
        "refused": 4,
        "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 25,
+     "present": 25
     },
     "filter": {
      "kind": "opaque: Unsupported parameter \"eval_formula\" for the filter of discovery rule \"FAN Discovery\".",
@@ -551,13 +555,17 @@
        "refused": 19,
        "present": 19
       },
+      "dependent": {
+       "refused": 2,
+       "present": 2
+      },
       "templated": {
        "refused": 4,
        "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 25,
+     "present": 25
     },
     "lld_macro_paths": {
      "kind": "opaque: Invalid parameter \"/1/lld_macro_paths\": cannot update property for templated discovery rule.",
@@ -588,13 +596,17 @@
        "refused": 19,
        "present": 19
       },
+      "dependent": {
+       "refused": 2,
+       "present": 2
+      },
       "templated": {
        "refused": 4,
        "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 25,
+     "present": 25
     },
     "templateid": {
      "kind": "cannot be updated",
@@ -603,13 +615,17 @@
        "refused": 19,
        "present": 19
       },
+      "dependent": {
+       "refused": 2,
+       "present": 2
+      },
       "templated": {
        "refused": 4,
        "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 25,
+     "present": 25
     }
    },
    "stuck": []
@@ -622,18 +638,18 @@
    "stuck": []
   },
   "graph": {
-   "samples": 3,
-   "rows": 538,
-   "ok": 1,
+   "samples": 4,
+   "rows": 625,
+   "ok": 2,
    "paths": {
     "discoveryRule": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -645,29 +661,29 @@
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 3,
-     "present": 1
+     "count": 4,
+     "present": 2
     },
     "gitems": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -676,13 +692,13 @@
      "present": 0
     },
     "graphDiscovery": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -691,13 +707,13 @@
      "present": 0
     },
     "graphtype": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -706,13 +722,13 @@
      "present": 0
     },
     "groups": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -721,13 +737,13 @@
      "present": 0
     },
     "height": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -736,13 +752,13 @@
      "present": 0
     },
     "hosts": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -751,13 +767,13 @@
      "present": 0
     },
     "items": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -766,13 +782,13 @@
      "present": 0
     },
     "name": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -781,13 +797,13 @@
      "present": 0
     },
     "percent_left": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -796,13 +812,13 @@
      "present": 0
     },
     "percent_right": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -811,13 +827,13 @@
      "present": 0
     },
     "show_3d": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -826,13 +842,13 @@
      "present": 0
     },
     "show_legend": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -841,13 +857,13 @@
      "present": 0
     },
     "show_triggers": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -856,13 +872,13 @@
      "present": 0
     },
     "show_work_period": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -874,29 +890,29 @@
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 1,
-       "present": 1
+       "refused": 2,
+       "present": 2
       },
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
      },
-     "count": 3,
-     "present": 1
+     "count": 4,
+     "present": 2
     },
     "templates": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -905,13 +921,13 @@
      "present": 0
     },
     "uuid": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -920,13 +936,13 @@
      "present": 0
     },
     "width": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -935,13 +951,13 @@
      "present": 0
     },
     "yaxismax": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -950,13 +966,13 @@
      "present": 0
     },
     "yaxismin": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -965,13 +981,13 @@
      "present": 0
     },
     "ymax_itemid": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -980,13 +996,13 @@
      "present": 0
     },
     "ymax_type": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -995,13 +1011,13 @@
      "present": 0
     },
     "ymin_itemid": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -1010,13 +1026,13 @@
      "present": 0
     },
     "ymin_type": {
-     "kind": "opaque: Cannot update a templated graph \"Zabbix server: Value cache effectiveness\".",
+     "kind": "opaque: Cannot update a discovered graph.",
      "categories": {
-      "templated": {
+      "discovered": {
        "refused": 0,
        "present": 0
       },
-      "discovered": {
+      "templated": {
        "refused": 0,
        "present": 0
       }
@@ -1026,6 +1042,40 @@
     }
    },
    "stuck": [
+    {
+     "id": "3159",
+     "category": "discovered",
+     "name": "Interface eth0: Network traffic",
+     "error": "Cannot update a discovered graph.",
+     "dropped": [
+      "name",
+      "width",
+      "height",
+      "yaxismin",
+      "yaxismax",
+      "templateid",
+      "show_work_period",
+      "show_triggers",
+      "graphtype",
+      "show_legend",
+      "show_3d",
+      "percent_left",
+      "percent_right",
+      "ymin_type",
+      "ymax_type",
+      "ymin_itemid",
+      "ymax_itemid",
+      "flags",
+      "uuid",
+      "gitems",
+      "groups",
+      "hosts",
+      "templates",
+      "items",
+      "discoveryRule",
+      "graphDiscovery"
+     ]
+    },
     {
      "id": "528",
      "category": "templated",
@@ -1059,69 +1109,35 @@
       "discoveryRule",
       "graphDiscovery"
      ]
-    },
-    {
-     "id": "3147",
-     "category": "discovered",
-     "name": "/etc/resolv.conf: Disk space usage",
-     "error": "Cannot update a discovered graph.",
-     "dropped": [
-      "name",
-      "width",
-      "height",
-      "yaxismin",
-      "yaxismax",
-      "templateid",
-      "show_work_period",
-      "show_triggers",
-      "graphtype",
-      "show_legend",
-      "show_3d",
-      "percent_left",
-      "percent_right",
-      "ymin_type",
-      "ymax_type",
-      "ymin_itemid",
-      "ymax_itemid",
-      "flags",
-      "uuid",
-      "gitems",
-      "groups",
-      "hosts",
-      "templates",
-      "items",
-      "discoveryRule",
-      "graphDiscovery"
-     ]
     }
    ]
   },
   "graphprototype": {
-   "samples": 4,
-   "rows": 506,
-   "ok": 4,
+   "samples": 5,
+   "rows": 606,
+   "ok": 5,
    "paths": {
     "flags": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 3,
-       "present": 3
+       "refused": 4,
+       "present": 4
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     },
     "templateid": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 3,
-       "present": 3
+       "refused": 4,
+       "present": 4
       }
      },
-     "count": 3,
-     "present": 3
+     "count": 4,
+     "present": 4
     }
    },
    "stuck": []
@@ -1166,7 +1182,7 @@
   },
   "hostgroup": {
    "samples": 4,
-   "rows": 25,
+   "rows": 30,
    "ok": 4,
    "paths": {
     "discoveryRule": {
@@ -1192,6 +1208,17 @@
      "present": 4
     },
     "groupDiscovery": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 4,
+       "present": 4
+      }
+     },
+     "count": 4,
+     "present": 4
+    },
+    "hostPrototype": {
      "kind": "unexpected",
      "categories": {
       "plain": {
@@ -2081,760 +2108,764 @@
    "stuck": []
   },
   "item": {
-   "samples": 23,
-   "rows": 600,
-   "ok": 23,
+   "samples": 29,
+   "rows": 677,
+   "ok": 29,
    "paths": {
     "allow_traps": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "authtype": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "delay": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "description": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "discoveryRule": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "error": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 10,
-       "present": 10
+       "refused": 13,
+       "present": 13
+      },
+      "discovered": {
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 9,
        "present": 9
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 29,
+     "present": 29
     },
     "evaltype": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "follow_redirects": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "formula": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "graphs": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "headers": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "history": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "hostid": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "hosts": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "http_proxy": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "interfaceid": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "interfaces": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "inventory_link": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "ipmi_sensor": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "itemDiscovery": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "jmx_endpoint": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "key_": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "lastclock": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "lastns": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "lastvalue": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "lifetime": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "logtimefmt": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "master_itemid": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "name": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "output_format": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "parameters": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "params": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "password": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "post_type": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "posts": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "preprocessing": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "prevvalue": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "privatekey": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "publickey": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "query_fields": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "request_method": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "retrieve_mode": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "snmp_oid": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "ssl_cert_file": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "ssl_key_file": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "ssl_key_password": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "state": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 10,
-       "present": 10
+       "refused": 13,
+       "present": 13
+      },
+      "discovered": {
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 9,
        "present": 9
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 29,
+     "present": 29
     },
     "status_codes": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "tags": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "templateid": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 10,
-       "present": 10
+       "refused": 13,
+       "present": 13
+      },
+      "discovered": {
+       "refused": 7,
+       "present": 7
       },
       "templated": {
        "refused": 9,
        "present": 9
-      },
-      "discovered": {
-       "refused": 4,
-       "present": 4
       }
      },
-     "count": 23,
-     "present": 23
+     "count": 29,
+     "present": 29
     },
     "timeout": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "trapper_hosts": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "trends": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "triggers": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "type": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "units": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "url": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "username": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "uuid": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "value_type": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "valuemap": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "valuemapid": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "verify_host": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     },
     "verify_peer": {
      "kind": "cannot be updated",
      "categories": {
       "discovered": {
-       "refused": 4,
-       "present": 4
+       "refused": 7,
+       "present": 7
       }
      },
-     "count": 4,
-     "present": 4
+     "count": 7,
+     "present": 7
     }
    },
    "stuck": []
   },
   "itemprototype": {
-   "samples": 21,
-   "rows": 528,
-   "ok": 21,
+   "samples": 28,
+   "rows": 628,
+   "ok": 28,
    "paths": {
     "templateid": {
      "kind": "cannot be updated",
      "categories": {
       "plain": {
-       "refused": 12,
-       "present": 12
+       "refused": 14,
+       "present": 14
+      },
+      "dependent": {
+       "refused": 5,
+       "present": 5
       },
       "templated": {
        "refused": 9,
        "present": 9
       }
      },
-     "count": 21,
-     "present": 21
+     "count": 28,
+     "present": 28
     }
    },
    "stuck": []
@@ -4592,9 +4623,9 @@
    "stuck": []
   },
   "trigger": {
-   "samples": 11,
-   "rows": 598,
-   "ok": 11,
+   "samples": 12,
+   "rows": 658,
+   "ok": 12,
    "paths": {
     "comments": {
      "kind": "cannot be updated",
@@ -4610,13 +4641,13 @@
     "correlation_mode": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -4625,13 +4656,13 @@
     "correlation_tag": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -4655,11 +4686,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4674,11 +4705,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4693,11 +4724,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4712,11 +4743,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4731,11 +4762,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4750,11 +4781,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4769,11 +4800,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4788,11 +4819,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4807,11 +4838,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4826,11 +4857,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4845,11 +4876,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4864,11 +4895,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4883,11 +4914,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4902,11 +4933,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4921,11 +4952,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4940,11 +4971,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4959,11 +4990,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4978,11 +5009,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -4997,11 +5028,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -5016,11 +5047,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -5035,11 +5066,11 @@
        "refused": 1,
        "present": 1
       },
-      "templated": {
+      "discovered": {
        "refused": 2,
        "present": 2
       },
-      "discovered": {
+      "templated": {
        "refused": 2,
        "present": 2
       }
@@ -5050,13 +5081,13 @@
     "description": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -5066,39 +5097,39 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "error": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "event_name": {
      "kind": "cannot be updated",
@@ -5114,13 +5145,13 @@
     "expression": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -5130,145 +5161,145 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "functions": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "groups": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "hosts": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "items": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "lastEvent": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "lastchange": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "manual_close": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -5299,13 +5330,13 @@
     "recovery_expression": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -5314,13 +5345,13 @@
     "recovery_mode": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -5330,20 +5361,20 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "tags": {
      "kind": "cannot be updated",
@@ -5360,39 +5391,39 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "triggerDiscovery": {
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     },
     "type": {
      "kind": "cannot be updated",
@@ -5419,13 +5450,13 @@
     "uuid": {
      "kind": "cannot be updated",
      "categories": {
-      "templated": {
-       "refused": 5,
-       "present": 5
-      },
       "discovered": {
        "refused": 3,
        "present": 3
+      },
+      "templated": {
+       "refused": 5,
+       "present": 5
       }
      },
      "count": 8,
@@ -5435,27 +5466,27 @@
      "kind": "unexpected",
      "categories": {
       "plain": {
+       "refused": 4,
+       "present": 4
+      },
+      "discovered": {
        "refused": 3,
        "present": 3
       },
       "templated": {
        "refused": 5,
        "present": 5
-      },
-      "discovered": {
-       "refused": 3,
-       "present": 3
       }
      },
-     "count": 11,
-     "present": 11
+     "count": 12,
+     "present": 12
     }
    },
    "stuck": []
   },
   "triggerprototype": {
    "samples": 6,
-   "rows": 511,
+   "rows": 611,
    "ok": 6,
    "paths": {
     "correlation_mode": {
@@ -6753,6 +6784,36 @@
      "present": 2
     },
     "status": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 2,
+       "present": 2
+      }
+     },
+     "count": 2,
+     "present": 2
+    }
+   },
+   "stuck": []
+  },
+  "module": {
+   "samples": 2,
+   "rows": 23,
+   "ok": 2,
+   "paths": {
+    "id": {
+     "kind": "unexpected",
+     "categories": {
+      "plain": {
+       "refused": 2,
+       "present": 2
+      }
+     },
+     "count": 2,
+     "present": 2
+    },
+    "relative_path": {
      "kind": "unexpected",
      "categories": {
       "plain": {

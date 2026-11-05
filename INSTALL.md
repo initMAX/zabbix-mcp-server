@@ -72,8 +72,10 @@ See [`config.example.toml`](config.example.toml) for all available options with 
 
 ```bash
 sudo systemctl start zabbix-mcp-server
-sudo systemctl enable zabbix-mcp-server
+sudo systemctl enable --now zabbix-mcp-initmax
 ```
+
+`zabbix-mcp-initmax` is a second unit that the installer writes next to the server's own. It does nothing by itself: it starts `zabbix-mcp-server` at boot, and enabling or disabling it enables or disables both. `start`, `stop` and `restart` work under either name, and under the alias `zabbix-mcp` once the unit is enabled; the status and the journal are the server's, under `zabbix-mcp-server`. The second name is there because `zabbix-mcp-server.service` is also the unit name of the MCP server that Zabbix 8.0 packages, whose install and removal scripts enable, disable, start and stop whatever unit carries the name (see "The MCP server shipped with Zabbix 8.0" in the README). On a host without that package `systemctl enable zabbix-mcp-server` works as before.
 
 ### Step 5: Verify
 
@@ -135,10 +137,12 @@ sudo ./deploy/install.sh [COMMAND] [OPTIONS]
 | `/opt/zabbix-mcp/venv` | Python virtual environment |
 | `/etc/zabbix-mcp/config.toml` | Server configuration |
 | `/var/log/zabbix-mcp/server.log` | Log file |
-| `/etc/systemd/system/zabbix-mcp-server.service` | Systemd unit |
+| `/etc/systemd/system/zabbix-mcp-server.service` | Systemd unit of the server |
+| `/etc/systemd/system/zabbix-mcp-initmax.service` | The unit the server is enabled through at boot (a name no other package uses); while it is enabled, systemd keeps the alias symlink `zabbix-mcp.service` next to it |
+| `/etc/systemd/system/zabbix-mcp-initmax-recover.path`, `.service` | Start the server again when the `zabbix-mcp-server` package of Zabbix 8.0 is installed, upgraded or removed (its scripts stop the shared unit name) |
 | `/etc/zabbix-mcp/assets/` | Uploaded logos |
 | `/etc/zabbix-mcp/tls/` | TLS certificates and keys |
-| `/etc/logrotate.d/zabbix-mcp-server` | Logrotate config |
+| `/etc/logrotate.d/zabbix-mcp` | Logrotate config (`/etc/logrotate.d/zabbix-mcp-server` before v1.42; moved by the next install or update, because that path belongs to the Zabbix 8.0 package of the same name) |
 | `/etc/sudoers.d/zabbix-mcp-server` | Sudoers rule for admin portal restart |
 
 ---
@@ -301,6 +305,8 @@ Two production paths:
 ```
 Client → Caddy/nginx (HTTPS, Let's Encrypt) → MCP Server (HTTP, localhost:8080)
 ```
+
+List the proxy in `config.toml`, also when it runs on the same host: `trusted_proxies = ["127.0.0.1"]` under `[server]`. Only a listed proxy is believed when it reports the client's address and the scheme (`X-Forwarded-For`, `X-Forwarded-Proto`); without the line the server does not know who the clients are, and `allowed_hosts` and tokens with `allowed_ips` refuse what the proxy forwards. The proxy has to set or append `X-Forwarded-For` (see [docs/OAUTH.md](docs/OAUTH.md) for nginx, Caddy and Apache).
 
 **B. Native TLS in the MCP server** - one-shot Let's Encrypt automation:
 

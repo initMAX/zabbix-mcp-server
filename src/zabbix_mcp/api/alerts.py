@@ -61,6 +61,7 @@ _ACTION_GET_EXTRA: list[ParamDef] = [
         "Return only actions with the given event source. "
         "Values: 0 = trigger events, 1 = discovery events, "
         "2 = autoregistration events, 3 = internal events, 4 = service events.",
+        api_name="filter.eventsource",
     ),
 ]
 
@@ -166,7 +167,8 @@ _ALERT_METHODS: list[MethodDef] = [
             "and remote command Zabbix has executed as a result of actions. Each "
             "alert entry contains delivery status, retry count, error text (if "
             "failed), and the message body. Use time_from/time_till to scope by "
-            "time window. Great for diagnosing 'why didn't I get notified?' issues."
+            "time window. Great for diagnosing 'why didn't I get notified?' issues. "
+            "The newest alerts come first unless a sort is given."
         ),
         read_only=True,
         compact_fields=("alertid", "actionid", "mediatypeid", "status", "clock"),
@@ -207,7 +209,8 @@ _MEDIATYPE_METHODS: list[MethodDef] = [
         description=(
             "Create a new media type (notification channel). Required fields depend "
             "on the type: 'name' and 'type' are always required. "
-            "Symbolic names accepted for 'type': EMAIL, SCRIPT, SMS, WEBHOOK. "
+            "Symbolic names accepted for 'type': EMAIL, SCRIPT, SMS, WEBHOOK, PUSH (8.0+, "
+            "notifications to the Zabbix mobile app). "
             "EMAIL needs smtp_server, smtp_email; SCRIPT needs exec_path; "
             "SMS needs gsm_modem; WEBHOOK needs script and optionally parameters. "
             "Set status to 0 (enabled) or 1 (disabled)."
@@ -337,6 +340,11 @@ _SCRIPT_METHODS: list[MethodDef] = [
                 "eventid", "str",
                 "Event context for the script.",
             ),
+            ParamDef(
+                "manualinput", "str",
+                "The value for a script that asks for manual input (its "
+                "{MANUALINPUT} macro). Zabbix 7.0+.",
+            ),
         ],
     ),
     MethodDef(
@@ -354,6 +362,14 @@ _SCRIPT_METHODS: list[MethodDef] = [
                 "eventids", "list[str]",
                 "Event IDs to get available scripts for.",
                 required=True,
+            ),
+            ParamDef(
+                "scriptid", "str",
+                "Return only this script, with its macros resolved for each event. Zabbix 7.0+.",
+            ),
+            ParamDef(
+                "manualinput", "str",
+                "Value of the {MANUALINPUT} macro to resolve in the script. Zabbix 7.0+.",
             ),
         ],
     ),
@@ -373,6 +389,14 @@ _SCRIPT_METHODS: list[MethodDef] = [
                 "hostids", "list[str]",
                 "Host IDs to get available scripts for.",
                 required=True,
+            ),
+            ParamDef(
+                "scriptid", "str",
+                "Return only this script, with its macros resolved for each host. Zabbix 7.0+.",
+            ),
+            ParamDef(
+                "manualinput", "str",
+                "Value of the {MANUALINPUT} macro to resolve in the script. Zabbix 7.0+.",
             ),
         ],
     ),

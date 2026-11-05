@@ -862,8 +862,9 @@ async def server_test_new(request: Request) -> Response:
     try:
         from zabbix_utils import ZabbixAPI
         # Throwaway probe: skip the library's min/max version gate here as
-        # before (an 8.0 is 'experimental' and must still test green with
-        # a token). The legacy version lock below is our own check.
+        # before (zabbix-utils 2.0.4 stops at 7.4, so an 8.0 would not test
+        # green with a token otherwise). The legacy version lock below is
+        # our own check.
         api = ZabbixAPI(url=url, validate_certs=verify_ssl, skip_version_check=True)
         version = _html.escape(str(api.api_version()))
         if legacy_auth:

@@ -166,6 +166,9 @@
     "with_triggers": {
      "type": "flag",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -180,7 +183,9 @@
     },
     "selectDiscoveries": {
      "type": "query",
-     "since": null
+     "since": null,
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryRules"
     },
     "selectDiscoveryData": {
      "type": "query",
@@ -205,7 +210,9 @@
     },
     "selectHostDiscovery": {
      "type": "query",
-     "since": null
+     "since": null,
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectHostGroups": {
      "type": "query",
@@ -397,6 +404,10 @@
     "with_triggers": {
      "type": "boolean",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag",
+     "removed": "6.2"
     }
    },
    "selects": {
@@ -415,7 +426,9 @@
     },
     "selectGroupDiscoveries": {
      "type": "query",
-     "since": "7.0"
+     "since": "7.0",
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectGroupDiscovery": {
      "type": "query",
@@ -434,6 +447,11 @@
      "type": "query",
      "since": null,
      "removed": "6.2"
+    },
+    "selectHostPrototype": {
+     "type": "query",
+     "since": null,
+     "removed": "7.0"
     }
    },
    "filter_props": null,
@@ -444,7 +462,8 @@
     "with_* parameters are typed boolean on the 7.4 page (host.get uses flag for the same names)",
     "monitored_hosts: marked deprecated on pages 6.2-7.0 (deprecated, please use `with_monitored_hosts` instead.)",
     "real_hosts: marked deprecated on pages 6.2-7.0 (deprecated, please use `with_hosts` instead.)",
-    "selectGroupDiscoveries: marked deprecated on pages 7.4-8.0 (deprecated, please use `selectDiscoveryData` instead.)"
+    "selectGroupDiscoveries: marked deprecated on pages 7.4-8.0 (deprecated, please use `selectDiscoveryData` instead.)",
+    "selectHostPrototype: the 6.0-6.4 source takes it (verified live on 6.0.48, 6.2.9, 6.4.21: returns hostPrototype); 7.0 answers 'unexpected parameter' and has selectHostPrototypes"
    ]
   },
   "hostinterface.get": {
@@ -489,6 +508,9 @@
     "triggerids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -621,6 +643,9 @@
     "with_triggers": {
      "type": "boolean",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -655,7 +680,9 @@
     },
     "selectItemDiscovery": {
      "type": "query",
-     "since": null
+     "since": null,
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectPreprocessing": {
      "type": "query",
@@ -829,6 +856,13 @@
     "withUnacknowledgedEvents": {
      "type": "flag",
      "since": null
+    },
+    "maintenanceids": {
+     "type": "ID/array",
+     "since": "8.0"
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -883,7 +917,9 @@
     },
     "selectTriggerDiscovery": {
      "type": "query",
-     "since": null
+     "since": null,
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     }
    },
    "filter_props": null,
@@ -950,6 +986,9 @@
     "templateids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -963,7 +1002,9 @@
     },
     "selectGraphDiscovery": {
      "type": "query",
-     "since": null
+     "since": null,
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryData"
     },
     "selectGraphItems": {
      "type": "query",
@@ -1127,6 +1168,9 @@
     "with_triggers": {
      "type": "flag",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -1141,7 +1185,9 @@
     },
     "selectDiscoveries": {
      "type": "query",
-     "since": null
+     "since": null,
+     "deprecated": "7.4",
+     "replaced_by": "selectDiscoveryRules"
     },
     "selectDiscoveryRules": {
      "type": "query",
@@ -1351,6 +1397,10 @@
     "inherited": {
      "type": "boolean",
      "since": "6.0"
+    },
+    "templateids": {
+     "type": "ID/array",
+     "since": null
     }
    },
    "selects": {
@@ -1382,7 +1432,8 @@
     "Returns host/template macros by default; globalmacro flag switches to global macros (object globalmacro)",
     "selectGroups replaced by selectHostGroups/selectTemplateGroups in 6.2 (deprecated 6.2-7.0, gone from 7.2 page); inherited parameter added in 6.0",
     "sortfield description says 'Possible value: macro' (singular) on 5.0-6.2 pages",
-    "selectGroups: marked deprecated on pages 6.2-7.0 (deprecated, please use `selectHostGroups` or `selectTemplateGroups` instead.)"
+    "selectGroups: marked deprecated on pages 6.2-7.0 (deprecated, please use `selectHostGroups` or `selectTemplateGroups` instead.)",
+    "templateids: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it. itemids and triggerids are in the class's option table too, but nothing reads them (a live server returns every macro)"
    ]
   },
   "valuemap.get": {
@@ -1410,6 +1461,10 @@
     "valuemapids": {
      "type": "ID/array",
      "since": null
+    },
+    "hostids": {
+     "type": "ID/array",
+     "since": null
     }
    },
    "selects": {
@@ -1421,7 +1476,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "valuemapids is the only method-specific parameter on all pages 5.0-8.0; value maps are host/template-level since 5.2 (hostid property appears from the 6.0 page)"
+    "valuemapids is the only method-specific parameter on all pages 5.0-8.0; value maps are host/template-level since 5.2 (hostid property appears from the 6.0 page)",
+    "hostids: taken by the API class in the frontend source and verified live on 6.0-8.0 (scripts/audit_api_sources.py); the reference page does not list it"
    ]
   },
   "maintenance.get": {
@@ -1460,6 +1516,13 @@
     "maintenanceids": {
      "type": "ID/array",
      "since": null
+    },
+    "triggerids": {
+     "type": "ID/array",
+     "since": "8.0"
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -1483,6 +1546,14 @@
     "selectTimeperiods": {
      "type": "query",
      "since": null
+    },
+    "selectTriggers": {
+     "type": "query",
+     "since": "8.0"
+    },
+    "selectEventNames": {
+     "type": "query",
+     "since": "8.0"
     }
    },
    "filter_props": null,

@@ -210,6 +210,26 @@ class TestCepRuleRoundTrip(unittest.TestCase):
         self.assertNotIn("eval_formula", sent["operations"][0]["filter"])
         self.assertEqual(sent["window"]["duration"], "10m")
 
+    def test_operation_scope_filter_follows_the_same_rule(self):
+        # 8.0.0 added scope / scope_filter to an operation; its filter is the same kind
+        rule = {"cep_ruleid": "7", "operations": [
+            {"sortorder": "1", "type": "11", "execute_when": "3", "tag": "t", "tag_value": "v", "scope": "2",
+             "filter": {"evaltype": "0", "eval_formula": "", "formula": "", "conditions": []},
+             "scope_filter": {"evaltype": "0", "eval_formula": "A and B", "formula": "",
+                              "conditions": [{"type": "25", "operator": "0", "tag": "rt", "formulaid": "A"},
+                                             {"type": "33", "operator": "10", "formulaid": "B"}]}},
+            {"sortorder": "2", "type": "2", "execute_when": "2", "scope": "1",
+             "scope_filter": {"evaltype": "3", "formula": "A", "eval_formula": "A",
+                              "conditions": [{"type": "34", "operator": "11", "formulaid": "A"}]}}]}
+        sent = self._send(rule)
+        first, second = sent["operations"]
+        self.assertNotIn("eval_formula", first["scope_filter"])
+        self.assertEqual([set(c) for c in first["scope_filter"]["conditions"]],
+                         [{"type", "operator", "tag"}, {"type", "operator"}])
+        self.assertEqual(first["scope"], "2")
+        self.assertNotIn("eval_formula", second["scope_filter"])
+        self.assertEqual(second["scope_filter"]["conditions"][0]["formulaid"], "A")   # custom expression
+
     def test_custom_expression_keeps_formulaid(self):
         rule = {"cep_ruleid": "7", "filter": {"evaltype": 3, "formula": "A and B", "eval_formula": "A and B",
                                                "conditions": [{"type": 3, "operator": 2, "event_name": "x", "formulaid": "A"},
@@ -217,6 +237,81 @@ class TestCepRuleRoundTrip(unittest.TestCase):
         sent = self._send(rule)
         self.assertEqual([c["formulaid"] for c in sent["filter"]["conditions"]], ["A", "B"])
         self.assertNotIn("eval_formula", sent["filter"])
+
+
+class TestTelemetryQueryItem(unittest.TestCase):
+    """A telemetry query item (8.0, type 24) carries a filter inside ``query``
+    that behaves like an LLD filter: ``eval_formula`` is refused, ``formulaid``
+    is refused outside a custom expression (verified live on 8.0.0)."""
+
+    def _send(self, tool, item):
+        from mcp.server.mcpserver import MCPServer
+        cfg = AppConfig(server=ServerConfig(), zabbix_servers={"t": ZabbixServerConfig(
+            name="t", url="http://localhost", api_token="x", read_only=False)})
+        mgr = ClientManager(cfg); mcp = MCPServer(name="test"); _register_tools(mcp, mgr)
+        sent = []
+        with patch.object(mgr, "call", side_effect=lambda s, m, p, *a, **k: sent.append(p) or {"itemids": ["1"]}), \
+                patch.object(mgr, "get_version", return_value="8.0.0"):
+            asyncio.run(mcp.call_tool(tool, {"params": item}))
+        return sent[0]
+
+    def test_filter_as_returned_by_get(self):
+        item = {"itemid": "1", "query": {"signal_type": "0", "columns": [], "metric_point_type": "0",
+                                         "aggregated_columns": [{"function": "4", "alias": "n", "column": "", "parameters": []}],
+                                         "filter": {"evaltype": "0", "formula": "", "eval_formula": "A",
+                                                    "conditions": [{"column": "ServiceName", "operator": "0", "value": "x",
+                                                                    "attribute_key": "", "formulaid": "A"}]}}}
+        sent = self._send("item_update", item)
+        flt = sent["query"]["filter"]
+        self.assertNotIn("eval_formula", flt)
+        self.assertNotIn("formulaid", flt["conditions"][0])
+        self.assertEqual(flt["conditions"][0]["column"], "ServiceName")
+
+    def test_an_lld_rule_can_be_a_telemetry_query_too(self):
+        # 8.0.0 added type 24 to the LLD rule and its prototype (source only, not on
+        # the reference page); a live discoveryrule.update refused the query a
+        # get had returned: unexpected parameter "eval_formula"
+        import copy
+        query = {"signal_type": "0", "columns": [], "metric_point_type": "0",
+                 "aggregated_columns": [{"function": "4", "alias": "n", "column": "", "parameters": []}],
+                 "filter": {"evaltype": "0", "formula": "", "eval_formula": "A",
+                            "conditions": [{"column": "ServiceName", "operator": "0", "value": "x",
+                                            "attribute_key": "", "formulaid": "A"}]}}
+        for tool in ("discoveryrule_update", "discoveryrule_create",
+                     "discoveryruleprototype_update", "discoveryruleprototype_create"):
+            sent = self._send(tool, {"itemid": "1", "query": copy.deepcopy(query)})
+            flt = sent["query"]["filter"]
+            self.assertNotIn("eval_formula", flt, tool)
+            self.assertNotIn("formulaid", flt["conditions"][0], tool)
+        # a custom expression keeps its labels
+        custom = copy.deepcopy(query)
+        custom["filter"].update(evaltype="3", formula="A and B", eval_formula="A and B")
+        custom["filter"]["conditions"].append({"column": "SpanName", "operator": "2", "value": "y",
+                                               "attribute_key": "", "formulaid": "B"})
+        sent = self._send("discoveryrule_update", {"itemid": "1", "query": custom})
+        self.assertNotIn("eval_formula", sent["query"]["filter"])
+        self.assertEqual([c["formulaid"] for c in sent["query"]["filter"]["conditions"]], ["A", "B"])
+        self.assertEqual(sent["query"]["filter"]["formula"], "A and B")
+        self.assertEqual(sent["query"]["aggregated_columns"][0]["alias"], "n")
+
+    def test_custom_expression_and_prototype_and_create(self):
+        query = {"signal_type": 0, "columns": [], "aggregated_columns": [{"function": 4, "alias": "n"}],
+                 "filter": {"evaltype": 3, "formula": "A and B", "eval_formula": "A and B", "conditions": [
+                     {"column": "ServiceName", "operator": 0, "value": "x", "formulaid": "A"},
+                     {"column": "SpanName", "operator": 2, "value": "y", "formulaid": "B"}]}}
+        for tool, extra in (("item_update", {"itemid": "1"}), ("itemprototype_update", {"itemid": "1"}),
+                            ("item_create", {"hostid": "1", "name": "n", "key_": "k", "type": "TELEMETRY_QUERY",
+                                             "value_type": "UNSIGNED", "delay": "1m"})):
+            with self.subTest(tool=tool):
+                sent = self._send(tool, dict(extra, query=json.loads(json.dumps(query))))
+                flt = sent["query"]["filter"]
+                self.assertNotIn("eval_formula", flt)
+                self.assertEqual([c["formulaid"] for c in flt["conditions"]], ["A", "B"])
+        self.assertEqual(sent["type"], 24)
+
+    def test_items_without_a_query_are_untouched(self):
+        sent = self._send("item_update", {"itemid": "1", "name": "x", "query_fields": [{"name": "a", "value": "b"}]})
+        self.assertEqual(sent, {"itemid": "1", "name": "x", "query_fields": [{"name": "a", "value": "b"}]})
 
 
 class TestHostDashboard(unittest.TestCase):

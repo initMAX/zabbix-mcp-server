@@ -27,7 +27,8 @@ tool for the right server up front.
 ``METHOD_SINCE`` lists the first release that has a method, for every
 method that is *not* in 5.0 (the oldest release this server supports);
 ``METHOD_REMOVED`` lists the first release *without* it and what the
-docs say to use instead (the legacy objects of 5.0 and 5.2 - applications,
+docs say to use instead; ``METHOD_DEPRECATED`` the first release whose
+reference calls it deprecated (the legacy objects of 5.0 and 5.2 - applications,
 screens, template screens, the old service dependencies - are listed too,
 so a raw call on a newer server gets the replacement, not "Method not
 found"). Both come from the per-release "API changes"
@@ -37,6 +38,8 @@ supported release.
 """
 
 from __future__ import annotations
+
+import re
 
 # First release that has the method (methods present in 5.0 are not listed).
 METHOD_SINCE: dict[str, str] = {
@@ -126,7 +129,7 @@ METHOD_SINCE: dict[str, str] = {
     "discoveryruleprototype.update": "7.4",
     # Zabbix 8.0
     "apmlog.get": "8.0",
-    "ceprule.create": "8.0",      # undocumented in 8.0.0rc2; CCepRule.php
+    "ceprule.create": "8.0",
     "ceprule.delete": "8.0",
     "ceprule.get": "8.0",
     "ceprule.resettimewindows": "8.0",
@@ -178,9 +181,28 @@ METHOD_REMOVED: dict[str, tuple[str, str]] = {
     # Zabbix 8.0
     "host.massupdate": ("8.0", "host.update (per host)"),
     "hostgroup.massupdate": ("8.0", "hostgroup.update, hostgroup.massadd or hostgroup.massremove"),
-    "hostinterface.replacehostinterfaces": ("8.0", "hostinterface.update, hostinterface.massadd or hostinterface.massremove"),
+    # 8.0.0 took the write half of the host interface API away (ZBXNEXT-10814;
+    # the release candidates still had it): interfaces are edited through
+    # the host, whose ``interfaces`` list REPLACES the current one.
+    "hostinterface.create": ("8.0", "host.update with the host's full interfaces list plus the new one (host.get with selectInterfaces first; an interface without interfaceid is created)"),
+    "hostinterface.delete": ("8.0", "host.update with the host's interfaces list without that interface (every interface not listed is removed)"),
+    "hostinterface.massadd": ("8.0", "host.update with the full interfaces list, per host"),
+    "hostinterface.massremove": ("8.0", "host.update with the full interfaces list, per host"),
+    "hostinterface.replacehostinterfaces": ("8.0", "host.update with interfaces (the list replaces the current one)"),
+    "hostinterface.update": ("8.0", "host.update with the host's full interfaces list, the changed interface carrying its interfaceid"),
     "template.massupdate": ("8.0", "template.update, template.massadd or template.massremove"),
     "templategroup.massupdate": ("8.0", "templategroup.update, templategroup.massadd or templategroup.massremove"),
+}
+
+
+# Deprecated but still working: first release whose reference says so ->
+# (release, what to use instead). Nothing is refused; ``tools/list`` tells the
+# model on which of its servers the method is on its way out.
+METHOD_DEPRECATED: dict[str, tuple[str, str]] = {
+    "correlation.create": ("8.0", "ceprule.create (complex event processing)"),
+    "correlation.delete": ("8.0", "ceprule.delete (complex event processing)"),
+    "correlation.get": ("8.0", "ceprule.get (complex event processing)"),
+    "correlation.update": ("8.0", "ceprule.update (complex event processing)"),
 }
 
 
@@ -193,6 +215,27 @@ def parse_version(version: str | None) -> tuple[int, int] | None:
         return int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
     except (ValueError, IndexError):
         return None
+
+
+_PRERELEASE_OF_DOT_ZERO = re.compile(r"^\s*\d+\.\d+\.0\s*-?(alpha|beta|rc)\d*\s*$", re.IGNORECASE)
+
+
+def is_removed(version: str | None, removed: str | None) -> bool:
+    """True when a server running *version* no longer has what release
+    *removed* took away.
+
+    A pre-release of that very release (``8.0.0alpha1``, ``8.0.0beta3``,
+    ``8.0.0rc2``) is not counted: what it still has is not known from its
+    number (8.0.0rc2 had the host interface write methods that 8.0.0
+    dropped), and an unknown never blocks a call.
+    """
+    current = parse_version(version)
+    gone = parse_version(removed)
+    if current is None or gone is None or current < gone:
+        return False
+    if current == gone and _PRERELEASE_OF_DOT_ZERO.match(str(version)):
+        return False
+    return True
 
 
 def unavailable_reason(api_method: str, version: str | None) -> str | None:
@@ -209,9 +252,24 @@ def unavailable_reason(api_method: str, version: str | None) -> str | None:
     if since and current < parse_version(since):
         return f"{api_method} requires Zabbix {since} or later (this server runs {version})."
     removed = METHOD_REMOVED.get(method)
-    if removed and current >= parse_version(removed[0]):
+    if removed and is_removed(version, removed[0]):
         return (
             f"{api_method} was removed in Zabbix {removed[0]} (this server runs {version}). "
             f"Use {removed[1]} instead."
+        )
+    return None
+
+
+def deprecated_reason(api_method: str, version: str | None) -> str | None:
+    """Why *api_method* should be avoided on a server running *version*, or
+    ``None``. A deprecated method still works; this is advice, not a refusal."""
+    current = parse_version(version)
+    if current is None:
+        return None
+    entry = METHOD_DEPRECATED.get(api_method.lower())
+    if entry and current >= parse_version(entry[0]):
+        return (
+            f"{api_method} is deprecated since Zabbix {entry[0]} and may be removed in a later "
+            f"release (this server runs {version}). Prefer {entry[1]}."
         )
     return None

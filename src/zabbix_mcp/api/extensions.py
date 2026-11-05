@@ -643,6 +643,24 @@ def capacity_forecast(
 # ---------------------------------------------------------------------------
 
 
+# item.get parameters item_threshold_search cannot work with: it needs the item
+# rows themselves, as a list
+ITEM_THRESHOLD_UNSUPPORTED = ("countOutput", "preservekeys", "groupCount")
+
+
+def item_threshold_unsupported(extra_params: Any) -> str | None:
+    """The refusal for an ``extra_params`` key the tool cannot work with."""
+    if not isinstance(extra_params, dict):
+        return None
+    for key in ITEM_THRESHOLD_UNSUPPORTED:
+        if extra_params.get(key):
+            return (
+                f"extra_params '{key}' is not supported by item_threshold_search: it filters "
+                f"a list of items by lastvalue and reports scanned / matched counts itself."
+            )
+    return None
+
+
 def item_threshold_search(
     client_manager: ClientManager,
     server_name: str,
@@ -707,8 +725,22 @@ def item_threshold_search(
         result_limit = kwargs.get("result_limit")
         extra_params: dict[str, Any] = kwargs.get("extra_params") or {}
 
+        # the threshold is applied to a list of item rows
+        unsupported = item_threshold_unsupported(extra_params)
+        if unsupported:
+            return _error_json(unsupported)
+
         # extra_params merged first so explicit arguments take precedence on conflict
         params: dict[str, Any] = dict(extra_params)
+        # a Zabbix switch is on as soon as it is present: webitems=false would
+        # add the web items, so false is left out as the description says
+        # (the get tools do the same in the server)
+        from zabbix_mcp.api.contracts import contract_for, false_means_unset
+        contract = contract_for("item.get")
+        if contract is not None:
+            for name in [k for k, v in params.items()
+                         if isinstance(v, (bool, int)) and not v and false_means_unset(contract, k)]:
+                del params[name]
 
         output = kwargs.get("output") or "itemid,name,key_,lastvalue"
         if output == "count":
@@ -717,7 +749,8 @@ def item_threshold_search(
                 "The tool reports scanned/matched counts separately in its response."
             )
         if output != "extend":
-            fields = [f.strip() for f in output.split(",") if f.strip()]
+            names = output if isinstance(output, list) else str(output).split(",")
+            fields = [str(f).strip() for f in names if str(f).strip()]
             if "lastvalue" not in fields:
                 fields.append("lastvalue")
             params["output"] = fields

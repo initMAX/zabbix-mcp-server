@@ -1,0 +1,181 @@
+# Debian 12 with the files of the MCP server that Zabbix 8.0 ships itself
+# (package zabbix-mcp-server): the same systemd unit name as this project,
+# and /etc/logrotate.d/zabbix-mcp-server, which this installer used for its
+# own logrotate config before v1.42.
+#
+# The unit and the logrotate file written below are the ones inside
+# zabbix-mcp-server_8.0.0-1+ubuntu24.04 (repo.zabbix.com, 8.0 stable), line
+# for line.
+FROM debian:12
+
+# The installer's own exit status counts, also when its output is piped to tee
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y python3 python3-venv python3-pip && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY . /opt/src
+WORKDIR /opt/src
+RUN chmod +x deploy/install.sh && mkdir -p /etc/logrotate.d /etc/systemd/system /usr/lib/systemd/system
+
+# What the Zabbix 8.0 package puts on the host
+RUN printf '%s\n' \
+        '[Unit]' \
+        'Description=Zabbix MCP Server' \
+        'After=network.target' \
+        '' \
+        '[Service]' \
+        'Environment="CONFFILE=/etc/zabbix/zabbix_mcp_server.conf"' \
+        'EnvironmentFile=-/etc/sysconfig/zabbix-mcp-server' \
+        '' \
+        'RuntimeDirectory=zabbix' \
+        'RuntimeDirectoryMode=0755' \
+        'RuntimeDirectoryPreserve=yes' \
+        'PIDFile=/run/zabbix/zabbix_mcp_server.pid' \
+        '' \
+        'Restart=on-failure' \
+        'KillMode=control-group' \
+        'ExecStartPre=/usr/sbin/zabbix_mcp_server -T -c $CONFFILE' \
+        'ExecStart=/usr/sbin/zabbix_mcp_server -c $CONFFILE' \
+        'Restart=on-failure' \
+        'RestartSec=10s' \
+        'User=zabbix' \
+        'Group=zabbix' \
+        'Type=exec' \
+        '' \
+        '' \
+        '[Install]' \
+        'WantedBy=multi-user.target' \
+        > /usr/lib/systemd/system/zabbix-mcp-server.service && \
+    printf '%s\n' \
+        '/var/log/zabbix/zabbix_mcp_server.log {' \
+        '	weekly' \
+        '	rotate 12' \
+        '	compress' \
+        '	delaycompress' \
+        '	missingok' \
+        '	notifempty' \
+        '	create 0664 zabbix-bridge-adapter zabbix' \
+        '}' \
+        > /etc/logrotate.d/zabbix-mcp-server && \
+    cp /usr/lib/systemd/system/zabbix-mcp-server.service /tmp/packaged.service && \
+    cp /etc/logrotate.d/zabbix-mcp-server /tmp/packaged.logrotate && \
+    grep -q 'ExecStart=/usr/sbin/zabbix_mcp_server -c \$CONFFILE' /tmp/packaged.service && \
+    grep -q '/var/log/zabbix/zabbix_mcp_server.log' /tmp/packaged.logrotate
+
+# Install next to it: the packaged logrotate file is not touched, ours has its
+# own name, and the operator is told that the unit name is shared.
+RUN deploy/install.sh install 2>&1 | tee /tmp/install.log && \
+    grep -q 'Installation complete' /tmp/install.log && \
+    cmp /etc/logrotate.d/zabbix-mcp-server /tmp/packaged.logrotate && \
+    grep -q '/var/log/zabbix-mcp/' /etc/logrotate.d/zabbix-mcp && \
+    grep -q 'Another zabbix-mcp-server.service is on this host: /usr/lib/systemd/system/zabbix-mcp-server.service' /tmp/install.log && \
+    cmp /usr/lib/systemd/system/zabbix-mcp-server.service /tmp/packaged.service && \
+    /opt/zabbix-mcp/venv/bin/zabbix-mcp-server --version && \
+    echo "PASS: installed next to the Zabbix 8.0 package without touching its files"
+
+# The units: the server keeps the shared name, is enabled at boot through a
+# unit under a name of its own (with an alias that systemd makes, not a
+# hand-made symlink), and a path unit watches the packaged unit file.
+RUN U=/etc/systemd/system && \
+    grep -qx 'PartOf=zabbix-mcp-initmax.service' $U/zabbix-mcp-server.service && \
+    grep -qx 'Wants=zabbix-mcp-initmax-recover.path' $U/zabbix-mcp-server.service && \
+    ! grep -q '^Alias=' $U/zabbix-mcp-server.service && \
+    test -f $U/zabbix-mcp-initmax.service && ! test -L $U/zabbix-mcp-initmax.service && \
+    grep -qx 'Requires=zabbix-mcp-server.service' $U/zabbix-mcp-initmax.service && \
+    grep -qx 'Also=zabbix-mcp-server.service' $U/zabbix-mcp-initmax.service && \
+    grep -qx 'Alias=zabbix-mcp.service' $U/zabbix-mcp-initmax.service && \
+    ! test -e $U/zabbix-mcp.service && \
+    test "$(grep -c '^PathChanged=' $U/zabbix-mcp-initmax-recover.path)" = 1 && \
+    grep -qx 'PathChanged=/usr/lib/systemd/system/zabbix-mcp-server.service' $U/zabbix-mcp-initmax-recover.path && \
+    grep -qx 'Unit=zabbix-mcp-initmax-recover.service' $U/zabbix-mcp-initmax-recover.path && \
+    grep -q 'systemctl is-enabled --quiet zabbix-mcp-initmax.service' $U/zabbix-mcp-initmax-recover.service && \
+    grep -q 'systemctl start --no-block zabbix-mcp-initmax.service' $U/zabbix-mcp-initmax-recover.service && \
+    grep -q 'sudo systemctl enable --now zabbix-mcp-initmax' /tmp/install.log && \
+    echo "PASS: enabled through zabbix-mcp-initmax.service, alias declared, packaged unit file watched"
+
+# Update next to it (the path an existing installation takes): same result
+RUN deploy/install.sh update 2>&1 | tee /tmp/update.log && \
+    cmp /etc/logrotate.d/zabbix-mcp-server /tmp/packaged.logrotate && \
+    grep -q '/var/log/zabbix-mcp/' /etc/logrotate.d/zabbix-mcp && \
+    grep -q 'Another zabbix-mcp-server.service is on this host' /tmp/update.log && \
+    ! grep -q 'Logrotate config moved' /tmp/update.log && \
+    echo "PASS: update next to the Zabbix 8.0 package leaves its files alone"
+
+# Uninstall with a systemctl that reports the shared name as active and
+# enabled: ours go, the package's files stay, and the operator is told that
+# the name is the package's again and was stopped and disabled.
+RUN printf '#!/bin/sh\necho "systemctl $*" >> /tmp/systemctl.log\nexit 0\n' > /usr/local/bin/systemctl && \
+    chmod +x /usr/local/bin/systemctl && \
+    echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall.log && \
+    rm -f /usr/local/bin/systemctl && \
+    ! test -e /etc/logrotate.d/zabbix-mcp && \
+    ! test -e /etc/systemd/system/zabbix-mcp-server.service && \
+    ! test -e /etc/systemd/system/zabbix-mcp-initmax.service && \
+    ! test -e /etc/systemd/system/zabbix-mcp-initmax-recover.path && \
+    ! test -e /etc/systemd/system/zabbix-mcp-initmax-recover.service && \
+    grep -q 'systemctl stop zabbix-mcp-initmax-recover.path' /tmp/systemctl.log && \
+    grep -q 'systemctl disable --now zabbix-mcp-initmax' /tmp/systemctl.log && \
+    cmp /etc/logrotate.d/zabbix-mcp-server /tmp/packaged.logrotate && \
+    cmp /usr/lib/systemd/system/zabbix-mcp-server.service /tmp/packaged.service && \
+    grep -q 'systemctl stop zabbix-mcp-server' /tmp/systemctl.log && \
+    grep -q 'systemctl disable zabbix-mcp-server' /tmp/systemctl.log && \
+    grep -q 'now means /usr/lib/systemd/system/zabbix-mcp-server.service again' /tmp/uninstall.log && \
+    grep -q 'systemctl enable --now zabbix-mcp-server' /tmp/uninstall.log && \
+    echo "PASS: uninstall left the Zabbix 8.0 package's files alone and said what happened to the name"
+
+# A host installed by v1.41 or older, without the Zabbix package: our logrotate
+# config sits at the old path and moves on the next install ...
+RUN rm -f /etc/logrotate.d/zabbix-mcp-server /usr/lib/systemd/system/zabbix-mcp-server.service && \
+    printf '/var/log/zabbix-mcp/*.log {\n    daily\n    rotate 30\n}\n' > /etc/logrotate.d/zabbix-mcp-server && \
+    deploy/install.sh install 2>&1 | tee /tmp/install2.log && \
+    grep -q 'Installation complete' /tmp/install2.log && \
+    ! test -e /etc/logrotate.d/zabbix-mcp-server && \
+    grep -q '/var/log/zabbix-mcp/' /etc/logrotate.d/zabbix-mcp && \
+    grep -q 'Logrotate config moved' /tmp/install2.log && \
+    ! grep -q 'Another zabbix-mcp-server.service' /tmp/install2.log && \
+    echo "PASS: pre-1.42 logrotate config moved to its own name, no warning without the package"
+
+# ... and on the next update, which is what such a host actually runs
+RUN printf '/var/log/zabbix-mcp/*.log {\n    daily\n    rotate 30\n}\n' > /etc/logrotate.d/zabbix-mcp-server && \
+    deploy/install.sh update 2>&1 | tee /tmp/update2.log && \
+    ! test -e /etc/logrotate.d/zabbix-mcp-server && \
+    grep -q '/var/log/zabbix-mcp/' /etc/logrotate.d/zabbix-mcp && \
+    grep -q 'Logrotate config moved' /tmp/update2.log && \
+    echo "PASS: update moves the pre-1.42 logrotate config"
+
+# A unit name that already belongs to somebody else is not declared as an
+# alias, and that unit is still there after uninstall.
+RUN printf '[Unit]\nDescription=somebody else\n[Service]\nExecStart=/bin/true\n' > /etc/systemd/system/zabbix-mcp.service && \
+    cp /etc/systemd/system/zabbix-mcp.service /tmp/foreign.service && \
+    deploy/install.sh update 2>&1 | tee /tmp/update3.log && \
+    ! grep -q '^Alias=' /etc/systemd/system/zabbix-mcp-initmax.service && \
+    grep -qx 'Requires=zabbix-mcp-server.service' /etc/systemd/system/zabbix-mcp-initmax.service && \
+    grep -q 'Unit name zabbix-mcp.service belongs to another unit; not used as an alias' /tmp/update3.log && \
+    cmp /etc/systemd/system/zabbix-mcp.service /tmp/foreign.service && \
+    echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall3.log && \
+    cmp /etc/systemd/system/zabbix-mcp.service /tmp/foreign.service && \
+    ! test -e /etc/systemd/system/zabbix-mcp-server.service && \
+    ! test -e /etc/systemd/system/zabbix-mcp-initmax.service && \
+    echo "PASS: an alias name that belongs to another unit is left alone"
+
+# The same for the name the server is enabled through: a foreign
+# zabbix-mcp-initmax.service is neither overwritten nor removed, and the
+# server is installed without it (and without the watcher that needs it).
+RUN rm -f /etc/systemd/system/zabbix-mcp.service && \
+    printf '[Unit]\nDescription=somebody else\n[Service]\nExecStart=/bin/true\n' > /etc/systemd/system/zabbix-mcp-initmax.service && \
+    cp /etc/systemd/system/zabbix-mcp-initmax.service /tmp/foreign-guard.service && \
+    deploy/install.sh install 2>&1 | tee /tmp/install4.log && \
+    grep -q 'Installation complete' /tmp/install4.log && \
+    grep -q 'Unit name zabbix-mcp-initmax.service belongs to another unit; the server is enabled under zabbix-mcp-server.service only' /tmp/install4.log && \
+    cmp /etc/systemd/system/zabbix-mcp-initmax.service /tmp/foreign-guard.service && \
+    ! test -e /etc/systemd/system/zabbix-mcp-initmax-recover.path && \
+    ! grep -q 'zabbix-mcp-initmax' /etc/systemd/system/zabbix-mcp-server.service && \
+    grep -qx 'After=network.target' /etc/systemd/system/zabbix-mcp-server.service && \
+    grep -qx '\[Service\]' /etc/systemd/system/zabbix-mcp-server.service && \
+    grep -q 'sudo systemctl enable zabbix-mcp-server' /tmp/install4.log && \
+    echo "yes" | deploy/install.sh uninstall 2>&1 | tee /tmp/uninstall4.log && \
+    cmp /etc/systemd/system/zabbix-mcp-initmax.service /tmp/foreign-guard.service && \
+    ! test -e /etc/systemd/system/zabbix-mcp-server.service && \
+    echo "PASS: a foreign zabbix-mcp-initmax.service is left alone"

@@ -61,6 +61,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from zabbix_mcp.api import trigger_expressions  # noqa: E402
 from zabbix_mcp.api.contracts import CONTRACTS, OBJECTS as OBJECTS_SPEC  # noqa: E402
 from zabbix_mcp.api.versions import unavailable_reason  # noqa: E402
 
@@ -107,8 +108,10 @@ OBJECTS: dict[str, tuple[str | None, dict]] = {
     "templatedashboard": ("dashboardid", {}),
     "templategroup": ("groupid", {}),
     "token": ("tokenid", {}),
-    "trigger": ("triggerid", {"expandExpression": True}),
-    "triggerprototype": ("triggerid", {"expandExpression": True}),
+    # read as stored and rebuilt by _fetch: Zabbix's own expandExpression puts the
+    # value of every user macro in, and this script sends what it reads back
+    "trigger": ("triggerid", {}),
+    "triggerprototype": ("triggerid", {}),
     "user": ("userid", {}),
     "userdirectory": ("userdirectoryid", {}),
     "usergroup": ("usrgrpid", {}),
@@ -186,15 +189,28 @@ def _get_params(obj: str, version: str) -> dict:
 
 
 def _fetch(api: Api, obj: str, params: dict) -> list:
-    """Every plain object (``templateid`` 0) plus a bounded sample of the
-    rest, so a box with ten thousand templated items stays cheap and the
-    plain objects are never cut off by the sample limit."""
+    """The objects to send back, trigger expressions in the form that can be written
+    (function calls written out, user macros kept: api/trigger_expressions.py)."""
+    rows = _fetch_stored(api, obj, params)
+    if f"{obj}.get" in trigger_expressions.METHODS:
+        trigger_expressions.rewrite(rows, f"{obj}.get", api.call)
+    return rows
+
+
+def _fetch_stored(api: Api, obj: str, params: dict) -> list:
+    """Plain objects (``templateid`` 0: the first 500 and the newest 100,
+    which is where the fixtures are) plus a bounded sample of the rest, so
+    a box with ten thousand templated items stays cheap."""
     if obj not in INHERITING:
         return _get_with_fallback(api, obj, params)
     id_field = OBJECTS[obj][0]
     rows: list = []
     seen: set = set()
     for extra in ({"filter": {"templateid": "0"}, "limit": 500},
+                  # the newest plain objects: where the fixtures are. Without this
+                  # batch a box with thousands of template items never reaches them
+                  # (the first 500 by id are all stock).
+                  {"filter": {"templateid": "0"}, "sortfield": id_field, "sortorder": "DESC", "limit": 100},
                   {"inherited": True, "limit": 60},
                   {"filter": {"flags": "4"}, "limit": 40}):
         try:
@@ -563,9 +579,8 @@ def main(argv: list[str]) -> int:
             print(f"  {obj}: {len(rows)} rows, {len(entries)} probed, {len(paths)} refused paths{flag}")
     finally:
         if cleanup:
-            from roundtrip_fixtures import delete_fixtures  # noqa: E402
-            delete_fixtures(api.call, cleanup)
-            print("fixtures deleted")
+            from roundtrip_fixtures import delete_fixtures, deleted_report  # noqa: E402
+            print(deleted_report(delete_fixtures(api.call, cleanup)))
 
     out = Path(f"write_roundtrip_observed_{version}.json")
     if only and out.exists():

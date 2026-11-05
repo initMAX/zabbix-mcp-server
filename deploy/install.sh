@@ -28,6 +28,28 @@ CONFIG_DIR="/etc/zabbix-mcp"
 LOG_DIR="/var/log/zabbix-mcp"
 SERVICE_USER="zabbix-mcp"
 SERVICE_NAME="zabbix-mcp-server"
+# Not ${SERVICE_NAME}: the MCP server that ships with Zabbix 8.0 is packaged
+# as zabbix-mcp-server too and owns /etc/logrotate.d/zabbix-mcp-server.
+LOGROTATE_FILE="/etc/logrotate.d/zabbix-mcp"
+# zabbix-mcp-server.service is also the unit name of the MCP server packaged
+# with Zabbix 8.0, and that package's scripts act on the name, which on a host
+# with this server means on this server (read from the 8.0.0 packages and
+# played through on real systemd, Ubuntu 24.04 and AlmaLinux 9):
+#   deb  install:           enables the name, starts it (a no-op while it runs)
+#   deb  upgrade:           restarts it
+#   deb  remove:            STOPS it
+#   deb  purge:             deletes its boot symlink
+#   rpm  first install:     applies the system preset, which DISABLES it
+#   rpm  upgrade:           marks it for a restart
+# Two things keep the server up through all of that:
+#   - it is enabled at boot through a second unit under a name of its own
+#     (GUARD_NAME, with an alias), which nothing else touches;
+#   - a path unit watches the packaged unit file and starts the server again
+#     when that package is installed, upgraded or removed (RECOVER_NAME).
+GUARD_NAME="zabbix-mcp-initmax"
+GUARD_ALIASES=("zabbix-mcp")
+RECOVER_NAME="zabbix-mcp-initmax-recover"
+PACKAGED_UNIT_DIRS=("/usr/lib/systemd/system" "/lib/systemd/system")
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DEFAULT_PORT=8080
 PYTHON_BIN=""
@@ -583,6 +605,11 @@ install_systemd_unit() {
 Description=Zabbix MCP Server
 Documentation=https://github.com/initMAX/zabbix-mcp-server
 After=network.target
+# stopping or restarting zabbix-mcp-initmax.service stops or restarts this one
+PartOf=zabbix-mcp-initmax.service
+# watches the unit file of the Zabbix 8.0 package of the same name: removing
+# that package stops this unit name, the watcher starts the server again
+Wants=zabbix-mcp-initmax-recover.path
 
 [Service]
 Type=simple
@@ -638,9 +665,20 @@ StateDirectoryMode=0750
 [Install]
 WantedBy=multi-user.target
 UNIT
+    install_guard_unit
+    if (( ! GUARD_INSTALLED )); then
+        # zabbix-mcp-initmax.service is somebody else's unit here: the server
+        # is not tied to it, and there is no watcher to pull in
+        sed -i \
+            -e '/^# stopping or restarting zabbix-mcp-initmax.service /d' \
+            -e '/^PartOf=zabbix-mcp-initmax.service$/d' \
+            -e '/^# watches the unit file of the Zabbix 8.0 package /,/^Wants=zabbix-mcp-initmax-recover.path$/d' \
+            "/etc/systemd/system/${SERVICE_NAME}.service"
+    fi
     if command -v systemctl &>/dev/null; then
         if spin "Reloading systemd" systemctl daemon-reload; then
-            :
+            refresh_boot_enablement
+            start_recover_watch
         else
             warn "systemctl daemon-reload failed — if running in a container, this is expected."
         fi
@@ -658,7 +696,10 @@ install_logrotate() {
         return 0
     fi
     info "Installing logrotate config..."
-    cat > "/etc/logrotate.d/${SERVICE_NAME}" <<'LOGROTATE'
+    if remove_legacy_logrotate; then
+        ok "Logrotate config moved from /etc/logrotate.d/${SERVICE_NAME} to $LOGROTATE_FILE"
+    fi
+    cat > "$LOGROTATE_FILE" <<'LOGROTATE'
 /var/log/zabbix-mcp/*.log {
     daily
     rotate 30
@@ -670,6 +711,272 @@ install_logrotate() {
     create 0640 zabbix-mcp zabbix-mcp
 }
 LOGROTATE
+}
+
+# zabbix-mcp-initmax.service: the unit this server is enabled through. It does
+# nothing itself; it requires zabbix-mcp-server.service, so starting it (at
+# boot, once it is enabled) starts the server, and the server is PartOf it,
+# so stopping or restarting it stops or restarts the server. Enabling it also
+# enables the server's own unit (Also=), disabling it disables both.
+#
+# What this buys: whatever another package does to the name
+# zabbix-mcp-server.service (see the comment at GUARD_NAME), the server still
+# starts at boot. Seen on real systemd with the Zabbix 8.0 package: without
+# this unit, installing its RPM next to this server, or purging its deb, left
+# the server disabled, and nothing ran after the next reboot.
+#
+# zabbix-mcp.service is declared as an alias of it (systemd creates the
+# symlink on enable and removes it on disable); a name that already belongs
+# to another unit is left alone.
+GUARD_INSTALLED=0
+GUARD_ALIASES_DECLARED=()
+
+unit_name_is_free() {
+    # $1: unit name without .service. Free = no unit of that name anywhere,
+    # or a leftover of ours (a symlink to one of this project's two units).
+    local name="$1" path="/etc/systemd/system/$1.service" dir
+    if [[ -L "$path" ]]; then
+        case "$(readlink "$path")" in
+            *"${SERVICE_NAME}.service"|*"${GUARD_NAME}.service") return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
+    [[ -e "$path" ]] && return 1
+    for dir in /usr/lib/systemd/system /lib/systemd/system /run/systemd/system; do
+        [[ -e "$dir/$name.service" ]] && return 1
+    done
+    return 0
+}
+
+install_guard_unit() {
+    local guard="/etc/systemd/system/${GUARD_NAME}.service" alias path
+    GUARD_INSTALLED=0
+    GUARD_ALIASES_DECLARED=()
+    if [[ -f "$guard" && ! -L "$guard" ]] && ! grep -q "^Requires=${SERVICE_NAME}.service" "$guard" 2>/dev/null; then
+        warn "Unit name ${GUARD_NAME}.service belongs to another unit; the server is enabled under ${SERVICE_NAME}.service only."
+        return 0
+    fi
+    # an alias symlink of an earlier layout must go first: writing through it
+    # would overwrite the unit it points to
+    rm -f "$guard"
+    for alias in "${GUARD_ALIASES[@]}"; do
+        path="/etc/systemd/system/${alias}.service"
+        if unit_name_is_free "$alias"; then
+            [[ -L "$path" ]] && rm -f "$path"   # systemd makes it again, pointing at the right unit
+            GUARD_ALIASES_DECLARED+=("$alias")
+        else
+            warn "Unit name ${alias}.service belongs to another unit; not used as an alias."
+        fi
+    done
+    cat > "$guard" <<UNIT
+[Unit]
+Description=Zabbix MCP Server (initMAX): starts ${SERVICE_NAME}.service at boot under a name no other package touches
+Documentation=https://github.com/initMAX/zabbix-mcp-server
+Requires=${SERVICE_NAME}.service
+After=${SERVICE_NAME}.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+
+[Install]
+WantedBy=multi-user.target
+Also=${SERVICE_NAME}.service
+UNIT
+    if (( ${#GUARD_ALIASES_DECLARED[@]} )); then
+        echo "Alias=${GUARD_ALIASES_DECLARED[*]/%/.service}" >> "$guard"
+    fi
+    GUARD_INSTALLED=1
+    install_recover_units
+}
+
+# zabbix-mcp-initmax-recover.path / .service: the deb of the Zabbix 8.0
+# package stops the unit name zabbix-mcp-server.service when it is removed
+# (its prerm), and on this host that name is this server. Nothing in systemd
+# tells that stop from an operator's own, so it cannot be refused; what can be
+# seen is its cause: the packaged unit file changes (it is deleted right after
+# the stop, replaced on an upgrade, created on an install). The path unit
+# watches that file and then starts the server again, when the server is
+# enabled at boot (an operator who disabled it keeps it down). It runs
+# whenever the server has been started (Wants= in the server's unit).
+#
+# A stop by hand is left alone: no package touched the file. The one case
+# where the server comes back unasked is a stop by hand followed, in the same
+# boot, by installing, upgrading or removing that package while the server is
+# still enabled; the package's own scripts start the shared name on install
+# and upgrade anyway.
+install_recover_units() {
+    # One watch per real directory a package may put the unit in: on a merged
+    # /usr, /lib is a symlink to /usr/lib and would be the same file twice.
+    local dir watched=""
+    for dir in "${PACKAGED_UNIT_DIRS[@]}"; do
+        if [[ -d "$dir" && "$(readlink -f "$dir" 2>/dev/null)" == "$dir" ]]; then
+            watched+="PathChanged=${dir}/${SERVICE_NAME}.service"$'\n'
+        fi
+    done
+    [[ -n "$watched" ]] || watched="PathChanged=${PACKAGED_UNIT_DIRS[0]}/${SERVICE_NAME}.service"$'\n'
+    cat > "/etc/systemd/system/${RECOVER_NAME}.path" <<UNIT
+[Unit]
+Description=Zabbix MCP Server (initMAX): watches the unit file of the zabbix-mcp-server package that ships with Zabbix 8.0
+Documentation=https://github.com/initMAX/zabbix-mcp-server
+
+[Path]
+${watched}Unit=${RECOVER_NAME}.service
+UNIT
+    cat > "/etc/systemd/system/${RECOVER_NAME}.service" <<UNIT
+[Unit]
+Description=Zabbix MCP Server (initMAX): start the server again after the zabbix-mcp-server package of Zabbix 8.0 was installed, upgraded or removed
+Documentation=https://github.com/initMAX/zabbix-mcp-server
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'if systemctl is-enabled --quiet ${GUARD_NAME}.service; then systemctl start --no-block ${GUARD_NAME}.service; fi'
+UNIT
+}
+
+# The watcher starts with the server; a server that is running already (an
+# update that did not restart it yet) gets it now. The unit the server is
+# enabled through is started as well, so that its state says what is true
+# without waiting for the next boot; the server is running, so this starts
+# nothing else.
+start_recover_watch() {
+    (( GUARD_INSTALLED )) || return 0
+    command -v systemctl &>/dev/null || return 0
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        systemctl start "${RECOVER_NAME}.path" &>/dev/null || true
+        if systemctl is-enabled --quiet "$GUARD_NAME" 2>/dev/null; then
+            systemctl start "$GUARD_NAME" &>/dev/null || true
+        fi
+    fi
+    return 0
+}
+
+# A server that is enabled already (an update of an existing installation, or
+# the Zabbix 8.0 package enabled the shared name before this installer took
+# it over) is enabled through the guard unit as well.
+refresh_boot_enablement() {
+    (( GUARD_INSTALLED )) || return 0
+    command -v systemctl &>/dev/null || return 0
+    if systemctl is-enabled --quiet "$SERVICE_NAME" 2>/dev/null || systemctl is-enabled --quiet "$GUARD_NAME" 2>/dev/null; then
+        if systemctl enable "$GUARD_NAME" &>/dev/null; then
+            ok "Enabled at boot through ${GUARD_NAME}.service (a unit name of its own)"
+        else
+            warn "Could not enable ${GUARD_NAME}.service; run: sudo systemctl enable $GUARD_NAME"
+        fi
+    fi
+    return 0
+}
+
+remove_guard_unit() {
+    local guard="/etc/systemd/system/${GUARD_NAME}.service" alias path
+    if [[ -f "/etc/systemd/system/${RECOVER_NAME}.path" || -f "/etc/systemd/system/${RECOVER_NAME}.service" ]]; then
+        if command -v systemctl &>/dev/null; then
+            systemctl stop "${RECOVER_NAME}.path" "${RECOVER_NAME}.service" &>/dev/null || true
+        fi
+        rm -f "/etc/systemd/system/${RECOVER_NAME}.path" "/etc/systemd/system/${RECOVER_NAME}.service"
+    fi
+    if [[ -f "$guard" || -L "$guard" ]] && { [[ -L "$guard" ]] || grep -q "^Requires=${SERVICE_NAME}.service" "$guard" 2>/dev/null; }; then
+        if command -v systemctl &>/dev/null; then
+            systemctl disable --now "$GUARD_NAME" &>/dev/null || true
+        fi
+        rm -f "$guard"
+    fi
+    for alias in "${GUARD_ALIASES[@]}" "$GUARD_NAME"; do
+        path="/etc/systemd/system/${alias}.service"
+        if [[ -L "$path" ]]; then
+            case "$(readlink "$path")" in
+                *"${SERVICE_NAME}.service"|*"${GUARD_NAME}.service") rm -f "$path" ;;
+            esac
+        fi
+    done
+    rm -f "/etc/systemd/system/multi-user.target.wants/${GUARD_NAME}.service"
+}
+
+# Before v1.42 the logrotate config was /etc/logrotate.d/zabbix-mcp-server,
+# the path the Zabbix 8.0 package of the same name ships. Remove it only when
+# it is ours (it rotates /var/log/zabbix-mcp), never the packaged one.
+remove_legacy_logrotate() {
+    local legacy="/etc/logrotate.d/${SERVICE_NAME}"
+    if [[ -f "$legacy" ]] && grep -q '/var/log/zabbix-mcp/' "$legacy" 2>/dev/null; then
+        rm -f "$legacy"
+        return 0
+    fi
+    return 1
+}
+
+# Zabbix 8.0 comes with an MCP server of its own, packaged as
+# zabbix-mcp-server: /usr/lib/systemd/system/zabbix-mcp-server.service. The
+# unit this installer writes to /etc/systemd/system has the same name and
+# takes precedence: this server takes the name over, on purpose, and the
+# packaged one no longer starts by it. The package's files are not touched
+# and its process is not stopped here; the operator is told what the name
+# means from now on and how to run the packaged server next to this one.
+#
+# This installer never puts a unit under /usr/lib or /lib, so a unit of
+# that name found there belongs to somebody else's package.
+packaged_unit_path() {
+    local unit dir
+    for dir in "${PACKAGED_UNIT_DIRS[@]}"; do
+        unit="${dir}/${SERVICE_NAME}.service"
+        if [[ -f "$unit" ]]; then
+            echo "$unit"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# True when the unit name is active and its main process is not this server:
+# the packaged server, started before this installer's unit took the name.
+foreign_server_running() {
+    command -v systemctl &>/dev/null || return 1
+    systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null || return 1
+    local pid cmd
+    pid="$(systemctl show -p MainPID --value "$SERVICE_NAME" 2>/dev/null || true)"
+    [[ -n "$pid" && "$pid" != "0" && -r "/proc/$pid/cmdline" ]] || return 1
+    cmd="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+    [[ -n "$cmd" && "$cmd" != *"$INSTALL_DIR"* ]]
+}
+
+# The packaged server does not start until it is configured (its default
+# config lacks the mandatory FrontendURL), and its unit has Restart=on-failure:
+# once somebody tried to start it, or the host was rebooted with the unit
+# enabled (the package enables it), systemd retries it every ten seconds. The
+# moment this installer's unit takes the name, the next retry would start THIS
+# server, before its config has been edited. A unit of that name that is
+# failing is therefore stopped first; one that runs properly is left alone.
+quiesce_failing_packaged_unit() {
+    packaged_unit_path >/dev/null || return 0
+    command -v systemctl &>/dev/null || return 0
+    [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]] && return 0   # the name is already ours
+    local state
+    state="$(systemctl show -p ActiveState --value "$SERVICE_NAME" 2>/dev/null || true)"
+    if [[ "$state" == "activating" || "$state" == "failed" ]]; then
+        systemctl stop "$SERVICE_NAME" &>/dev/null || true
+        systemctl reset-failed "$SERVICE_NAME" &>/dev/null || true
+        info "The packaged ${SERVICE_NAME}.service was failing to start (it is not configured);"
+        info "its restart loop was stopped, so that it does not start this server before you have"
+        info "edited the config."
+    fi
+    return 0
+}
+
+warn_packaged_zabbix_mcp_server() {
+    local unit
+    unit="$(packaged_unit_path)" || return 0
+    warn "Another ${SERVICE_NAME}.service is on this host: $unit"
+    warn "(Zabbix 8.0 ships an MCP server of its own under the same package and unit name)."
+    warn "This server takes the name over: the unit in /etc/systemd/system has precedence, so"
+    warn "'systemctl start|restart|enable ${SERVICE_NAME}' means THIS server from now on."
+    if foreign_server_running; then
+        warn "The packaged server is running under that name right now. It keeps running until the"
+        warn "unit is restarted: 'sudo systemctl restart ${SERVICE_NAME}' replaces it with this server"
+        warn "('start' does nothing while it runs)."
+    fi
+    warn "The package's files are not touched. To run the packaged server as well, give it a unit"
+    warn "name of its own; see README: The MCP server shipped with Zabbix 8.0."
+    return 0
 }
 
 # --------------------------------------------------------------------------- #
@@ -939,8 +1246,10 @@ do_install() {
     install_package
 
     # systemd + logrotate
+    quiesce_failing_packaged_unit
     install_systemd_unit
     install_logrotate
+    warn_packaged_zabbix_mcp_server
 
     # Verify permissions (catches issues from re-runs or partial earlier installs)
     check_permissions
@@ -963,8 +1272,21 @@ do_install() {
     echo
     echo "  Next steps:"
     echo "  1. Edit config:      sudo nano $CONFIG_DIR/config.toml"
-    echo "  2. Start service:    sudo systemctl start $SERVICE_NAME"
-    echo "  3. Enable on boot:   sudo systemctl enable $SERVICE_NAME"
+    if foreign_server_running; then
+        # 'start' is a no-op while the packaged server holds the name
+        echo "  2. Start service:    sudo systemctl restart $SERVICE_NAME"
+        echo "                       (restart, not start: it replaces the MCP server packaged with"
+        echo "                       Zabbix 8.0, which is running under this unit name)"
+    else
+        echo "  2. Start service:    sudo systemctl start $SERVICE_NAME"
+    fi
+    if (( GUARD_INSTALLED )); then
+        echo "  3. Enable on boot:   sudo systemctl enable --now $GUARD_NAME"
+        echo "                       (a unit name of its own that starts $SERVICE_NAME; 'systemctl enable"
+        echo "                       $SERVICE_NAME' works too, but another package can switch that one off)"
+    else
+        echo "  3. Enable on boot:   sudo systemctl enable $SERVICE_NAME"
+    fi
     echo "  4. Check status:     sudo systemctl status $SERVICE_NAME"
     echo "  5. View logs:        tail -f $LOG_DIR/server.log"
     echo "  6. Health check:     curl http://localhost:$active_port/health"
@@ -1099,6 +1421,7 @@ do_update() {
     # Update systemd + logrotate (in case they changed)
     install_systemd_unit
     install_logrotate
+    warn_packaged_zabbix_mcp_server
 
     # Remove obsolete sudoers rule from older installs (no longer used —
     # the admin portal now triggers restart by exiting the process and
@@ -1121,6 +1444,9 @@ do_update() {
     # Restart service if running
     if command -v systemctl &>/dev/null; then
         if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+            if foreign_server_running; then
+                warn "Replacing the MCP server packaged with Zabbix 8.0, which was running as ${SERVICE_NAME}.service"
+            fi
             spin "Restarting $SERVICE_NAME" systemctl restart "$SERVICE_NAME"
             # Health check after restart
             check_health "$(get_configured_port)" "$(get_configured_host)"
@@ -1155,7 +1481,7 @@ do_uninstall() {
     echo "  - Install dir:      $INSTALL_DIR (virtualenv, binaries)"
     echo "  - Config dir:       $CONFIG_DIR (config.toml)"
     echo "  - Log dir:          $LOG_DIR (server.log and rotated logs)"
-    echo "  - Logrotate config: /etc/logrotate.d/${SERVICE_NAME}"
+    echo "  - Logrotate config: $LOGROTATE_FILE"
     echo "  - Sudoers rule:     /etc/sudoers.d/${SERVICE_NAME}"
     echo "  - System user:      $SERVICE_USER"
     echo
@@ -1184,7 +1510,8 @@ do_uninstall() {
         fi
     fi
 
-    # Remove systemd unit
+    # Remove the unit the server is enabled through, then the server's own
+    remove_guard_unit
     if [[ -f "/etc/systemd/system/${SERVICE_NAME}.service" ]]; then
         rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
         ok "Removed systemd unit"
@@ -1193,11 +1520,23 @@ do_uninstall() {
         fi
     fi
 
-    # Remove logrotate config
-    if [[ -f "/etc/logrotate.d/${SERVICE_NAME}" ]]; then
-        rm -f "/etc/logrotate.d/${SERVICE_NAME}"
+    # The name is shared with the MCP server packaged with Zabbix 8.0: what was
+    # stopped and disabled above by name is, from here on, that package's unit.
+    local packaged_unit=""
+    packaged_unit="$(packaged_unit_path)" || true
+    if [[ -n "$packaged_unit" ]]; then
+        warn "The unit name ${SERVICE_NAME}.service now means $packaged_unit again"
+        warn "(the MCP server packaged with Zabbix 8.0; its files were not touched). The name was"
+        warn "stopped and disabled above; if that server should run:"
+        warn "  sudo systemctl enable --now ${SERVICE_NAME}"
+    fi
+
+    # Remove logrotate config (and the pre-1.42 file name, if it is ours)
+    if [[ -f "$LOGROTATE_FILE" ]]; then
+        rm -f "$LOGROTATE_FILE"
         ok "Removed logrotate config"
     fi
+    remove_legacy_logrotate || true
 
     # Remove sudoers rule
     if [[ -f "/etc/sudoers.d/${SERVICE_NAME}" ]]; then

@@ -3,7 +3,8 @@
   "dashboard.get": {
    "object": "dashboard",
    "sortfield": [
-    "dashboardid"
+    "dashboardid",
+    "name"
    ],
    "common": [
     "countOutput",
@@ -48,7 +49,8 @@
    "filter_props": null,
    "search_props": null,
    "notes": [
-    "selectWidgets listed only on 5.0 (replaced by selectPages from 6.0, dashboard pages introduced in 5.4). sortfield identical 5.0-8.0: dashboardid."
+    "selectWidgets listed only on 5.0 (replaced by selectPages from 6.0, dashboard pages introduced in 5.4). sortfield identical 5.0-8.0: dashboardid.",
+    "sort field 'name': $sortColumns of CDashboardGeneral is ['dashboardid', 'name'] in every source from 6.0 to 8.0, verified live; the reference page lists dashboardid only"
    ]
   },
   "templatedashboard.get": {
@@ -80,6 +82,9 @@
     "templateids": {
      "type": "ID/array",
      "since": "6.0"
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -424,6 +429,10 @@
      "values": {
       "objectid": "objectid"
      }
+    },
+    "groupCount": {
+     "type": "flag",
+     "removed": "7.0"
     }
    },
    "selects": {
@@ -733,6 +742,18 @@
     "serviceids": {
      "type": "ID/array",
      "since": "6.0"
+    },
+    "evaltype": {
+     "type": "integer",
+     "since": "6.0",
+     "values": {
+      "0": "And/Or",
+      "2": "Or"
+     }
+    },
+    "service_tags": {
+     "type": "object/array",
+     "since": "6.0"
     }
    },
    "selects": {
@@ -753,7 +774,8 @@
    "search_props": null,
    "notes": [
     "Documentation page for this method does not exist on 5.0; first documented release among the checked ones is 6.0, all items marked since 6.0.",
-    "SLA object introduced in Zabbix 6.0 (no 5.0 page). sortfield identical 6.0-8.0: slaid, name, period, slo, effective_date, timezone, status, description. selectSchedule/selectExcludedDowntimes/selectServiceTags support count."
+    "SLA object introduced in Zabbix 6.0 (no 5.0 page). sortfield identical 6.0-8.0: slaid, name, period, slo, effective_date, timezone, status, description. selectSchedule/selectExcludedDowntimes/selectServiceTags support count.",
+    "evaltype and service_tags (the SLAs whose service tags match: tag, value, operator): validated by CSla::get in every source from 6.0 to 8.0, accepted live; the reference page does not list them"
    ]
   },
   "action.get": {
@@ -916,6 +938,9 @@
     "time_till": {
      "type": "timestamp",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {
@@ -970,6 +995,9 @@
     "userids": {
      "type": "ID/array",
      "since": null
+    },
+    "groupCount": {
+     "type": "flag"
     }
    },
    "selects": {

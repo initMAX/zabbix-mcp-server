@@ -55,6 +55,7 @@ IMAGES=(
     "Dockerfile.debian12:Debian 12 (python3.11)"
     "Dockerfile.debian13:Debian 13 Trixie (python3.12)"
     "Dockerfile.minimal:Minimal (python3.10-slim)"
+    "Dockerfile.zabbix80-coexist:Debian 12 next to the Zabbix 8.0 zabbix-mcp-server package (shared names)"
 )
 
 PASS=0

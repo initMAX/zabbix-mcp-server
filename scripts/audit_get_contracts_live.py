@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -107,6 +108,11 @@ def main() -> int:
         base: dict = {"limit": 1} if "limit" in c.common else {}
         if method == "history.get":
             base["history"] = 0
+        try:
+            base.update(_required_params(api, method))
+        except Exception as exc:
+            print(f"  skip {method}: cannot build its required parameters ({exc})")
+            continue
         props = [p.name for p in output_props(c, version)]
         # 1. output = every catalogued property. Methods that validate
         #    ``output`` strictly answer with the complete allowed list, which
@@ -135,6 +141,10 @@ def main() -> int:
                 except Exception as exc2:
                     print(f"FAIL {method} output(allowed): {exc2}")
                     rows = []
+            elif "APM DB is not configured" in text:
+                # the OpenTelemetry tools need the APM database; nothing to probe without it
+                print(f"  skip {method}: no APM database on this server")
+                continue
             else:
                 print(f"FAIL {method} output(all): {exc}")
                 rows = []
@@ -206,6 +216,8 @@ def main() -> int:
                 continue
             if method == "user.get" and name == "selectRole" and tuple(int(x) for x in version.split(".")[:2]) < (5, 4):
                 continue
+            if spec.type != "query":
+                continue  # takes its own object, not "extend" (service.get selectStatusTimeline wants periods)
             try:
                 api.call(method, dict(base, output=props[:1] or "extend", **{name: "extend"}))
             except Exception as exc:
@@ -221,6 +233,20 @@ def main() -> int:
                                  indent=1) + "\n")
     print(f"done: {api.n} API calls, {problems} problem(s); observations in {report}")
     return 1 if problems else 0
+
+
+def _required_params(api, method: str) -> dict:
+    """What a get method refuses to run without."""
+    if method == "hostdashboard.get":
+        hosts = (api.call("host.get", {"output": ["hostid"], "filter": {"host": "Zabbix server"}})
+                 or api.call("host.get", {"output": ["hostid"], "limit": 1}))
+        return {"hostids": [hosts[0]["hostid"]]}
+    if method == "serverinfo.get":
+        return {"serverid": api.call("settings.get", {"output": ["serverid"]})["serverid"]}
+    if method.startswith("apm"):
+        now = int(time.time())
+        return {"time_from": now - 3600, "time_till": now}
+    return {}
 
 
 def _guess_type(value) -> str:

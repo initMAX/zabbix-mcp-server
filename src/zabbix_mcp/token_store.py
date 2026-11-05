@@ -353,25 +353,33 @@ class TokenStore:
                 logger.warning("Token '%s' has expired (at %s)", info.id, info.expires_at)
                 return None
 
-        # Check allowed IPs
-        if info.allowed_ips and client_ip:
+        # Check allowed IPs. A token limited to addresses is refused when
+        # the caller's address is unknown or is not an address: until v1.41
+        # both cases skipped the check.
+        if info.allowed_ips:
             try:
-                addr = ip_address(client_ip)
-                allowed = False
-                for cidr in info.allowed_ips:
-                    try:
-                        if addr in ip_network(cidr, strict=False):
-                            allowed = True
-                            break
-                    except ValueError:
-                        logger.warning("Invalid CIDR in token '%s': %s", info.id, cidr)
-                if not allowed:
-                    logger.warning(
-                        "Token '%s' rejected: IP %s not in allowed_ips", info.id, client_ip
-                    )
-                    return None
+                addr = ip_address(client_ip) if client_ip else None
             except ValueError:
-                logger.warning("Invalid client IP for token check: %s", client_ip)
+                addr = None
+            if addr is None:
+                logger.warning(
+                    "Token '%s' rejected: it is limited to allowed_ips and the client address %r is not an IP address",
+                    info.id, client_ip,
+                )
+                return None
+            allowed = False
+            for cidr in info.allowed_ips:
+                try:
+                    if addr in ip_network(cidr, strict=False):
+                        allowed = True
+                        break
+                except ValueError:
+                    logger.warning("Invalid CIDR in token '%s': %s", info.id, cidr)
+            if not allowed:
+                logger.warning(
+                    "Token '%s' rejected: IP %s not in allowed_ips", info.id, client_ip
+                )
+                return None
 
         # Update runtime stats
         info.use_count += 1
