@@ -315,6 +315,9 @@ class ServerConfig:
     # (the MCP SDK drops it and runs the rest: a misspelt filter returned
     # every row). False restores that, for a client that adds keys of its own.
     reject_unknown_arguments: bool = True
+    # refuse to start over HTTP on an address other than loopback when no client
+    # authentication is configured (no token, no auth_token, no OAuth)
+    require_auth: bool = False
     strip_write_params: bool = True
     response_max_chars: int = 50000
     # Freshness hint (seconds) attached to tools/list results as the
@@ -358,6 +361,9 @@ class ReportEmailConfig:
     from_address: str = ""
     use_starttls: bool = True
     use_ssl: bool = False
+    # check the SMTP server's certificate and name (STARTTLS and implicit TLS).
+    # False only for a server with a self-signed certificate on a trusted network.
+    verify_tls: bool = True
     timeout: int = 30
     allowed_recipients: list[str] = field(default_factory=list)
 
@@ -880,6 +886,10 @@ def load_config(path: str | Path) -> AppConfig:
     if not isinstance(reject_unknown_raw, bool):
         raise ConfigError("'reject_unknown_arguments' must be a boolean (true or false)")
 
+    require_auth_raw = server_raw.get("require_auth", False)
+    if not isinstance(require_auth_raw, bool):
+        raise ConfigError("'require_auth' must be a boolean (true or false)")
+
     strip_write_raw = server_raw.get("strip_write_params", True)
     if not isinstance(strip_write_raw, bool):
         raise ConfigError("'strip_write_params' must be a boolean (true or false)")
@@ -921,6 +931,7 @@ def load_config(path: str | Path) -> AppConfig:
         validate_get_params=validate_get_raw,
         schema_constraints=schema_constraints_raw,
         reject_unknown_arguments=reject_unknown_raw,
+        require_auth=require_auth_raw,
         strip_write_params=strip_write_raw,
         response_max_chars=response_max_chars_raw,
         tools_list_cache_ttl=tools_cache_ttl_raw,
@@ -1031,6 +1042,7 @@ def load_config(path: str | Path) -> AppConfig:
         from_address=str(email_raw.get("from_address", "") or ""),
         use_starttls=bool(email_raw.get("use_starttls", True)),
         use_ssl=bool(email_raw.get("use_ssl", False)),
+        verify_tls=bool(email_raw.get("verify_tls", True)),
         timeout=int(email_raw.get("timeout", 30) or 30),
         allowed_recipients=list(allowed_recipients_raw),
     )

@@ -74,9 +74,9 @@
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="button" class="btn btn-danger btn-sm"
                                     {% if user_data.role == 'admin' %}
-                                    onclick="confirmDeleteTyped('{{ username }}', 'You are about to delete an ADMIN user. They will lose all access immediately.', 'del-user-{{ username }}')"
+                                    onclick="confirmDeleteTyped({{ username | tojson | forceescape }}, 'You are about to delete an ADMIN user. They will lose all access immediately.', 'del-user-' + {{ username | tojson | forceescape }})"
                                     {% else %}
-                                    onclick="confirmDelete('user {{ username }}', 'del-user-{{ username }}')"
+                                    onclick="confirmDelete('user ' + {{ username | tojson | forceescape }}, 'del-user-' + {{ username | tojson | forceescape }})"
                                     {% endif %}>Delete</button>
                         </form>
                         {% endif %}

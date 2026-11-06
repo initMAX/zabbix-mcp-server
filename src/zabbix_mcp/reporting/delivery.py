@@ -41,6 +41,7 @@ import fnmatch
 import logging
 import re
 import smtplib
+import ssl
 import time
 from email.message import EmailMessage
 from pathlib import Path
@@ -57,6 +58,19 @@ MAX_ATTACHMENT_MB = 25
 class DeliveryError(Exception):
     """Raised when a delivery channel is unavailable or refused."""
 
+
+
+def smtp_tls_context(verify: bool = True) -> ssl.SSLContext:
+    """The TLS settings of the SMTP connection. Without a context of its own smtplib
+    takes one that checks neither the certificate nor the name, so whoever sits on
+    the path could read the SMTP password and the reports. ``verify`` False is the
+    administrator's choice for a server with a self-signed certificate.
+    """
+    context = ssl.create_default_context()
+    if not verify:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    return context
 
 def _safe_component(value: str, fallback: str = "report") -> str:
     cleaned = _SAFE_CHARS.sub("-", (value or "").strip()).strip("-.")
@@ -99,8 +113,14 @@ def save_report(pdf_bytes: bytes, output_dir: str, filename: str) -> str:
     return str(target)
 
 
+# One bare address: no display name, no angle brackets, no group syntax, no second
+# address. The glob of the allowlist matches any character, so "a@evil.test x@example.com"
+# matched "*@example.com" and the mail header then named both.
+_BARE_ADDRESS = re.compile(r"[^\s@<>,;:\"()\[\]\\]+@[^\s@<>,;:\"()\[\]\\]+")
+
+
 def recipient_allowed(address: str, allowed: list[str] | None) -> bool:
-    """True when *address* matches the operator's allowlist.
+    """True when *address* is one bare address and matches the operator's allowlist.
 
     Entries are compared case-insensitively and may use a glob, so
     ``*@example.com`` permits the whole domain. An empty allowlist
@@ -109,6 +129,8 @@ def recipient_allowed(address: str, allowed: list[str] | None) -> bool:
     if not allowed:
         return False
     addr = address.strip().lower()
+    if not _BARE_ADDRESS.fullmatch(addr):
+        return False
     return any(fnmatch.fnmatch(addr, pattern.strip().lower()) for pattern in allowed)
 
 
@@ -158,18 +180,20 @@ def send_report_email(
     )
 
     timeout = int(getattr(email_config, "timeout", 30) or 30)
+    context = smtp_tls_context(bool(getattr(email_config, "verify_tls", True)))
     try:
         if email_config.use_ssl:
             smtp: smtplib.SMTP = smtplib.SMTP_SSL(
-                email_config.smtp_host, email_config.smtp_port, timeout=timeout)
+                email_config.smtp_host, email_config.smtp_port, timeout=timeout, context=context)
         else:
             smtp = smtplib.SMTP(email_config.smtp_host, email_config.smtp_port, timeout=timeout)
         with smtp:
             if email_config.use_starttls and not email_config.use_ssl:
-                smtp.starttls()
+                smtp.starttls(context=context)
             if email_config.smtp_user:
                 smtp.login(email_config.smtp_user, email_config.smtp_password)
-            smtp.send_message(msg)
+            # the envelope is the checked list, whatever the header says
+            smtp.send_message(msg, to_addrs=[r.strip() for r in recipients])
     except DeliveryError:
         raise
     except Exception as exc:  # noqa: BLE001 - surfaced to the operator

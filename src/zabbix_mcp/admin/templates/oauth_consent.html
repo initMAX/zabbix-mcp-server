@@ -99,6 +99,9 @@
             <div class="consent-greeting">
                 Signed in as <strong>{{ subject }}</strong>{% if subject_role %} ({{ subject_role }} role){% endif %}. <strong>{{ client_name }}</strong> wants to call MCP tools on your behalf.
             </div>
+            <div class="consent-greeting">
+                If you allow it, access is handed to <strong><code>{{ redirect_host }}</code></strong>. The name above is what the client calls itself; the address is where your access goes. Allow only if you started this login and know that address.
+            </div>
 
             {% if has_wildcard_request %}
             <div class="consent-warning">
@@ -107,7 +110,7 @@
             </div>
             {% endif %}
 
-            <form method="post" action="/oauth/login" autocomplete="off">
+            <form method="post" autocomplete="off">
                 <input type="hidden" name="request_id" value="{{ request_id }}">
                 <input type="hidden" name="step" value="consent">
                 {# Zone the browser lives in (issue #75); filled by the

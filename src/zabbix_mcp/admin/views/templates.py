@@ -42,6 +42,21 @@ BULK_DELETE_MAX = 500
 
 CUSTOM_TEMPLATE_DIR = Path("/etc/zabbix-mcp/templates")
 
+def _unsafe(html_content: str) -> list[str]:
+    from zabbix_mcp.admin.template_markup import unsafe_markup
+    return unsafe_markup(html_content)
+
+
+def _template_refusal(html_content: str) -> str | None:
+    """Why *html_content* may not be saved: markup that runs script, or Jinja that does not render."""
+    from zabbix_mcp.admin.template_markup import refusal
+    unsafe = refusal(html_content)
+    if unsafe:
+        return unsafe
+    error = _validate_template_syntax(html_content)
+    return f"Template will not render: {error}" if error else None
+
+
 def _validate_template_syntax(html_content: str) -> str | None:
     """Return a user-facing error string if the template won't render.
 
@@ -224,12 +239,13 @@ async def template_create(request: Request) -> Response:
     # Validate Jinja syntax before write so we never ship a broken
     # template into the templates directory (and then hit the same
     # error on every preview/PDF attempt).
-    validation_error = _validate_template_syntax(html_content)
+    validation_error = _template_refusal(html_content)
     if validation_error:
         return admin_app.render("report_templates/edit.html", request, {
             "active": "templates",
             "create_mode": True,
-            "error": f"Template will not render: {validation_error}",
+            "unsafe_markup": bool(_unsafe(html_content)),
+            "error": validation_error,
             "initial_content": html_content,
             "initial_name": name,
             "initial_description": description,
@@ -304,7 +320,7 @@ async def template_edit(request: Request) -> Response:
 
         # Validate Jinja syntax before overwriting the saved file so a
         # typo never replaces a working template with a broken one.
-        validation_error = _validate_template_syntax(html_content)
+        validation_error = _template_refusal(html_content)
         if validation_error:
             return admin_app.render("report_templates/edit.html", request, {
                 "active": "templates",
@@ -313,7 +329,8 @@ async def template_edit(request: Request) -> Response:
                     "name": display_name or tmpl["name"],
                     "description": description,
                 },
-                "error": f"Template will not render: {validation_error}",
+                "unsafe_markup": bool(_unsafe(html_content)),
+                "error": validation_error,
                 "initial_content": html_content,
                 **_ai_template_ctx(admin_app.config),
             })
@@ -348,8 +365,21 @@ async def template_edit(request: Request) -> Response:
         "template": tmpl,
         "template_id": template_id,
         "initial_content": content,
+        # a template saved before 1.42.2 with markup that runs script: shown as source only
+        "unsafe_markup": bool(_unsafe(content)),
         **_ai_template_ctx(admin_app.config),
     })
+
+
+# A rendered template is somebody's HTML. It is shown sandboxed: no script runs and
+# the page has no origin of its own, so it cannot act with the session of whoever
+# opens it (a template with <script> written by an operator, opened by an admin).
+_PREVIEW_CSP = "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"
+
+
+def _preview_response(content: str, status_code: int = 200) -> HTMLResponse:
+    return HTMLResponse(content, status_code=status_code,
+                        headers={"Content-Security-Policy": _PREVIEW_CSP, "X-Frame-Options": "SAMEORIGIN"})
 
 
 async def template_preview(request: Request) -> Response:
@@ -357,7 +387,7 @@ async def template_preview(request: Request) -> Response:
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)
     if not session or session.role == "viewer":
-        return HTMLResponse("Unauthorized", status_code=401)
+        return _preview_response("Unauthorized", status_code=401)
 
     html_content = ""
     if request.method == "POST":
@@ -388,7 +418,7 @@ async def template_preview(request: Request) -> Response:
                     html_content = file_path.read_text(encoding="utf-8")
 
     if not html_content:
-        return HTMLResponse("<p>No content to preview.</p>")
+        return _preview_response("<p>No content to preview.</p>")
 
     # Render with sample context
     try:
@@ -415,21 +445,14 @@ async def template_preview(request: Request) -> Response:
         logo_fallback = None
         configured_logo = getattr(admin_app.config.server, "report_logo", None)
         if configured_logo:
-            configured_path = Path(configured_logo)
-            if configured_path.is_file() and not configured_path.is_symlink():
-                try:
-                    logo_data = configured_path.read_bytes()
-                    ext = configured_path.suffix.lower()
-                    mime = {
-                        ".svg": "image/svg+xml",
-                        ".png": "image/png",
-                        ".jpg": "image/jpeg",
-                        ".jpeg": "image/jpeg",
-                    }.get(ext, "application/octet-stream")
-                    logo_b64 = base64.b64encode(logo_data).decode("ascii")
-                    logo_fallback = f"data:{mime};base64,{logo_b64}"
-                except OSError as exc:
-                    logger.warning("Preview logo read failed for %s: %s", configured_path, exc)
+            # the same reader as the reports: an image file only (PNG, JPG, SVG), no
+            # symbolic link. The path once came from a form field, and any file the
+            # service could read ended up in the page.
+            from zabbix_mcp.reporting.engine import _read_logo_as_base64
+            try:
+                logo_fallback = _read_logo_as_base64(configured_logo)
+            except OSError as exc:
+                logger.warning("Preview logo read failed for %s: %s", configured_logo, exc)
         if logo_fallback is None:
             logo_path = Path(__file__).parent.parent / "static" / "logo-horizontal-dark.svg"
             if logo_path.exists():
@@ -524,14 +547,14 @@ async def template_preview(request: Request) -> Response:
                 {"host": "host-03", "statuses": {d: True for d in sample_days}},
             ],
         )
-        return HTMLResponse(rendered)
+        return _preview_response(rendered)
     except Exception as e:
         import html as _html
         # Full HTML document so the preview iframe renders the error
         # in a readable card instead of a bare paragraph on white.
         err_msg = _html.escape(str(e))
         err_type = _html.escape(e.__class__.__name__)
-        return HTMLResponse(
+        return _preview_response(
             "<!DOCTYPE html><html><head><meta charset='utf-8'>"
             "<style>body{font-family:system-ui,Segoe UI,sans-serif;background:#fafafa;"
             "color:#222;padding:24px;margin:0;}"
@@ -640,6 +663,17 @@ async def template_generate(request: Request) -> Response:
         return JSONResponse(
             {"error": "internal_error", "message": str(exc)},
             status_code=500,
+        )
+
+    unsafe = _unsafe(result.html)
+    if unsafe:
+        logger.warning("AI template generation returned markup that runs script (%s); not handed to the editor",
+                       ", ".join(unsafe))
+        return JSONResponse(
+            {"error": "unsafe_markup",
+             "message": "The generated template contains markup that runs script (" + ", ".join(unsafe)
+                        + "). Nothing was put into the editor; generate it again."},
+            status_code=502,
         )
 
     # Audit the fact of generation + request length + token cost, but

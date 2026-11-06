@@ -116,7 +116,8 @@ _USER_METHODS: list[MethodDef] = [
             "role, groups, etc.). This is the standard way to start an API session "
             "when not using persistent API tokens."
         ),
-        read_only=True,
+        # a write: it tests a password against Zabbix (guessing, lockouts) and opens a session
+        read_only=False,
         params=[
             ParamDef(
                 "username", "str",
@@ -403,7 +404,9 @@ _USERDIRECTORY_METHODS: list[MethodDef] = [
             "Zabbix configuration restricts userdirectory.test to interactive "
             "sessions."
         ),
-        read_only=True,
+        # a write: Zabbix fills in the stored bind password and connects to the host the
+        # caller names, so a read-only token could have the LDAP password sent anywhere
+        read_only=False,
         params=[
             ParamDef(
                 "auth_sessionid", "str",

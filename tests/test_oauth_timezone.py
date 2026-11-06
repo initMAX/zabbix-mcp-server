@@ -138,6 +138,14 @@ class TestZoneRidesTheTokens(unittest.TestCase):
 _PASSWORD = "Operator_Pass_2026!"
 
 
+def _consent_cookie(response) -> str:
+    """The value of the consent cookie the login step set."""
+    for name, value in response.raw_headers:
+        if name == b"set-cookie" and value.startswith(oauth_login.CONSENT_COOKIE.encode() + b"_"):
+            return value.split(b";")[0].split(b"=", 1)[1].decode()
+    raise AssertionError("the login step set no consent cookie")
+
+
 class _Form(dict):
     def getlist(self, key):
         v = self.get(key, [])
@@ -188,7 +196,8 @@ timezone = "Mars/Olympus"
         consent = _Form(action="allow", scope=["monitoring"])
         if consent_browser_zone is not None:
             consent["browser_timezone"] = consent_browser_zone
-        resp = oauth_login._handle_consent_step(p, pending, "req1", consent, "127.0.0.1")
+        nonce = _consent_cookie(resp)
+        resp = oauth_login._handle_consent_step(p, pending, "req1", consent, "127.0.0.1", nonce)
         self.assertEqual(resp.status_code, 302, "consent must redirect back to the client")
         return next(iter(p._codes.values()))
 

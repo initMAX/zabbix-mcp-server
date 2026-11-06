@@ -173,9 +173,9 @@
     <div class="modal-card" style="max-width:900px; height:80vh;">
         <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; padding:16px 24px;">
             <h3>Rendered Preview</h3>
-            <button class="btn btn-ghost btn-sm" onclick="var m=document.getElementById('preview-modal'); m.style.display='none'; document.getElementById('preview-frame').src='about:blank';">&times;</button>
+            <button class="btn btn-ghost btn-sm" onclick="var m=document.getElementById('preview-modal'); m.style.display='none'; document.getElementById('preview-frame').srcdoc='';">&times;</button>
         </div>
-        <iframe id="preview-frame" style="width:100%; height:calc(100% - 60px); border:none; background:white; border-radius:0 0 var(--radius-lg) var(--radius-lg);"></iframe>
+        <iframe id="preview-frame" sandbox="" referrerpolicy="no-referrer" style="width:100%; height:calc(100% - 60px); border:none; background:white; border-radius:0 0 var(--radius-lg) var(--radius-lg);"></iframe>
     </div>
 </div>
 
@@ -228,6 +228,8 @@
 // Initialize GrapesJS
 var editor = grapesjs.init({
     container: '#gjs',
+    // its own filter, as far as it goes; unsafeMarkup() below keeps the rest out
+    parser: { optionsHtml: { allowScripts: false, allowUnsafeAttr: false, allowUnsafeAttrValue: false } },
     height: '600px',
     width: 'auto',
     storageManager: false,
@@ -445,11 +447,41 @@ var initialContent = document.getElementById('template-editor').value;
 // etc). For such content, keep the operator in HTML-source mode so
 // the template stays intact; operators can opt in to visual editing
 // after removing the control-flow constructs.
+// The visual editor draws the template on this page's own origin, so markup that
+// runs script must never reach it. The same rule as the server's
+// (zabbix_mcp/admin/template_markup.py), which refuses to save such a template.
+var UNSAFE_MARKUP_FROM_SERVER = {{ 'true' if unsafe_markup else 'false' }};
+{% raw %}function unsafeMarkup(s) {
+    s = s || '';
+    if (/<\s*\/?\s*(script|iframe|frame|frameset|object|embed|applet|base|portal)(?=[\s\/>]|$)/i.test(s)) return true;
+    if (/[\s"'\/](on[a-z]+|srcdoc|formaction|data-gjs-[\w-]*)\s*=/i.test(s)) return true;
+    // entities decoded twice in an inert document (DOMParser runs nothing, loads nothing)
+    var decoded = s;
+    for (var i = 0; i < 2; i++) {
+        var doc = new DOMParser().parseFromString('<textarea>' + decoded.replace(/<\/textarea/gi, '') + '</textarea>', 'text/html');
+        decoded = doc.querySelector('textarea').value;
+    }
+    decoded = decoded.replace(/[\x00-\x20\x7f]+/g, '').toLowerCase();
+    return /javascript:|vbscript:|data:text\/html|data:application\/xhtml/.test(decoded);
+}
+function keepAsSource(why) {
+    document.getElementById('tab-visual').classList.remove('active');
+    document.getElementById('tab-html').classList.add('active');
+    document.getElementById('visual-editor').style.display = 'none';
+    document.getElementById('html-editor').style.display = 'block';
+    if (why) {
+        var tab = document.getElementById('tab-visual');
+        tab.title = why;
+    }
+}{% endraw %}
 {% raw %}function hasJinjaControlFlow(s) {
     return /\{%\s*(extends|block|for|if|macro|include)\b/.test(s || '');
 }{% endraw %}
 {% raw %}if (initialContent) {
-    if (hasJinjaControlFlow(initialContent)) {
+    if (UNSAFE_MARKUP_FROM_SERVER || unsafeMarkup(initialContent)) {
+        // shown as source only, never drawn by the visual editor
+        keepAsSource('This template contains markup that runs script; it is shown as HTML only. Remove it to use the visual editor.');
+    } else if (hasJinjaControlFlow(initialContent)) {
         // Skip GrapesJS parse (it mangles {% for %} inside table/list
         // elements). Show HTML mode directly with the original textarea
         // content preserved verbatim - do NOT route through switchTab
@@ -516,6 +548,11 @@ function switchTab(tab) {
         // control flow, confirm with the operator first so they
         // do not silently destroy working syntax.
         var txt = document.getElementById('template-editor').value;
+        if (unsafeMarkup(txt)) {
+            window.alert('This template contains markup that runs script (script, iframe, an on... handler, a javascript: link). ' +
+                         'It cannot be shown in the visual editor and cannot be saved. Remove it in the HTML code first.');
+            return;
+        }
         if (hasJinjaControlFlow(txt)) {
             var ok = window.confirm(
                 'This template uses Jinja control flow (extends / block / for / if).\n' +
@@ -582,9 +619,9 @@ function renderPreview() {
     })
         .then(function(r) { return r.text(); })
         .then(function(rendered) {
-            var iframe = document.getElementById('preview-frame');
-            var doc = iframe.contentDocument || iframe.contentWindow.document;
-            doc.open(); doc.write(rendered); doc.close();
+            // sandbox="" without allow-same-origin / allow-scripts: the template's own
+            // markup cannot run script or reach this page
+            document.getElementById('preview-frame').srcdoc = rendered;
         });
 }
 

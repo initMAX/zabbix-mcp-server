@@ -92,6 +92,15 @@ def _read_audit_entries(
     return entries[offset:offset + limit], total
 
 
+
+def _csv_cell(value) -> str:
+    """A cell a spreadsheet shows as text. The audit log holds what anybody typed
+    (a user name at a failed login): "=HYPERLINK(...)" would be a live formula."""
+    text = "" if value is None else str(value)
+    if text[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
+
 async def audit_view(request: Request) -> Response:
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)
@@ -184,7 +193,7 @@ async def audit_export(request: Request) -> Response:
     writer.writerow(["Timestamp", "Action", "User", "Target Type", "Target ID", "Details", "IP"])
 
     for entry in entries:
-        writer.writerow([
+        writer.writerow([_csv_cell(v) for v in (
             entry.get("timestamp", ""),
             entry.get("action", ""),
             entry.get("user", ""),
@@ -192,7 +201,7 @@ async def audit_export(request: Request) -> Response:
             entry.get("target_id", ""),
             json.dumps(entry.get("details", {})) if entry.get("details") else "",
             entry.get("ip", ""),
-        ])
+        )])
 
     output.seek(0)
     return StreamingResponse(

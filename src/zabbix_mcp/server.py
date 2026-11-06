@@ -2917,7 +2917,8 @@ def _register_tools(
 
     # Fallback suffix whitelist for methods not in ALL_METHODS. ".test" is
     # not on it: mediatype.test sends a real message through the media
-    # type. userdirectory.test stays read-only through its MethodDef.
+    # type. userdirectory.test is a write too (1.42.2: it sends the stored LDAP
+    # bind password to the host given in the call).
     _READ_ONLY_SUFFIXES = (
         ".get",
         ".getscriptsbyevents", ".getscriptsbyhosts",
@@ -2999,7 +3000,8 @@ def _register_tools(
             "mcp_server": "ok",
             "zabbix_servers": {},
         }
-        for i, name in enumerate(client_manager.server_names, 1):
+        # the servers this token may use, not all of them
+        for i, name in enumerate(_servers_for_caller(client_manager), 1):
             label = f"server_{i}"
             try:
                 await asyncio.to_thread(client_manager.check_connection, name)
@@ -3093,7 +3095,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = _resolve_server_for_caller(client_manager, server or _default_server_for_caller(client_manager))
-        _auth_err = check_token_authorization(srv, tool_prefix="host")
+        _auth_err = check_token_authorization(srv, tool_prefixes=["host", "item", "trend"])  # every source it reads
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -3128,7 +3130,7 @@ def _register_tools(
         if _raw_err:
             raise ToolError(_raw_err)
         srv = _resolve_server_for_caller(client_manager, server or _default_server_for_caller(client_manager))
-        _auth_err = check_token_authorization(srv, tool_prefix="host")
+        _auth_err = check_token_authorization(srv, tool_prefixes=["host", "item", "trend"])  # every source it reads
         if _auth_err:
             raise ToolError(_auth_err)
         return _raise_if_extension_error(await asyncio.to_thread(
@@ -3537,9 +3539,14 @@ def _register_tools(
                 """Synchronous PDF generation - shared between sync and task-augmented paths."""
                 from zabbix_mcp.reporting import data_fetcher
                 srv = _resolve_server_for_caller(client_manager, server or _default_server_for_caller(client_manager))
-                _auth_err = check_token_authorization(srv, tool_prefix="host")
+                _auth_err = check_token_authorization(srv, tool_prefixes=["host", "item", "history", "trend", "event", "trigger"])  # every source it reads
                 if _auth_err:
                     raise ToolError(_auth_err)
+                if save_to_file or email_to:
+                    # a file on the server, a mail sent: writes, not for a read-only token
+                    _write_err = check_token_authorization(srv, tool_prefix="host", is_write=True)
+                    if _write_err:
+                        raise ToolError(_write_err + " (save_to_file and email_to write; without them the report is returned)")
 
                 valid_types = tuple(_REPORT_TEMPLATES.keys())
                 if report_type not in valid_types:
@@ -4424,6 +4431,12 @@ def run_server(
                 auth_code_ttl_seconds=config.oauth.auth_code_ttl_seconds,
                 access_token_ttl_seconds=config.oauth.access_token_ttl_seconds,
                 refresh_token_ttl_seconds=config.oauth.refresh_token_ttl_seconds,
+                subject_check=lambda subject, role, fingerprint=None: __import__(
+                    "zabbix_mcp.admin.auth", fromlist=["user_still_valid"]).user_still_valid(
+                    getattr(config, "_config_path", None), subject, role, fingerprint),
+                subject_fingerprint=lambda subject: __import__(
+                    "zabbix_mcp.admin.auth", fromlist=["current_password_fingerprint"]).current_password_fingerprint(
+                    getattr(config, "_config_path", None), subject),
             )
             auth_kwargs["auth_server_provider"] = oauth_provider
             auth_kwargs["auth"] = AuthSettings(
@@ -4488,6 +4501,16 @@ def run_server(
                 "Set auth_token in config.toml to require bearer token authentication.",
                 host,
             )
+
+    if (transport in ("http", "sse") and getattr(config.server, "require_auth", False)
+            and token_store.token_count == 0 and not config.server.auth_token
+            and not getattr(getattr(config, "oauth", None), "enabled", False)
+            and host not in ("127.0.0.1", "::1", "localhost")):
+        raise SystemExit(
+            f"[server].require_auth is on, the server would listen on {host} and no client "
+            "authentication is configured: add a token ([tokens.*] or the admin portal), "
+            "set auth_token, enable [oauth], or listen on 127.0.0.1."
+        )
 
     # Security status summary at startup
     if transport in ("http", "sse"):

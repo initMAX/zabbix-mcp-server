@@ -14,7 +14,7 @@
         <p class="page-subtitle">OAuth client registration details. <a href="/oauth-clients">Back to all clients</a>.</p>
     </div>
     {% if can_revoke %}
-    <form method="post" action="/oauth-clients/{{ client.id | urlencode }}/revoke" style="display:inline;" onsubmit="return confirm('Revoke OAuth client &quot;{{ client.name }}&quot;? This deletes the registration AND invalidates every access/refresh token it currently holds.');">
+    <form method="post" action="/oauth-clients/{{ client.id | urlencode }}/revoke" style="display:inline;" onsubmit="return confirm('Revoke OAuth client &quot;' + {{ client.name | tojson | forceescape }} + '&quot;? This deletes the registration AND invalidates every access/refresh token it currently holds.');">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit" class="btn btn-danger">Revoke client</button>
     </form>

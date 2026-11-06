@@ -1090,6 +1090,7 @@ Every message ends with the tool's parameters and never repeats a value. With `s
 |---|---|---|---|
 | every get, export, `importcompare`, the extension views | true | | |
 | `*_create`, `*_massadd`, `history_push`, `user_login` | false | false (it only adds) | false |
+| `userdirectory_test` | false | false (it changes nothing) | true |
 | `*_update`, `*_massupdate`, `*_propagate`, `configuration_import` | false | true (it overwrites; a list property replaces the whole list) | true |
 | `*_delete`, `*_massremove`, `history_clear` | false | true | true |
 | `script_execute`, `event_acknowledge`, `token_generate`, `zabbix_raw_api_call` | false | true | false |
@@ -1156,7 +1157,8 @@ All available options with detailed descriptions are in [`config.example.toml`](
 <tr><td><code>log_level</code></td><td><code>debug</code>, <code>info</code>, <code>warning</code>, <code>error</code>, or <code>critical</code></td></tr>
 <tr><td><code>log_file</code></td><td>Path to log file (parent directory must exist)</td></tr>
 <tr><td><code>auth_token</code></td><td>Bearer token for HTTP/SSE authentication (supports <code>${ENV_VAR}</code>)</td></tr>
-<tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute per client (default: <code>300</code>, set to <code>0</code> to disable)</td></tr>
+<tr><td><code>rate_limit</code></td><td>Max Zabbix API calls per minute per client, counted per MCP token (or client address) since 1.42.2 (default: <code>300</code>, set to <code>0</code> to disable)</td></tr>
+<tr><td><code>require_auth</code></td><td>Refuse to start over HTTP on an address other than loopback when no client authentication is configured (no token, no <code>auth_token</code>, no OAuth). Default <code>false</code>: only a warning. Also in the admin portal (Settings, TLS and access)</td></tr>
 <tr><td><code>tools</code></td><td>Filter exposed tools by category or prefix - e.g. <code>["monitoring", "alerts"]</code> (default: all 255 tools)</td></tr>
 <tr><td><code>disabled_tools</code></td><td>Denylist counterpart to <code>tools</code> — exclude specific tool groups or prefixes</td></tr>
 <tr><td><code>tls_cert_file</code> / <code>tls_key_file</code></td><td>Enable native HTTPS — paths to TLS certificate and private key (see <a href="#tls--https">TLS / HTTPS</a> below)</td></tr>

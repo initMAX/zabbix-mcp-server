@@ -300,6 +300,15 @@ async def user_detail(request: Request) -> Response:
             if new_role in ("admin", "operator", "viewer"):
                 user_section["role"] = new_role
 
+            # every other session of this user ends (a password changed after a compromise,
+            # a demotion); one's own edit keeps one's own session, with what it changed
+            from zabbix_mcp.admin.auth import password_fingerprint as _fingerprint
+            if is_self:
+                session.password_fingerprint = _fingerprint(str(user_section.get("password_hash", "")))
+                session.role = str(user_section.get("role", session.role))
+            admin_app.sessions.destroy_user_sessions(
+                username, keep=request.cookies.get("admin_session") if is_self else None)
+
             # timezone (issue #75): a value is written, an empty field
             # removes the key so the file never carries `timezone = ""`.
             if timezone_name:

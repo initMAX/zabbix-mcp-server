@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zabbix-mcp-server"
-version = "1.42.1"
+version = "1.42.2"
 description = "Production-quality MCP server for the complete Zabbix API"
 readme = "README.md"
 license = "AGPL-3.0-only"
@@ -25,6 +25,9 @@ classifiers = [
 ]
 dependencies = [
     "mcp>=2.0.0,<3.0",
+    # comes with mcp; 1.45.0 has a known vulnerability (CVE-2026-114603). Listed here so an
+    # update of this server raises it, which an update otherwise does not do
+    "opentelemetry-api>=1.45.1",
     "zabbix-utils>=2.0.2,<3.0",
     "tomli>=1.1.0; python_version < '3.11'",
     "tzdata>=2024.1",

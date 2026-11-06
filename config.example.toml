@@ -139,6 +139,11 @@ compact_output = true
 # call.
 # reject_unknown_arguments = true
 
+# Refuse to start when the server listens on an address other than loopback
+# and no client authentication is configured (no [tokens.*], no auth_token, no
+# [oauth]). Off by default: an unauthenticated server only gets a warning.
+# require_auth = false
+
 # Drop, before every create / update tool call, the keys the matching get
 # tool returns but Zabbix refuses on write (default: true): read-only
 # properties (templateid, flags, state, error, lastclock), row identifiers
@@ -562,6 +567,8 @@ compact_output = true
 # from_address = "zabbix-mcp@example.com"
 # use_starttls = true                # STARTTLS on the plain port (587)
 # use_ssl = false                    # implicit TLS instead (465)
+# verify_tls = true                  # check the server's certificate and name; false only
+#                                    # for a self-signed certificate on a trusted network
 # timeout = 30
 #
 # THE SAFETY FENCE. The AI client picks the recipient ("email the report to

@@ -53,6 +53,7 @@ button only renders when `is_ai_enabled()` returns True.
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import os
@@ -289,11 +290,12 @@ class AnthropicProvider:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(req, timeout=self.timeout) as resp:
+            with _open(req, self.timeout, getattr(self, "public_only", False)) as resp:
                 data = json.loads(resp.read())
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")[:500]
-            raise AIProviderError(f"Anthropic API returned {exc.code}: {body}") from exc
+            logger.warning("AI provider returned %s: %s", exc.code, body)
+            raise AIProviderError(f"Anthropic API returned HTTP {exc.code} (details in the server log)") from exc
         except URLError as exc:
             raise AIProviderError(f"Anthropic API unreachable: {exc.reason}") from exc
 
@@ -301,8 +303,9 @@ class AnthropicProvider:
         parts = data.get("content") or []
         text_pieces = [p.get("text", "") for p in parts if p.get("type") == "text"]
         if not text_pieces:
+            logger.warning("%s: %s", f"Anthropic API returned no text content", json.dumps(data)[:300])
             raise AIProviderError(
-                f"Anthropic API returned no text content: {json.dumps(data)[:300]}"
+                f"Anthropic API returned no text content (details in the server log)"
             )
         return "".join(text_pieces)
 
@@ -323,6 +326,8 @@ class OpenAIProvider:
     base_url: str = "https://api.openai.com/v1"
     # Human-readable label for error messages (e.g. "OpenAI", "Ollama").
     label: str = "OpenAI"
+    # a base URL a caller gave: connect to public addresses only
+    public_only: bool = False
 
     def generate(self, system: str, user: str) -> str:
         # Some OpenAI-compatible backends (Ollama, older forks)
@@ -352,18 +357,22 @@ class OpenAIProvider:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(req, timeout=self.timeout) as resp:
+            with _open(req, self.timeout, getattr(self, "public_only", False)) as resp:
                 data = json.loads(resp.read())
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")[:500]
-            raise AIProviderError(f"{self.label} API returned {exc.code}: {body}") from exc
+            logger.warning("AI provider returned %s: %s", exc.code, body)
+            raise AIProviderError(f"{self.label} API returned HTTP {exc.code} (details in the server log)") from exc
         except URLError as exc:
+            if self.public_only:      # a caller's endpoint: a closed port and a private address answer alike
+                raise AIProviderError("the AI endpoint is not reachable at a public address") from exc
             raise AIProviderError(f"{self.label} API unreachable: {exc.reason}") from exc
 
         choices = data.get("choices") or []
         if not choices:
+            logger.warning("%s: %s", f"{self.label} API returned no choices", json.dumps(data)[:300])
             raise AIProviderError(
-                f"{self.label} API returned no choices: {json.dumps(data)[:300]}"
+                f"{self.label} API returned no choices (details in the server log)"
             )
         msg = (choices[0].get("message") or {}).get("content", "")
         if not msg:
@@ -409,24 +418,27 @@ class GeminiProvider:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(req, timeout=self.timeout) as resp:
+            with _open(req, self.timeout, getattr(self, "public_only", False)) as resp:
                 data = json.loads(resp.read())
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")[:500]
-            raise AIProviderError(f"Gemini API returned {exc.code}: {body}") from exc
+            logger.warning("AI provider returned %s: %s", exc.code, body)
+            raise AIProviderError(f"Gemini API returned HTTP {exc.code} (details in the server log)") from exc
         except URLError as exc:
             raise AIProviderError(f"Gemini API unreachable: {exc.reason}") from exc
 
         candidates = data.get("candidates") or []
         if not candidates:
+            logger.warning("%s: %s", f"Gemini API returned no candidates", json.dumps(data)[:300])
             raise AIProviderError(
-                f"Gemini API returned no candidates: {json.dumps(data)[:300]}"
+                f"Gemini API returned no candidates (details in the server log)"
             )
         parts = ((candidates[0].get("content") or {}).get("parts") or [])
         text_pieces = [p.get("text", "") for p in parts if p.get("text")]
         if not text_pieces:
+            logger.warning("%s: %s", f"Gemini API returned no text parts", json.dumps(data)[:300])
             raise AIProviderError(
-                f"Gemini API returned no text parts: {json.dumps(data)[:300]}"
+                f"Gemini API returned no text parts (details in the server log)"
             )
         return "".join(text_pieces)
 
@@ -447,6 +459,7 @@ class AzureOpenAIProvider:
     timeout: int = 180
     base_url: str = ""
     api_version: str = "2024-10-21"
+    public_only: bool = False
 
     def generate(self, system: str, user: str) -> str:
         if not self.base_url:
@@ -472,18 +485,22 @@ class AzureOpenAIProvider:
             method="POST",
         )
         try:
-            with urllib_request.urlopen(req, timeout=self.timeout) as resp:
+            with _open(req, self.timeout, getattr(self, "public_only", False)) as resp:
                 data = json.loads(resp.read())
         except HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")[:500]
-            raise AIProviderError(f"Azure OpenAI API returned {exc.code}: {body}") from exc
+            logger.warning("AI provider returned %s: %s", exc.code, body)
+            raise AIProviderError(f"Azure OpenAI API returned HTTP {exc.code} (details in the server log)") from exc
         except URLError as exc:
+            if self.public_only:      # a caller's endpoint: a closed port and a private address answer alike
+                raise AIProviderError("the AI endpoint is not reachable at a public address") from exc
             raise AIProviderError(f"Azure OpenAI API unreachable: {exc.reason}") from exc
 
         choices = data.get("choices") or []
         if not choices:
+            logger.warning("%s: %s", f"Azure OpenAI returned no choices", json.dumps(data)[:300])
             raise AIProviderError(
-                f"Azure OpenAI returned no choices: {json.dumps(data)[:300]}"
+                f"Azure OpenAI returned no choices (details in the server log)"
             )
         msg = (choices[0].get("message") or {}).get("content", "")
         if not msg:
@@ -508,6 +525,81 @@ PROVIDER_DEFAULTS: dict[str, tuple[str, str]] = {
 SUPPORTED_PROVIDERS = frozenset(PROVIDER_DEFAULTS.keys())
 # Providers where api_key may be empty (self-hosted with no auth).
 PROVIDERS_KEY_OPTIONAL = frozenset({"ollama"})
+
+
+class _NoRedirects(urllib_request.HTTPRedirectHandler):
+    """A redirect is an error: it could lead a request (with its key) to another host,
+    or into this network past the check of the address."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        return None
+
+
+def _public_peer(sock) -> None:
+    import ipaddress
+    address = sock.getpeername()[0]
+    if not ipaddress.ip_address(str(address).split("%")[0]).is_global:
+        sock.close()
+        raise AIProviderError("the AI endpoint is not reachable at a public address")
+
+
+class _PublicHTTPConnection(http.client.HTTPConnection):
+    def connect(self):
+        super().connect()
+        _public_peer(self.sock)
+
+
+class _PublicHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self):
+        super().connect()
+        _public_peer(self.sock)
+
+
+class _PublicHTTPHandler(urllib_request.HTTPHandler):
+    def http_open(self, req):
+        return self.do_open(_PublicHTTPConnection, req)
+
+
+class _PublicHTTPSHandler(urllib_request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_PublicHTTPSConnection, req, context=self._context)
+
+
+def _open(req, timeout: int, public_only: bool = False):
+    """``urlopen`` for the AI providers: redirects refused; with *public_only* (an
+    endpoint a caller named) the connection must be to a public address."""
+    handlers: list = [_NoRedirects()]
+    if public_only:
+        # straight to the endpoint: through a proxy the address checked would be the
+        # proxy's, and the proxy would resolve the name on its own
+        handlers += [urllib_request.ProxyHandler({}), _PublicHTTPHandler(), _PublicHTTPSHandler()]
+    return urllib_request.build_opener(*handlers).open(req, timeout=timeout)
+
+
+def _checked_override_base(url: str, configured: str = "") -> str:
+    """A caller's api_base: http(s), and not an address inside this network (the
+    server would POST there for the caller). The configured api_base is allowed as it is."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlsplit
+
+    if configured and url.rstrip("/") == configured.rstrip("/"):
+        return url
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise AIDisabledError("api_base must be an http(s) URL")
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(parts.hostname, parts.port or 443, proto=socket.IPPROTO_TCP)}
+    except OSError as exc:
+        raise AIDisabledError(f"api_base host cannot be resolved: {parts.hostname}") from exc
+    for address in addresses:
+        ip = ipaddress.ip_address(address.split("%")[0])
+        if not ip.is_global:
+            raise AIDisabledError(
+                "api_base points into a private, loopback or link-local network; "
+                "set such an endpoint as [admin.ai].api_base in config.toml instead"
+            )
+    return url
 
 
 def _resolve_env(value: str | None) -> str:
@@ -567,9 +659,12 @@ def get_provider(
     override_api_base = (override_api_base or "").strip()
 
     ai_cfg = getattr(config, "admin_ai", None)
-    # Prefer the per-call override for api_base (Azure deployment URL
-    # or self-hosted Ollama endpoint) over the server-side default.
-    api_base_cfg = override_api_base or (getattr(ai_cfg, "api_base", "") or "").strip()
+    configured_base = (getattr(ai_cfg, "api_base", "") or "").strip()
+    # A per-call api_base (Azure deployment URL, self-hosted Ollama) goes with a
+    # per-call provider only, never with the server's own key: the key was sent to
+    # whatever address the caller named.
+    api_base_cfg = configured_base
+    public_only = False
 
     if override_provider or override_api_key:
         # BYO path. Provider must be supported; key must be present
@@ -584,6 +679,9 @@ def get_provider(
         provider_name = override_provider
         api_key = override_api_key
         model_cfg = override_model
+        if override_api_base:
+            api_base_cfg = _checked_override_base(override_api_base, configured_base)
+            public_only = api_base_cfg.rstrip("/") != configured_base.rstrip("/")
     else:
         # Fall back to server-side [admin.ai] config.
         if ai_cfg is None:
@@ -614,7 +712,7 @@ def get_provider(
     if provider_name == "azure-openai":
         return AzureOpenAIProvider(
             api_key=api_key, model=model, max_tokens=max_tokens, timeout=timeout,
-            base_url=base_url,
+            base_url=base_url, public_only=public_only,
         )
     # openai + ollama + mistral + groq share the OpenAI wire format;
     # only the base URL and default model differ.
@@ -626,7 +724,7 @@ def get_provider(
     }
     return OpenAIProvider(
         api_key=api_key, model=model, max_tokens=max_tokens, timeout=timeout,
-        base_url=base_url, label=labels.get(provider_name, provider_name),
+        base_url=base_url, label=labels.get(provider_name, provider_name), public_only=public_only,
     )
 
 

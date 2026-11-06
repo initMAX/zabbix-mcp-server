@@ -138,6 +138,13 @@ def _http_post_json(url: str, body: dict, headers: dict | None = None) -> tuple[
     return resp.status, _json_load(raw), hdrs
 
 
+# The browser of these tests: it keeps the cookies a server sets, as the consent
+# step requires (it is accepted from the browser that logged in only).
+import http.cookiejar  # noqa: E402
+
+_BROWSER_COOKIES = http.cookiejar.CookieJar()
+
+
 def _http_post_form(url: str, body, headers: dict | None = None, follow: bool = False):
     """``body`` may be a dict or a list of (key, value) tuples to allow
     repeated keys (e.g. multiple ``scope`` checkboxes on the consent
@@ -148,15 +155,16 @@ def _http_post_form(url: str, body, headers: dict | None = None, follow: bool = 
         url, data=data, method="POST",
         headers={"Content-Type": "application/x-www-form-urlencoded", **(headers or {})},
     )
+    cookies = urllib.request.HTTPCookieProcessor(_BROWSER_COOKIES)
     if not follow:
-        opener = urllib.request.build_opener(_NoRedirectHandler())
+        opener = urllib.request.build_opener(_NoRedirectHandler(), cookies)
         try:
             with opener.open(req, timeout=10) as resp:
                 return resp.status, resp.read().decode("utf-8", errors="replace"), dict(resp.headers)
         except urllib.error.HTTPError as exc:
             return exc.code, exc.read().decode("utf-8", errors="replace"), dict(exc.headers)
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.build_opener(cookies).open(req, timeout=10) as resp:
             return resp.status, resp.read().decode("utf-8", errors="replace"), dict(resp.headers)
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read().decode("utf-8", errors="replace"), dict(exc.headers)

@@ -46,6 +46,22 @@ def hash_password(password: str) -> str:
     return f"scrypt:131072:8:1${salt_hex}${hash_hex}"
 
 
+_DUMMY_HASH: str | None = None
+
+
+def verify_password_timed(password: str, stored_hash: str | None) -> bool:
+    """``verify_password`` that takes as long for a user that does not exist: without a
+    stored hash it checks against a throwaway one and answers False. A login that
+    skipped scrypt for an unknown name told which names exist (10 ms against 380 ms)."""
+    global _DUMMY_HASH
+    if stored_hash:
+        return verify_password(password, stored_hash)
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_password(secrets.token_urlsafe(16))
+    verify_password(password, _DUMMY_HASH)
+    return False
+
+
 def verify_password(password: str, stored_hash: str) -> bool:
     """Verify a password against a stored scrypt hash. Constant-time comparison."""
     try:
@@ -108,6 +124,72 @@ class Session:
     expires_at: float
     ip: str  # Stored for audit/logging, not validated (users may change IP during session)
     csrf_token: str = ""  # Per-session CSRF token; rotated with the session
+    # sha256 of the password hash the user logged in with: a password changed since
+    # (by an admin, after a compromise) ends the session
+    password_fingerprint: str = ""
+
+
+def password_fingerprint(password_hash: str) -> str:
+    return hashlib.sha256(str(password_hash or "").encode("utf-8")).hexdigest()
+
+
+_USERS_CACHE: dict[str, tuple[tuple[int, int, int], dict]] = {}
+_USERS_LOCK = threading.Lock()
+
+
+def portal_users(config_path: str | None) -> dict | None:
+    """[admin.users.*] as config.toml has it now (cached while the file is unchanged).
+    None when the file cannot be read; {} when there is no config file at all."""
+    if not config_path:
+        return {}
+    try:
+        stat = os.stat(config_path)
+        # nanoseconds and inode too: a password change keeps the size, and a coarse clock
+        # could keep the old mtime (cf. #80)
+        key = (stat.st_mtime_ns, stat.st_size, stat.st_ino)
+        with _USERS_LOCK:
+            cached = _USERS_CACHE.get(config_path)
+            if cached and cached[0] == key:
+                return cached[1]
+        try:
+            import tomllib
+        except ImportError:  # Python 3.10
+            import tomli as tomllib  # type: ignore[no-redef]
+        with open(config_path, "rb") as fh:
+            data = tomllib.load(fh)
+        users = {str(k): dict(v) for k, v in ((data.get("admin") or {}).get("users") or {}).items()}
+        with _USERS_LOCK:
+            _USERS_CACHE[config_path] = (key, users)
+        return users
+    except Exception:  # noqa: BLE001 - unreadable config: unknown, not "nobody"
+        logger.exception("Could not read [admin.users] from %s", config_path)
+        return None
+
+
+def current_password_fingerprint(config_path: str | None, username: str) -> str | None:
+    """The fingerprint of *username*'s password hash as config.toml has it now."""
+    users = portal_users(config_path) or {}
+    user = users.get(username)
+    return password_fingerprint(user.get("password_hash", "")) if user else None
+
+
+def user_still_valid(config_path: str | None, username: str, role: str | None,
+                     fingerprint: str | None = None) -> bool:
+    """Whether *username* still exists with *role* (and, when given, the same password).
+    A user deleted, demoted or promoted, or whose password was changed, is not."""
+    if not config_path:
+        return True   # no config file (tests, stdio): no portal users to check against
+    users = portal_users(config_path)
+    if users is None:
+        return False  # the file could not be read: nobody is vouched for (logged above)
+    user = users.get(username)
+    if user is None or user.get("disabled"):
+        return False
+    if role is not None and str(user.get("role", "viewer")) != str(role):
+        return False
+    if fingerprint and password_fingerprint(user.get("password_hash", "")) != fingerprint:
+        return False
+    return True
 
 
 class SessionManager:
@@ -120,7 +202,17 @@ class SessionManager:
         self._signing_key = signing_key
         self._lock = threading.RLock()
 
-    def create_session(self, user: str, role: str, ip: str) -> str:
+    def destroy_user_sessions(self, user: str, keep: str | None = None) -> int:
+        """End every session of *user* (but the token *keep*). Returns how many."""
+        with self._lock:
+            gone = [t for t, s in self._sessions.items() if s.user == user and t != keep]
+            for token in gone:
+                del self._sessions[token]
+        if gone:
+            logger.info("Ended %d session(s) of user '%s'", len(gone), user)
+        return len(gone)
+
+    def create_session(self, user: str, role: str, ip: str, password_fingerprint: str = "") -> str:
         """Create a new session, return session token."""
         with self._lock:
             self._cleanup_expired_unlocked()
@@ -136,6 +228,7 @@ class SessionManager:
                 expires_at=now + self.SESSION_DURATION,
                 ip=ip,
                 csrf_token=csrf_token,
+                password_fingerprint=password_fingerprint,
             )
             self._sessions[token] = session
             logger.info("Created session for user '%s' from %s", user, ip)

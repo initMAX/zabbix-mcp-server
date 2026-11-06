@@ -35,7 +35,7 @@ logger = logging.getLogger("zabbix_mcp.admin")
 # Settings that require a server restart to take effect
 RESTART_REQUIRED = {"host", "port", "transport", "tls_cert_file", "tls_key_file", "log_file",
                     "register_write_tools", "strip_write_params", "validate_get_params",
-                    "schema_constraints", "reject_unknown_arguments"}
+                    "schema_constraints", "reject_unknown_arguments", "require_auth"}
 
 # List fields — split comma-separated into TOML arrays
 LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "tools", "disabled_tools", "allowed_recipients"}
@@ -43,7 +43,7 @@ LIST_KEYS = {"cors_origins", "allowed_hosts", "allowed_origins", "allowed_import
 # Boolean fields — checkbox present = True, absent = False
 BOOL_KEYS = {"compact_output", "enabled", "update_check_enabled", "use_starttls",
              "use_ssl", "download_urls", "register_write_tools", "strip_write_params",
-             "validate_get_params", "schema_constraints", "reject_unknown_arguments"}
+             "validate_get_params", "schema_constraints", "reject_unknown_arguments", "verify_tls", "require_auth"}
 
 # Map UI section names to actual config.toml section + allowed keys
 SECTION_CONFIG = {
@@ -54,7 +54,7 @@ SECTION_CONFIG = {
     },
     "tls_access": {
         "toml_section": "server",
-        "allowed_keys": {"tls_cert_file", "tls_key_file", "cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "rate_limit"},
+        "allowed_keys": {"tls_cert_file", "tls_key_file", "cors_origins", "allowed_hosts", "allowed_origins", "allowed_import_dirs", "rate_limit", "require_auth"},
         "min_role": "admin",
     },
     "tools": {
@@ -65,7 +65,9 @@ SECTION_CONFIG = {
     },
     "reporting": {
         "toml_section": "server",
-        "allowed_keys": {"report_company", "report_subtitle", "report_logo"},
+        # report_logo is set by the upload (/settings/upload/logo) only: a path typed
+        # here was read and shown in the template preview, whatever file it named
+        "allowed_keys": {"report_company", "report_subtitle"},
         "min_role": "operator",
     },
     # [reporting] / [reporting.email] - out-of-band delivery of generated
@@ -81,7 +83,7 @@ SECTION_CONFIG = {
         "toml_section": "reporting.email",
         "allowed_keys": {
             "enabled", "smtp_host", "smtp_port", "smtp_user", "smtp_password",
-            "from_address", "use_starttls", "use_ssl", "timeout",
+            "from_address", "use_starttls", "use_ssl", "verify_tls", "timeout",
             "allowed_recipients",
         },
         "min_role": "admin",
@@ -293,6 +295,7 @@ async def settings_view(request: Request) -> Response:
             settings["mail_from_address"] = mail_cfg.get("from_address", "")
             settings["mail_use_starttls"] = bool(mail_cfg.get("use_starttls", True))
             settings["mail_use_ssl"] = bool(mail_cfg.get("use_ssl", False))
+            settings["mail_verify_tls"] = bool(mail_cfg.get("verify_tls", True))
             settings["mail_timeout"] = int(mail_cfg.get("timeout") or 30)
             _recips = mail_cfg.get("allowed_recipients", []) or []
             settings["mail_allowed_recipients"] = ", ".join(_recips) if isinstance(_recips, list) else str(_recips)

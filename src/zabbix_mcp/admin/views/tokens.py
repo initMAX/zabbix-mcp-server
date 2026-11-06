@@ -201,6 +201,25 @@ def _validate_and_dedupe_ips(ip_lines: list[str]) -> tuple[list[str], str | None
     return deduped, None
 
 
+
+def _beyond_role(role: str, scopes) -> list[str]:
+    """The scopes of a token that *role* may not hand out (empty when all are within it).
+
+    An operator gets, through OAuth, monitoring / data_collection / alerts /
+    extensions at most; a static token made in the portal is held to the same, so
+    an operator cannot mint (or take over by editing or regenerating) a token for
+    the users and administration methods, or one with every scope.
+    """
+    if role == "admin":
+        return []
+    from zabbix_mcp.config import TOOL_GROUPS
+    from zabbix_mcp.oauth_login import _scope_cap_for_role
+    cap = _scope_cap_for_role(role)
+    allowed = set(cap)
+    for group in cap:
+        allowed.update(TOOL_GROUPS.get(group, []))
+    return [s for s in (scopes or ["*"]) if s not in allowed]
+
 async def token_list(request: Request) -> Response:
     admin_app = request.app.state.admin_app
     session = admin_app.require_auth(request)
@@ -307,6 +326,10 @@ async def token_create(request: Request) -> Response:
         scopes = form.getlist("scopes")
     if not scopes:
         scopes = ["*"]
+    beyond = _beyond_role(session.role, scopes)
+    if beyond:
+        return _err(f"Your role ({session.role}) cannot give a token these scopes: {', '.join(beyond)}. "
+                    "Pick narrower scopes, or ask an admin.")
 
     read_only = "read_only" in form
     allow_raw_json = "allow_raw_json" in form
@@ -443,6 +466,12 @@ async def token_detail(request: Request) -> Response:
     if not token:
         return RedirectResponse("/tokens", status_code=303)
 
+    if request.method == "POST" and session.role != "viewer" and _beyond_role(session.role, token.scopes):
+        return admin_app.flash_redirect(
+            f"/tokens/{token_id}",
+            f"This token has scopes your role ({session.role}) cannot hand out; only an admin can change it.",
+            "danger",
+        )
     if request.method == "POST" and session.role != "viewer":
         form = await request.form()
 
@@ -488,6 +517,13 @@ async def token_detail(request: Request) -> Response:
         else:
             scopes = form.getlist("scopes")
         if scopes:
+            beyond = _beyond_role(session.role, scopes)
+            if beyond:
+                return admin_app.flash_redirect(
+                    f"/tokens/{token_id}",
+                    f"Your role ({session.role}) cannot give a token these scopes: {', '.join(beyond)}.",
+                    "danger",
+                )
             updates["scopes"] = list(scopes)
 
         read_only = "read_only" in form
@@ -617,6 +653,9 @@ async def token_revoke(request: Request) -> Response:
         return RedirectResponse("/tokens", status_code=303)
 
     token_id = request.path_params["token_id"]
+    existing = admin_app.token_store.get_token(token_id)
+    if existing is not None and _beyond_role(session.role, existing.scopes):
+        return admin_app.flash_redirect("/tokens", "Only an admin can change this token.", "danger")
     try:
         doc = load_config_document(admin_app.config_path)
         tokens_section = doc.get("tokens", {})
@@ -661,6 +700,9 @@ async def token_regenerate(request: Request) -> Response:
     token = admin_app.token_store.get_token(token_id)
     if not token:
         return admin_app.flash_redirect("/tokens", f"Token '{token_id}' not found.", "danger")
+    if _beyond_role(session.role, token.scopes):
+        # a new secret for a wider token would hand it to whoever asked
+        return admin_app.flash_redirect("/tokens", "Only an admin can regenerate this token.", "danger")
 
     raw_token, token_hash = TokenStore.generate_token()
     try:

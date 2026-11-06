@@ -119,9 +119,11 @@ class UnknownOutcomeError(Exception):
 # Methods a lost answer may simply be asked for again: they change nothing
 # in Zabbix. Everything else (create, update, delete, mass*, import,
 # execute, acknowledge, push, clear, generate ...) is sent once.
+# (user.login and userdirectory.test are sent once too: a second login is a second
+# password attempt, a second directory test a second connection to that host.)
 _RESEND_SAFE_VERBS = frozenset({
     "get", "version", "export", "importcompare", "getsli",
-    "getscriptsbyhosts", "getscriptsbyevents", "checkauthentication", "login", "test",
+    "getscriptsbyhosts", "getscriptsbyevents", "checkauthentication",
 })
 
 
@@ -172,6 +174,18 @@ class _RateLimiter:
                 )
             calls.append(now)
             self._buckets[key] = calls
+
+
+def _calling_client() -> str | None:
+    """Whose call this is, for the rate limit: the MCP token (for OAuth, the registered
+    client). It was one shared count always, so one token could use up the limit of all
+    of them. Without a token (stdio, or an unauthenticated server) it stays one shared
+    count: a count per address would let a client that changes its address go past it."""
+    from zabbix_mcp.token_store import current_token_info
+    token = current_token_info.get()
+    if token is not None and getattr(token, "id", None):
+        return f"token:{token.id}"
+    return None
 
 
 _NEWER_RE = re.compile(r"Version of Zabbix API \[(\d+)\.(\d+)[^\]]*\] was not tested")
@@ -554,7 +568,7 @@ class ClientManager:
           "validation flaky / sometimes OK sometimes fails".
         """
         import ssl
-        self._rate_limiter.check()
+        self._rate_limiter.check(_calling_client())
         client = self._get_client(server)
         try:
             return self._do_call(client, method, params)

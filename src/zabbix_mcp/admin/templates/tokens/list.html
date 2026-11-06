@@ -232,7 +232,7 @@
                         </form>
                         {% endif %}
                         <button class="btn btn-danger btn-sm"
-                                onclick="openModal('delete-modal-{{ token.id }}')">Delete</button>
+                                onclick="openModal('delete-modal-' + {{ token.id | tojson | forceescape }})">Delete</button>
                     </div>
 
                     <!-- Delete confirmation modal -->
@@ -240,17 +240,17 @@
                         <div class="modal">
                             <div class="modal-header">
                                 <h3 class="modal-title">Delete Token</h3>
-                                <button class="modal-close" onclick="closeModal('delete-modal-{{ token.id }}')">&times;</button>
+                                <button class="modal-close" onclick="closeModal('delete-modal-' + {{ token.id | tojson | forceescape }})">&times;</button>
                             </div>
                             <div class="modal-body">
                                 Are you sure you want to delete the token <strong>{{ token.name }}</strong>? This action cannot be undone.
                             </div>
                             <div class="modal-footer">
-                                <button class="btn btn-ghost" onclick="closeModal('delete-modal-{{ token.id }}')">Cancel</button>
+                                <button class="btn btn-ghost" onclick="closeModal('delete-modal-' + {{ token.id | tojson | forceescape }})">Cancel</button>
                                 <form method="post" action="/tokens/{{ token.id }}/delete" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                     <button type="submit" class="btn btn-danger"
-                                            onclick="closeModal('delete-modal-{{ token.id }}')">Delete</button>
+                                            onclick="closeModal('delete-modal-' + {{ token.id | tojson | forceescape }})">Delete</button>
                                 </form>
                             </div>
                         </div>

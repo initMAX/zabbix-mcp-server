@@ -35,7 +35,7 @@
             <div class="card-body">
                 <p class="text-sm" style="margin-bottom:16px;">{{ template.description }}</p>
                 <div class="actions">
-                    <button class="btn btn-ghost btn-sm" onclick="previewBuiltin('{{ template.id }}')">&#x1F441; Preview</button>
+                    <button class="btn btn-ghost btn-sm" onclick="previewBuiltin({{ template.id | tojson | forceescape }})">&#x1F441; Preview</button>
                     <a href="/templates/create?duplicate={{ template.id }}" class="btn btn-ghost btn-sm">&#x1F4CB; Duplicate</a>
                 </div>
             </div>
@@ -82,7 +82,7 @@
                     <a href="/templates/{{ template.id }}" class="btn btn-ghost btn-sm">&#x270F; Edit</a>
                     <form method="post" action="/templates/{{ template.id }}/delete" style="display:inline;" id="del-tpl-{{ template.id }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                        <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('template {{ template.name }}', 'del-tpl-{{ template.id }}')">Delete</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('template ' + {{ template.name | tojson | forceescape }}, 'del-tpl-' + {{ template.id | tojson | forceescape }})">Delete</button>
                     </form>
                 </div>
             </div>
@@ -108,7 +108,7 @@
             <h3 id="preview-title">Template Preview</h3>
             <button class="btn btn-ghost btn-sm" onclick="var m=document.getElementById('preview-modal'); m.style.display='none'; document.getElementById('preview-iframe').src='about:blank';">&times;</button>
         </div>
-        <iframe id="preview-iframe" style="width:100%; height:calc(100% - 60px); border:none; background:white; border-radius: 0 0 var(--radius-lg) var(--radius-lg);"></iframe>
+        <iframe id="preview-iframe" sandbox="" referrerpolicy="no-referrer" style="width:100%; height:calc(100% - 60px); border:none; background:white; border-radius: 0 0 var(--radius-lg) var(--radius-lg);"></iframe>
     </div>
 </div>
 {% endblock %}
@@ -118,13 +118,12 @@
 function previewBuiltin(templateId) {
     document.getElementById('preview-title').textContent = templateId.replace(/_/g, ' ').replace(/\b\w/g, function(l){ return l.toUpperCase(); }) + ' — Preview';
     var iframe = document.getElementById('preview-iframe');
-    iframe.src = '';
+    iframe.srcdoc = '';
     document.getElementById('preview-modal').style.display = 'flex';
     fetch('/templates/' + templateId + '/preview')
         .then(function(r) { return r.text(); })
         .then(function(html) {
-            var doc = iframe.contentDocument || iframe.contentWindow.document;
-            doc.open(); doc.write(html); doc.close();
+            iframe.srcdoc = html;   // sandboxed: the preview runs no script
         });
 }
 </script>

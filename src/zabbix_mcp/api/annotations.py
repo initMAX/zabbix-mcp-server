@@ -73,12 +73,15 @@ WRITE_VERBS: dict[str, tuple[bool, bool]] = {
     "execute": (True, False),               # script.execute
     "acknowledge": (True, False),           # can close a problem; a message is added every time
     "generate": (True, False),              # token.generate: the previous token string stops working
+    # write methods that change nothing in the configuration (since 1.42.2 not open to
+    # a read-only token: what they do cannot be called reading)
+    "login": (False, False),                # user.login: a session, a password tried against Zabbix
+    "test": (False, True),                  # userdirectory.test: Zabbix connects to the server named
 }
 
 # Tools the catalog treats as reads (a read-only server and a read-only token
 # may call them) that still leave something behind.
 _LEAVES_A_TRACE: dict[str, tuple[bool, bool]] = {
-    "user_login": (False, False),           # a session
 }
 
 # Tools whose call makes Zabbix contact what the caller names: a script on a

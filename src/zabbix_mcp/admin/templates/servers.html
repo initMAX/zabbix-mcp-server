@@ -274,7 +274,7 @@
                 {% if current_user_role != 'viewer' %}
                 <form method="post" action="/servers/{{ server.name }}/delete" style="display:inline;" id="del-srv-{{ server.name }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('server {{ server.name }}', 'del-srv-{{ server.name }}')">Delete</button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="confirmDelete('server ' + {{ server.name | tojson | forceescape }}, 'del-srv-' + {{ server.name | tojson | forceescape }})">Delete</button>
                 </form>
                 {% endif %}
             </div>

@@ -103,6 +103,25 @@ def _generated_at(tz: tzinfo | None = None) -> str:
     return datetime.now(zone).strftime("%Y-%m-%d %H:%M ") + zone_name(zone)
 
 
+def _data_uri_fetcher(url: str, *args, **kwargs):
+    """What a report may load while it is turned into a PDF: data: URIs only. Every
+    image of a report is embedded that way; WeasyPrint's own fetcher would read any
+    file:// path and fetch any http(s):// URL a template names."""
+    if not str(url).startswith("data:"):
+        raise ValueError(f"reports load data: URIs only, not {str(url)[:80]}")
+    return weasyprint.default_url_fetcher(url, *args, **kwargs)
+
+
+def _report_url_fetcher():
+    """The fetcher for ``weasyprint.HTML``: data: URIs only. WeasyPrint 68 and later
+    take a ``URLFetcher`` object (a plain function is refused there), earlier releases
+    a function."""
+    fetcher_class = getattr(weasyprint, "URLFetcher", None)
+    if fetcher_class is not None:
+        return fetcher_class(allowed_protocols={"data"})
+    return _data_uri_fetcher
+
+
 def _read_logo_as_base64(logo_path: str) -> str | None:
     """Safely read a logo file and return a base64 data URI.
 
@@ -207,7 +226,7 @@ class ReportEngine:
     def render_pdf(self, template_name: str, context: dict) -> bytes:
         """Render an HTML template to PDF bytes."""
         html_string = self.render_html(template_name, context)
-        pdf_doc = weasyprint.HTML(string=html_string).write_pdf()
+        pdf_doc = weasyprint.HTML(string=html_string, url_fetcher=_report_url_fetcher()).write_pdf()
         return pdf_doc
 
     def load_custom_templates(self, custom_templates: dict) -> None:

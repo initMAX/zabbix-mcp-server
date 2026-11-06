@@ -212,6 +212,18 @@
             </div>
         </div>
         <div class="settings-row">
+            <div class="settings-label">Require Authentication <span class="tooltip-icon" tabindex="0" data-tooltip="Refuse to start when the server listens on an address other than 127.0.0.1 and no client authentication is set up (no token, no auth_token, no OAuth). OFF only warns at start, as before. Restart required.">&#x1F6C8;</span></div>
+            <div>
+                <label class="toggle-label">
+                    <span class="toggle">
+                        <input type="checkbox" name="require_auth" value="true" {% if settings.require_auth %}checked{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    Do not start unauthenticated on a network address
+                </label>
+            </div>
+        </div>
+        <div class="settings-row">
             <div class="settings-label">Rate Limit <span class="tooltip-icon" tabindex="0" data-tooltip="Per-token request budget per minute. 300 covers a typical AI client's monitoring queries; lower it to throttle a runaway agent. 0 = unlimited (not recommended on shared hardware).">&#x1F6C8;</span></div>
             <div>
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -520,6 +532,13 @@
                         <span class="toggle-slider"></span>
                     </span>
                     <span>Implicit TLS (port 465)</span>
+                </label>
+                <label class="toggle-label" style="margin-top:8px;">
+                    <span class="toggle">
+                        <input type="checkbox" name="verify_tls" {% if settings.mail_verify_tls is not defined or settings.mail_verify_tls %}checked{% endif %} {% if current_user_role != 'admin' %}disabled{% endif %}>
+                        <span class="toggle-slider"></span>
+                    </span>
+                    <span>Verify the server certificate <span class="tooltip-icon" tabindex="0" data-tooltip="Checks the SMTP server's certificate and host name. Turn off only for a server with a self-signed certificate on a network you trust: without the check, anyone on the path can read the SMTP password and the reports.">?</span></span>
                 </label>
             </div>
         </div>

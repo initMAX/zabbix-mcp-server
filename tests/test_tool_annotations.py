@@ -101,17 +101,22 @@ class TestClassification(unittest.TestCase):
             self.assertEqual(_hints(tool), {"readOnlyHint": True, "openWorldHint": False}, tool)
 
     def test_a_login_leaves_a_session_behind(self):
-        # a read for the catalog (a read-only server may log in), not for the hint
-        self.assertTrue(BY_TOOL["user_login"].read_only)
+        # a write since 1.42.2: it tries a password against Zabbix and opens a session
+        self.assertFalse(BY_TOOL["user_login"].read_only)
         self.assertEqual(_hints("user_login"), {"readOnlyHint": False, "destructiveHint": False,
                                                 "idempotentHint": False, "openWorldHint": False})
+
+    def test_a_directory_test_is_not_for_a_read_only_token(self):
+        # Zabbix adds the stored bind password and connects to the host given in the call
+        self.assertFalse(BY_TOOL["userdirectory_test"].read_only)
+        self.assertEqual(_hints("userdirectory_test"), {"readOnlyHint": False, "destructiveHint": False,
+                                                        "idempotentHint": True, "openWorldHint": True})
 
     def test_only_what_makes_zabbix_reach_outside_is_open_world(self):
         for name in OPEN_WORLD:
             self.assertIn(name, BY_TOOL)
         opened = {m.tool_name for m in ALL_METHODS if _hints(m.tool_name)["openWorldHint"]}
         self.assertEqual(opened, {"script_execute", "userdirectory_test"})
-        self.assertIs(_hints("userdirectory_test")["readOnlyHint"], True)
 
     def test_an_unknown_verb_is_the_worst_case(self):
         self.assertEqual(annotations_for("host_frobnicate", False),
@@ -152,14 +157,14 @@ class TestAsRegistered(unittest.TestCase):
 
     def test_the_hint_agrees_with_what_a_read_only_token_is_shown(self):
         # a tool hidden from a read-only token says it writes, and the other
-        # way round; user_login and the preview half of the approval flow are
-        # the two deliberate differences
+        # way round; the preview half of the approval flow is the deliberate difference
         writes = _build_write_tools_set()
         for name, hints in REGISTERED.items():
-            if name in ("user_login", "action_prepare"):
+            if name == "action_prepare":
                 continue
             self.assertEqual(hints.read_only_hint is False, name in writes, name)
-        self.assertNotIn("user_login", writes)
+        self.assertIn("user_login", writes)
+        self.assertIn("userdirectory_test", writes)
         self.assertIn("action_prepare", writes)
 
 

@@ -142,6 +142,11 @@ class _PostRateLimitMiddleware:
         await self.app(scope, receive, send)
 
 
+# No plugins, no <base> pointing elsewhere, not framed by another site.
+# (Scripts stay inline in the templates for now.)
+_PORTAL_CSP = b"object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+
+
 class _SecurityHeadersMiddleware:
     """ASGI middleware that adds the standard hardening headers to
     every response. Cheap defense-in-depth on top of the existing
@@ -191,6 +196,9 @@ class _SecurityHeadersMiddleware:
                     add.append((b"x-frame-options", b"DENY"))
                 if b"referrer-policy" not in seen:
                     add.append((b"referrer-policy", b"same-origin"))
+                if b"content-security-policy" not in seen:
+                    # what holds for every page; the template previews set a stricter one
+                    add.append((b"content-security-policy", _PORTAL_CSP))
                 if self.tls_enabled and b"strict-transport-security" not in seen:
                     # 6 months, no preload / subdomains - safe default
                     # for self-hosted deployments behind their own DNS.
@@ -235,13 +243,20 @@ class _CsrfMiddleware:
         # Extract session cookie + its CSRF token (if authenticated)
         admin_app = self.state.admin_app if hasattr(self.state, "admin_app") else None
         headers = dict(scope.get("headers", []))
-        cookie = headers.get(b"cookie", b"").decode()
-        session_token = ""
-        for part in cookie.split(";"):
-            k, _, v = part.strip().partition("=")
-            if k == "admin_session":
-                session_token = v
-                break
+        cookie = b"; ".join(v for k, v in scope.get("headers", []) if k == b"cookie").decode("latin-1")
+        # The handlers read the cookie as Starlette does (the last of a name wins); this
+        # check must judge the same session. Two admin_session cookies are refused: one
+        # planted from a sibling subdomain in front of the real one passed this check
+        # unchecked while the handler acted on the real session.
+        from starlette.requests import cookie_parser
+        sent = [part.strip().partition("=")[0].strip() for part in cookie.split(";")]
+        if sent.count("admin_session") > 1:
+            await send({"type": "http.response.start", "status": 403,
+                        "headers": [(b"content-type", b"text/plain; charset=utf-8")]})
+            await send({"type": "http.response.body",
+                        "body": b"More than one admin_session cookie; clear the cookies of this site and log in again."})
+            return
+        session_token = cookie_parser(cookie).get("admin_session", "")
 
         session = None
         if admin_app is not None and session_token:
@@ -638,11 +653,25 @@ class AdminApp:
         return response
 
     def _get_session(self, request: Request):
-        """Extract and validate session from cookie."""
+        """Extract and validate session from cookie.
+
+        The session is checked against config.toml on every request: a user that was
+        deleted, given another role, or whose password was changed is logged out at
+        once. Before, the session lived on for its 8 hours with the role it was
+        created with (a deleted admin could create a new admin).
+        """
         token = request.cookies.get("admin_session")
         if not token:
             return None
-        return self.sessions.validate_session(token)
+        session = self.sessions.validate_session(token)
+        if session is None:
+            return None
+        from zabbix_mcp.admin.auth import user_still_valid
+        if not user_still_valid(self.config_path, session.user, session.role, session.password_fingerprint or None):
+            self.sessions.destroy_session(token)
+            logger.info("Session of '%s' ended: the user was deleted or changed", session.user)
+            return None
+        return session
 
     def require_auth(self, request: Request):
         """Check auth, return session or raise redirect."""
@@ -771,7 +800,8 @@ class AdminApp:
                     pass
 
         user_data = admin_users.get(username)
-        if not user_data or not verify_password(password, user_data.get("password_hash", "")):
+        from zabbix_mcp.admin.auth import verify_password_timed
+        if not verify_password_timed(password, (user_data or {}).get("password_hash") or None) or not user_data:
             self.rate_limiter.record_attempt(client_ip)
             logger.warning("Failed login attempt for user '%s' from %s", username, client_ip)
             write_audit("login_failure", user=username, ip=client_ip)
@@ -789,7 +819,9 @@ class AdminApp:
 
         self.rate_limiter.reset(client_ip)
         role = user_data.get("role", "viewer")
-        session_token = self.sessions.create_session(username, role, client_ip)
+        from zabbix_mcp.admin.auth import password_fingerprint
+        session_token = self.sessions.create_session(
+            username, role, client_ip, password_fingerprint(user_data.get("password_hash", "")))
         logger.info("Admin login: user '%s' from %s (role: %s)", username, client_ip, role)
         write_audit("login_success", user=username, details={"role": role}, ip=client_ip)
 

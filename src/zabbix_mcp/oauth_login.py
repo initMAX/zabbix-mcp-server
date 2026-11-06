@@ -44,7 +44,10 @@ Flow:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -126,15 +129,14 @@ def _verify_admin_user(config: Any, username: str, password: str) -> tuple[bool,
         return False, "", None
     try:
         from zabbix_mcp.admin.config_writer import load_config_document
-        from zabbix_mcp.admin.auth import verify_password
+        from zabbix_mcp.admin.auth import verify_password_timed
         doc = load_config_document(cfg_path)
         users = (doc.get("admin", {}) or {}).get("users", {}) or {}
         user = users.get(username)
-        if user is None:
+        # the same work whether the user exists or not (no timing tells the names)
+        if not verify_password_timed(password, str((user or {}).get("password_hash", "")) or None):
             return False, "", None
-        if user.get("disabled"):
-            return False, "", None
-        if not verify_password(password, str(user.get("password_hash", ""))):
+        if user is None or user.get("disabled"):
             return False, "", None
         timezone = _valid_timezone_or_none(user.get("timezone"))
         if user.get("timezone") and timezone is None:
@@ -324,10 +326,35 @@ async def handle_oauth_login(
         )
 
     if step == "consent":
-        return _handle_consent_step(provider, pending, request_id, form, client_ip)
+        return _handle_consent_step(provider, pending, request_id, form, client_ip,
+                                    request.cookies.get(consent_cookie_name(request_id), ""))
     return _handle_login_step(
         provider, pending, request_id, form, client_ip, config,
+        secure=request.url.scheme == "https",
     )
+
+
+# The consent step belongs to the browser that logged in. A request_id alone is not
+# enough: it travels in the login link, and whoever holds the link could otherwise
+# submit "Allow" for a user who logged in through it and receive the code at a
+# redirect URI of their own (a client registers itself without authentication).
+CONSENT_COOKIE = "zmcp_oauth_consent"
+
+
+def consent_cookie_name(request_id: str) -> str:
+    """One cookie per login: two MCP clients connecting at once, in two tabs of one
+    browser, do not overwrite each other's."""
+    return f"{CONSENT_COOKIE}_{hashlib.sha256(request_id.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _nonce_hash(nonce: str) -> str:
+    return hashlib.sha256(nonce.encode("utf-8")).hexdigest()
+
+
+def _redirect_host(pending: Any) -> str:
+    from urllib.parse import urlsplit
+    parts = urlsplit(str(pending.params.redirect_uri or ""))
+    return parts.netloc or str(pending.params.redirect_uri or "")
 
 
 def _render_login_form(provider: Any, request: Request) -> Response:
@@ -361,6 +388,8 @@ def _handle_login_step(
     form: Any,
     client_ip: str,
     config: Any,
+    *,
+    secure: bool = False,
 ) -> Response:
     """Step 1: credential verification -> render consent screen on success."""
     from zabbix_mcp.admin.audit_writer import write_audit
@@ -425,15 +454,25 @@ def _handle_login_step(
                     row["description"]
                     + f"  -- not available to your role ({role}); ask an admin."
                 )
-    return HTMLResponse(_render_template(
+    nonce = secrets.token_urlsafe(32)
+    pending.consent_nonce_hash = _nonce_hash(nonce)
+    response = HTMLResponse(_render_template(
         "oauth_consent.html",
         request_id=request_id,
         client_name=(pending.client.client_name or "").strip() or str(pending.client.client_id or ""),
+        redirect_host=_redirect_host(pending),
         subject=username,
         subject_role=role,
         scopes=rows,
         has_wildcard_request=has_wildcard,
     ))
+    import time as _time
+    # as long as the request it belongs to (the pending entry's lifetime, [oauth] setting);
+    # path "/" so that it does not depend on where the login is served
+    lifetime = max(60, int(getattr(pending, "expires_at", _time.time() + 600) - _time.time()))
+    response.set_cookie(consent_cookie_name(request_id), nonce, max_age=lifetime, path="/",
+                        httponly=True, samesite="strict", secure=secure)
+    return response
 
 
 def _handle_consent_step(
@@ -442,9 +481,29 @@ def _handle_consent_step(
     request_id: str,
     form: Any,
     client_ip: str,
+    nonce: str = "",
 ) -> Response:
     """Step 2: operator clicked Allow / Deny on the consent screen."""
     from zabbix_mcp.admin.audit_writer import write_audit
+
+    expected = getattr(pending, "consent_nonce_hash", None)
+    if pending.authenticated_subject is not None and (
+            not expected or not nonce or not hmac.compare_digest(expected, _nonce_hash(nonce))):
+        # not the browser that logged in
+        _oauth_login_limiter.record_attempt(client_ip)
+        write_audit(
+            action="oauth.consent_rejected",
+            user=pending.authenticated_subject,
+            target_type="oauth_client",
+            target_id=str(pending.client.client_id or ""),
+            details={"client_name": pending.client.client_name or "", "reason": "not_the_browser_that_logged_in"},
+            ip=client_ip or "",
+        )
+        return _render_error_page(
+            "This consent was not sent from the browser that signed in. "
+            "Reconnect from your MCP client to begin a new login.",
+            status_code=403,
+        )
 
     if pending.authenticated_subject is None:
         # Cannot reach the consent screen without first authenticating.
@@ -566,4 +625,6 @@ def _handle_consent_step(
         subject, pending.client.client_id,
         list(pending.params.scopes or []), allowed_grant, timezone,
     )
-    return RedirectResponse(redirect_url, status_code=302)
+    done = RedirectResponse(redirect_url, status_code=302)
+    done.delete_cookie(consent_cookie_name(request_id), path="/")
+    return done

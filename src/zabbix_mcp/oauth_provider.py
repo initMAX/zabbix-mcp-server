@@ -65,7 +65,10 @@ import secrets
 import time
 from collections import OrderedDict
 from typing import Any
+import asyncio
+
 from mcp.server.auth.provider import (
+    RegistrationError,
     AccessToken,
     AuthorizationCode,
     AuthorizationParams,
@@ -140,6 +143,13 @@ def _new_secret(num_bytes: int = 32) -> str:
     return secrets.token_urlsafe(num_bytes)
 
 
+
+# What an unauthenticated registration may store (RFC 7591 needs no login).
+_MAX_DYNAMIC_CLIENTS = 200
+_MAX_CLIENT_NAME = 100
+_MAX_REDIRECT_URIS = 10
+_MAX_REDIRECT_URI_LENGTH = 2000
+
 class _PendingAuthorization:
     """Holds an /authorize request that is awaiting user login + consent.
 
@@ -165,7 +175,7 @@ class _PendingAuthorization:
 
     __slots__ = (
         "client", "params", "expires_at", "authenticated_subject", "authenticated_role",
-        "authenticated_timezone", "browser_timezone",
+        "authenticated_timezone", "browser_timezone", "consent_nonce_hash",
     )
 
     def __init__(self, client: OAuthClientInformationFull, params: AuthorizationParams, ttl_seconds: int = _AUTH_CODE_TTL_SECONDS) -> None:
@@ -173,6 +183,9 @@ class _PendingAuthorization:
         self.params = params
         self.expires_at = time.time() + ttl_seconds
         self.authenticated_subject: str | None = None
+        # sha256 of the cookie the browser that logged in was given; the consent
+        # step is accepted from that browser only
+        self.consent_nonce_hash: str | None = None
         # Role of the operator who logged in (admin/operator/viewer);
         # caps which scopes this consent step can grant.
         self.authenticated_role: str | None = None
@@ -223,8 +236,16 @@ class ZmcpOAuthProvider:
         auth_code_ttl_seconds: int = _AUTH_CODE_TTL_SECONDS,
         access_token_ttl_seconds: int = _ACCESS_TOKEN_TTL_SECONDS,
         refresh_token_ttl_seconds: int = _REFRESH_TOKEN_TTL_SECONDS,
+        subject_check: Any = None,
+        subject_fingerprint: Any = None,
     ) -> None:
         self._public_url = public_url.rstrip("/")
+        # (subject, role) -> whether that portal user still exists with that role. A
+        # token of a user deleted or given another role stops working at once.
+        self._subject_check = subject_check
+        # subject -> fingerprint of the user's password now: stored on every token, so a
+        # password changed since (by an admin, after a compromise) ends the user's tokens
+        self._subject_fingerprint = subject_fingerprint
         self._token_store = token_store
         self._login_path = login_path
         self._persist_client = register_client_persister
@@ -366,6 +387,19 @@ class ZmcpOAuthProvider:
         return self._clients.get(client_id)
 
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
+        # Registration needs no login (RFC 7591), so what a caller may store is bounded:
+        # every client is written to config.toml and listed in the portal.
+        if len(self._clients) >= _MAX_DYNAMIC_CLIENTS:
+            logger.warning("OAuth client registration refused: %d clients are registered (limit). "
+                           "Remove unused ones in the admin portal.", len(self._clients))
+            raise RegistrationError("invalid_client_metadata",
+                                    f"no more clients can register ({_MAX_DYNAMIC_CLIENTS} are registered); an administrator can remove unused ones in the portal")
+        if len(client_info.client_name or "") > _MAX_CLIENT_NAME:
+            raise RegistrationError("invalid_client_metadata", f"client_name is longer than {_MAX_CLIENT_NAME} characters")
+        uris = [str(u) for u in (client_info.redirect_uris or [])]
+        if len(uris) > _MAX_REDIRECT_URIS or any(len(u) > _MAX_REDIRECT_URI_LENGTH for u in uris):
+            raise RegistrationError("invalid_redirect_uri",
+                                    f"at most {_MAX_REDIRECT_URIS} redirect_uris of at most {_MAX_REDIRECT_URI_LENGTH} characters")
         # Mint client_id if the client did not pre-supply one (RFC 7591 §3.2.1).
         if not client_info.client_id:
             client_info.client_id = _new_secret(16)
@@ -382,7 +416,8 @@ class ZmcpOAuthProvider:
         self._clients[client_info.client_id] = client_info
         if self._persist_client is not None:
             try:
-                self._persist_client(client_info)
+                # rewriting config.toml is file work: not on the event loop
+                await asyncio.to_thread(self._persist_client, client_info)
             except Exception as exc:  # pragma: no cover
                 logger.exception("Could not persist OAuth client %s: %s", client_info.client_id, exc)
         logger.info(
@@ -471,6 +506,24 @@ class ZmcpOAuthProvider:
             refresh_ttl_override=refresh_ttl,
         )
 
+    def _subject_still_valid(self, token: Any) -> bool:
+        """Whether the portal user a token was issued to still exists with that role."""
+        if self._subject_check is None:
+            return True
+        subject = str(getattr(token, "_subject", "") or "")
+        if not subject or subject == "anonymous":
+            return True
+        role = str(getattr(token, "_role", "") or "") or None
+        fingerprint = getattr(token, "_pwfp", None)
+        try:
+            ok = bool(self._subject_check(subject, role, fingerprint))
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not check OAuth subject %s", subject)
+            return True
+        if not ok:
+            logger.info("OAuth token of '%s' refused: the portal user was deleted or changed", subject)
+        return ok
+
     def _enforce_client_ip_allowlist(self, client: OAuthClientInformationFull) -> None:
         """Raise TokenError if the calling IP is outside the client's allowlist.
 
@@ -525,6 +578,9 @@ class ZmcpOAuthProvider:
         if rt.expires_at and rt.expires_at < int(time.time()):
             self._refresh_tokens.pop(refresh_token, None)
             return None
+        if not self._subject_still_valid(rt):
+            self._refresh_tokens.pop(refresh_token, None)
+            return None
         return rt
 
     async def exchange_refresh_token(
@@ -535,6 +591,8 @@ class ZmcpOAuthProvider:
     ) -> OAuthToken:
         # Per OAuth 2.1 §4.3.1, rotate the refresh token; reject any scope
         # the client did not originally hold.
+        # The client's IP allowlist holds for every token, not for the first one only.
+        self._enforce_client_ip_allowlist(client)
         for s in scopes or []:
             if s not in refresh_token.scopes:
                 raise TokenError("invalid_scope", f"scope '{s}' was not in the original grant")
@@ -584,6 +642,9 @@ class ZmcpOAuthProvider:
             timezone_implicit=timezone_implicit,
             resource=None,
             family_id=family,  # rotate within the same family
+            # the client's own lifetimes, as at the first exchange
+            access_ttl_override=self._client_access_ttl(client),
+            refresh_ttl_override=self._client_refresh_ttl(client),
         )
 
     async def load_access_token(self, token: str) -> AccessToken | None:
@@ -601,6 +662,16 @@ class ZmcpOAuthProvider:
                     at.resource, self._public_url,
                 )
                 return None
+            if not self._subject_still_valid(at):
+                self._access_tokens.pop(token, None)
+                return None
+            client = self._clients.get(at.client_id)
+            if client is not None:
+                try:
+                    self._enforce_client_ip_allowlist(client)
+                except TokenError as exc:
+                    logger.warning("Rejected access token of client %s: %s", at.client_id, exc.error_description)
+                    return None
             # Portal role -> write permission. Before v1.37.3 every
             # OAuth token was published writable, so a viewer with the
             # "monitoring" scope could create, change and delete hosts,
@@ -752,8 +823,15 @@ class ZmcpOAuthProvider:
         )
         # Carry subject for downstream auth checks; not part of the
         # OAuth wire model so we attach it as a private attribute.
+        fingerprint = None
+        if self._subject_fingerprint is not None and subject and subject != "anonymous":
+            try:
+                fingerprint = self._subject_fingerprint(subject)
+            except Exception:  # noqa: BLE001
+                logger.exception("Could not read the password fingerprint of %s", subject)
         object.__setattr__(access, "_subject", subject)  # type: ignore[arg-type]
         object.__setattr__(access, "_role", role)  # type: ignore[arg-type]
+        object.__setattr__(access, "_pwfp", fingerprint)  # type: ignore[arg-type]
         object.__setattr__(access, "_timezone", _timezone_or_none(timezone))  # type: ignore[arg-type]
         object.__setattr__(access, "_timezone_implicit", bool(timezone_implicit))  # type: ignore[arg-type]
         refresh = RefreshToken(
@@ -764,6 +842,7 @@ class ZmcpOAuthProvider:
         )
         object.__setattr__(refresh, "_subject", subject)  # type: ignore[arg-type]
         object.__setattr__(refresh, "_role", role)  # type: ignore[arg-type]
+        object.__setattr__(refresh, "_pwfp", fingerprint)  # type: ignore[arg-type]
         object.__setattr__(refresh, "_timezone", _timezone_or_none(timezone))  # type: ignore[arg-type]
         object.__setattr__(refresh, "_timezone_implicit", bool(timezone_implicit))  # type: ignore[arg-type]
         self._gc(self._access_tokens, _MAX_LIVE_ACCESS_TOKENS)
