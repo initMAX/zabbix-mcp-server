@@ -3953,6 +3953,133 @@ class _BearerTokenVerifier:
 _UVICORN_PROXY_SETTINGS: dict[str, Any] = {"proxy_headers": False}
 
 
+# How long a request that is being worked on may take to finish once the server is
+# told to stop. After that uvicorn cancels it; systemd would kill the process at 90 s.
+_STOP_GRACE_SECONDS = 30
+_LISTEN_METHOD = b"subscriptions/listen"
+_STOPPING_BODY = b'{"error": "the server is stopping"}'
+
+
+class _StopNotificationStreams:
+    """ASGI layer: ends the notification streams when the server is told to stop.
+
+    A client of the 2026-07-28 protocol keeps one request open for as long as
+    it is connected (``subscriptions/listen``: the answer is a stream of
+    notifications). The MCP library ends it when the client goes away and at
+    no other time, and uvicorn does not exit while a response is open. With
+    one such client connected, ``systemctl restart`` waited the 90 seconds
+    systemd allows and then killed the process.
+
+    When the server is told to stop, this layer tells such a stream what the
+    library does listen to: the client is gone (``http.disconnect``). The
+    library cancels its handler, the response is closed properly, and the
+    client connects again when the server is back. Other requests are passed
+    through as they are: one that is being worked on has ``_STOP_GRACE_SECONDS``
+    to finish before uvicorn cancels it.
+
+    Whether uvicorn does this itself depends on its version: 0.44 tells every
+    open request of the shutdown in this very way (a tool call included, which
+    it thereby cuts short, and a stream it cuts instead of ending), 0.42 and
+    0.54 tell none. An update of this server keeps the uvicorn that is
+    installed, so all of them are out there.
+
+    Which request is a notification stream is read from the ``Mcp-Method``
+    header, which the library requires to be the method in the body.
+    """
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+        self.server: Any = None          # the uvicorn server, once there is one
+        self._stopped: asyncio.Event | None = None
+        self._watcher: asyncio.Task | None = None
+
+    def stopping(self) -> bool:
+        return bool(self.server is not None and getattr(self.server, "should_exit", False))
+
+    async def _watch(self) -> None:
+        # uvicorn itself learns of the signal this way: its handler sets a flag
+        assert self._stopped is not None
+        while not self.stopping():
+            await asyncio.sleep(0.1)
+        self._stopped.set()
+
+    def _stop_event(self) -> asyncio.Event:
+        if self._stopped is None:
+            self._stopped = asyncio.Event()
+            self._watcher = asyncio.get_running_loop().create_task(self._watch())
+        return self._stopped
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http" or dict(scope.get("headers") or []).get(b"mcp-method") != _LISTEN_METHOD:
+            await self.app(scope, receive, send)
+            return
+        stopped = self._stop_event()
+        told = started = finished = body_read = False
+
+        async def receive_or_stop() -> dict:
+            nonlocal told, body_read
+            if told:
+                return {"type": "http.disconnect"}
+            if not body_read:
+                # the request itself is read as it comes: the library answers a
+                # request it could not read with an error of its own
+                message = await receive()
+                body_read = message.get("type") != "http.request" or not message.get("more_body", False)
+                return message
+            # From here on the library only waits for the client to go away. (A caller
+            # that polls instead of waiting would not see a message that is ready: the
+            # race below takes a turn of the loop. Nothing on this path polls.)
+            message = asyncio.ensure_future(receive())
+            stop = asyncio.ensure_future(stopped.wait())
+            try:
+                await asyncio.wait({message, stop}, return_when=asyncio.FIRST_COMPLETED)
+                if message.done():
+                    return message.result()
+                told = True
+                return {"type": "http.disconnect"}
+            finally:
+                for pending in (message, stop):
+                    if not pending.done():
+                        pending.cancel()
+
+        async def tracked_send(event: dict) -> None:
+            nonlocal started, finished
+            await send(event)
+            if event.get("type") == "http.response.start":
+                started = True
+            elif event.get("type") == "http.response.body" and not event.get("more_body", False):
+                finished = True
+
+        await self.app(scope, receive_or_stop, tracked_send)
+        if not finished and (told or self.stopping()):
+            # the library has let go of the stream without ending the response: end it
+            # (also when uvicorn was the one that told it; to a client that is really
+            # gone, uvicorn sends nothing)
+            if not started:
+                await send({"type": "http.response.start", "status": 503,
+                            "headers": [(b"content-type", b"application/json"), (b"retry-after", b"5")]})
+                await send({"type": "http.response.body", "body": _STOPPING_BODY, "more_body": False})
+            else:
+                await send({"type": "http.response.body", "body": b"", "more_body": False})
+
+
+def _serve(asgi_app: Any, uvicorn_kwargs: dict[str, Any], streams: "_StopNotificationStreams | None" = None) -> None:
+    """``uvicorn.run`` for this one process, with the server object at hand, so that
+    *streams* can see when it is told to stop."""
+    import sys
+    import uvicorn
+
+    server = uvicorn.Server(uvicorn.Config(asgi_app, **uvicorn_kwargs))
+    if streams is not None:
+        streams.server = server
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        pass
+    if not server.started:
+        sys.exit(3)      # as uvicorn.run does when the server did not start (the port is taken)
+
+
 def _wrap_http_app(asgi_app: Any, server_config: Any) -> Any:
     """The layers around the MCP app, innermost first.
 
@@ -4754,15 +4881,18 @@ def run_server(
                 asgi_app.router.lifespan_context = _lifespan_with_cleanup
 
             asgi_app = _wrap_http_app(asgi_app, config.server)
+            # outermost: what a restart must not wait for (see the class)
+            notification_streams = _StopNotificationStreams(asgi_app)
+            asgi_app = notification_streams
 
             # Run with uvicorn (supports TLS natively)
-            import uvicorn
-
             uvicorn_kwargs: dict[str, Any] = {
                 "host": host,
                 "port": port,
                 "log_level": config.server.log_level.lower(),
                 "access_log": False,  # Suppress uvicorn access logs — they mix formats with app logs
+                # a request that is being worked on gets this long to finish when the server is stopped
+                "timeout_graceful_shutdown": _STOP_GRACE_SECONDS,
                 **_UVICORN_PROXY_SETTINGS,
             }
             if config.server.tls_cert_file and config.server.tls_key_file:
@@ -4824,7 +4954,7 @@ def run_server(
                 logger.info("Admin portal: %s://%s:%d/", admin_scheme, admin_host, admin_port)
 
             logger.info("#### Zabbix MCP Server started successfully ####")
-            uvicorn.run(asgi_app, **uvicorn_kwargs)
+            _serve(asgi_app, uvicorn_kwargs, notification_streams)
         else:
             logger.info("#### Zabbix MCP Server started successfully (stdio) ####")
             mcp.run(transport="stdio")

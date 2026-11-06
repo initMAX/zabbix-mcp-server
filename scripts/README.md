@@ -141,21 +141,36 @@ log with the expression before and after. The script lists the updates in which
 the only change was a user macro turning into a plain value, and with `--restore`
 writes the earlier expression back where three things hold: nothing but macros
 changed in that update, the trigger still has what that update left behind, and
-the values written are values those macros have today. Everything else is listed
+each value written is what its macro resolves to today (looked up in the order
+Zabbix uses: the macro with the context asked for, or with a regular expression
+that matches it, on the host, on its templates, then among the global macros, and
+only then the macro without a context). What it does not restore is listed
 with the reason and left alone (`SKIPPED`: changed again since; `REVIEW`: the
-value is not the macro's, or the macro is a secret). A trigger a template gives to
-hosts is restored on the template. `--user NAME` looks only at updates by that
-Zabbix user, for instance the one whose API token the MCP server uses.
+value is not the macro's, or the macro is a secret or a vault macro, or the macro went in an update
+that changed something else as well, which is what a model produces when it edits
+the expanded text, or in an earlier update after which the expression was changed
+again). A trigger a template gives to hosts is restored on the template. `--user
+NAME` looks only at updates by that Zabbix user; give it the one whose API token
+the MCP server uses, since the log cannot tell a number somebody typed on purpose
+from the value an expansion left when the two are the same.
 
 ```bash
-python3 scripts/restore_trigger_macros.py https://zabbix.example.com <api-token>            # list only
-python3 scripts/restore_trigger_macros.py https://zabbix.example.com <api-token> --restore
+python3 scripts/restore_trigger_macros.py https://zabbix.example.com <api-token> --user mcp            # list only
+python3 scripts/restore_trigger_macros.py https://zabbix.example.com <api-token> --user mcp --restore
 python3 scripts/restore_trigger_macros.py https://zabbix.example.com Admin <password> --days 31
 ```
 
+Two things it does not see: one macro put in the place of another with nothing
+else changed (somebody's choice), and, since macros are counted over the whole
+expression and not place by place, a loss in one place where the same macro
+stands or is later written in another place: that one can go unnoticed, or be
+listed under another update than the one it went in.
+
 Zabbix 6.0 or later (the audit log of earlier releases does not carry the two
 values). The log is kept for 31 days by default from 7.0 and 365 before, so run
-it soon after upgrading. Exit status 1 while something is left to restore.
+it soon after upgrading. Exit status 1 while something is left, 2 when the script
+could not do its work (an option it does not know, a `--user` Zabbix does not
+have, Zabbix not reached or refusing a call).
 
 ## `audit_get_flags_live.py` - what does `false` mean?
 

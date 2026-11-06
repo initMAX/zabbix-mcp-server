@@ -155,9 +155,13 @@ class TestTheServerDecidesAlone(unittest.TestCase):
         default = uvicorn.Config(app)
         default.load()
         self.assertIsInstance(default.loaded_app, ProxyHeadersMiddleware)
+        # both listeners get those settings: the portal through uvicorn.run, the MCP
+        # endpoint through _serve, which hands them to uvicorn as they are
         source = inspect.getsource(server.run_server)
         self.assertEqual(source.count("**_UVICORN_PROXY_SETTINGS"), 2)
-        self.assertEqual(source.count("uvicorn.run("), 2)
+        self.assertEqual(source.count("uvicorn.run("), 1)
+        self.assertEqual(source.count("_serve(asgi_app, uvicorn_kwargs, "), 1)
+        self.assertIn("uvicorn.Config(asgi_app, **uvicorn_kwargs)", inspect.getsource(server._serve))
 
     def test_a_proxy_that_is_not_listed_is_not_believed(self):
         # v1.41 and before: a local relay that passed the client's header through
