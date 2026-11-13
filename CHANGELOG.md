@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.43 - 2026-11-13
+
+The fields of `selectXxx` in the tool schemas ([#106](https://github.com/initMAX/zabbix-mcp-server/issues/106), @Amelkahil), the part of that issue v1.42 left for later.
+
+### Added
+
+- **`selectXxx` lists in the JSON Schema and checked per release.** For a select whose list Zabbix checks itself, `extra_params` in `tools/list` now types it: `"extend"` / `"count"`, or a list of the fields it takes. The lists are measured, not read from the reference pages, on 5.0 to 8.0 (`scripts/audit_select_fields_live.py`, merged by `scripts/build_select_fields.py` into `api/select_fields.json`): each select is sent a name no object has, and Zabbix answers with its own list (`value must be one of ...`), which is narrowed where a select is answered by several queries (`selectGroups` on 6.2 to 7.0 asks host and template groups). 160 selects of 37 methods are typed. The list Zabbix takes is often smaller than what `"extend"` returns (`selectHosts` of `hostgroup_get` returns `active_available` and refuses it in a list), so the schema is the measured list, not the returned one.
+- **The server checks such a list against the release it calls** and refuses a field that release does not take, with the fields it does: `selectHosts of hostgroup.get: 'proxy_hostid' is not a field it returns on Zabbix 8.0.0. Fields: ... proxyid ...`. Zabbix would refuse the same call; it is now said before the call, with the list.
+- **A select that fails the whole read on an unknown name is checked as well**: `selectTags` on 5.x and 6.0 answers a field it lacks with an internal error ("field host_tag.automatic does not exist"); its fields are measured from what it returns, so `selectTags: ["tag", "value", "automatic"]` on 6.0 is refused with the fields it has, instead of failing the read.
+- **A select Zabbix does not check is not refused, but the answer says what was left out.** Such a select (5.x mostly, `selectInterfaces` or `selectItems` of `host_get`, `selectOperations` of `action_get`, ...) takes any name and drops the unknown ones without a word. Its fields stay open in the schema and no call is refused on them; when a name was neither checked nor returned on that release, the first line of the answer adds "Note: Zabbix left out names it does not return under selectInterfaces: ...". A field of another release that this one does not return is refused with that reason (Zabbix leaves it out or fails on it). An unknown release is not checked.
+- The schema lists only what some release that checks the select takes, not what `"extend"` returns (`selectParentTemplates` returns 44 fields on 5.x and takes 6 on 7.0); a 5.x server is reached with `"extend"` or names Zabbix ignores, as before.
+
+- **A near miss of a parameter name is named**: `selectHostgroups` on `host_get` is answered with "Did you mean 'selectHostGroups'?" before the full list.
+
+### Checked
+
+- On every supported release (5.0, 5.2, 5.4, 6.0, 6.2, 6.4, 7.0, 7.2, 7.4, 8.0): every measured list passes the check and is taken by Zabbix; a name outside it is refused by both (where Zabbix checks a select only when it has rows to return, the server refuses it either way); the end-to-end run of every tool (`scripts/test_all_tools.py`) gives the same result as v1.42.4.
+- The tool catalog grows by about 7 % (the typed lists); `[server].schema_constraints = false` returns the plain types, as before.
+
 ## v1.42.4 - 2026-11-13
 
 Report mail for a read-only token, broken by v1.42.2 ([#109](https://github.com/initMAX/zabbix-mcp-server/issues/109), @metehan25).

@@ -1,0 +1,3800 @@
+{
+ "methods": {
+  "action.get": {
+   "selectFilter": {
+    "fields": [
+     "conditions",
+     "eval_formula",
+     "evaltype",
+     "formula"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectOperations": {
+    "fields": [
+     "actionid",
+     "esc_period",
+     "esc_step_from",
+     "esc_step_to",
+     "evaltype",
+     "opcommand",
+     "opcommand_grp",
+     "opcommand_hst",
+     "opconditions",
+     "operationid",
+     "operationtype",
+     "opgroup",
+     "opinventory",
+     "opmessage",
+     "opmessage_grp",
+     "opmessage_usr",
+     "optag",
+     "optemplate"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectRecoveryOperations": {
+    "fields": [
+     "actionid",
+     "evaltype",
+     "opconditions",
+     "operationid",
+     "operationtype",
+     "opmessage",
+     "opmessage_grp",
+     "opmessage_usr"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectUpdateOperations": {
+    "fields": [
+     "evaltype",
+     "operationid",
+     "operationtype",
+     "opmessage",
+     "opmessage_grp",
+     "opmessage_usr"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "alert.get": {
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectMediatypes": {
+    "fields": [
+     "attempt_interval",
+     "description",
+     "event_menu_name",
+     "event_menu_url",
+     "exec_path",
+     "gsm_modem",
+     "maxattempts",
+     "maxsessions",
+     "mediatypeid",
+     "message_format",
+     "name",
+     "parameters",
+     "passwd",
+     "process_tags",
+     "provider",
+     "script",
+     "show_event_menu",
+     "smtp_authentication",
+     "smtp_email",
+     "smtp_helo",
+     "smtp_port",
+     "smtp_security",
+     "smtp_server",
+     "smtp_verify_host",
+     "smtp_verify_peer",
+     "status",
+     "timeout",
+     "type",
+     "username"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsers": {
+    "fields": [
+     "attempt_clock",
+     "attempt_failed",
+     "attempt_ip",
+     "autologin",
+     "autologout",
+     "lang",
+     "name",
+     "provisioned",
+     "refresh",
+     "roleid",
+     "rows_per_page",
+     "surname",
+     "theme",
+     "timezone",
+     "ts_provisioned",
+     "url",
+     "userdirectoryid",
+     "userid",
+     "username"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "auditlog.get": {},
+  "connector.get": {
+   "selectTags": {
+    "fields": [
+     "operator",
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "correlation.get": {
+   "selectFilter": {
+    "fields": [
+     "conditions",
+     "eval_formula",
+     "evaltype",
+     "formula"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectOperations": {
+    "fields": [
+     "type"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "dashboard.get": {
+   "selectPages": {
+    "fields": [
+     "dashboard_pageid",
+     "display_period",
+     "name",
+     "widgets"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUserGroups": {
+    "fields": [
+     "permission",
+     "usrgrpid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsers": {
+    "fields": [
+     "permission",
+     "userid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "dcheck.get": {
+   "selectDRules": {
+    "fields": [
+     "concurrency_max",
+     "delay",
+     "druleid",
+     "error",
+     "iprange",
+     "name",
+     "proxyid",
+     "status"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "dhost.get": {
+   "selectDRules": {
+    "measured": false,
+    "strict": false
+   },
+   "selectDServices": {
+    "measured": false,
+    "strict": false
+   }
+  },
+  "discoveryrule.get": {
+   "selectFilter": {
+    "fields": [
+     "conditions",
+     "eval_formula",
+     "evaltype",
+     "formula"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectGraphs": {
+    "fields": [
+     "discover",
+     "flags",
+     "graphid",
+     "graphtype",
+     "height",
+     "name",
+     "percent_left",
+     "percent_right",
+     "show_3d",
+     "show_legend",
+     "show_triggers",
+     "show_work_period",
+     "templateid",
+     "uuid",
+     "width",
+     "yaxismax",
+     "yaxismin",
+     "ymax_itemid",
+     "ymax_type",
+     "ymin_itemid",
+     "ymin_type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHostPrototypes": {
+    "fields": [
+     "custom_interfaces",
+     "discover",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "name",
+     "status",
+     "templateid",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectLLDMacroPaths": {
+    "fields": [
+     "lld_macro",
+     "path"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectOverrides": {
+    "fields": [
+     "filter",
+     "name",
+     "operations",
+     "step",
+     "stop"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectPreprocessing": {
+    "fields": [
+     "error_handler",
+     "error_handler_params",
+     "params",
+     "type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTriggers": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "discover",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "drule.get": {
+   "selectDChecks": {
+    "fields": [
+     "allow_redirect",
+     "dcheckid",
+     "druleid",
+     "host_source",
+     "key_",
+     "name_source",
+     "ports",
+     "snmp_community",
+     "snmpv3_authpassphrase",
+     "snmpv3_authprotocol",
+     "snmpv3_contextname",
+     "snmpv3_privpassphrase",
+     "snmpv3_privprotocol",
+     "snmpv3_securitylevel",
+     "snmpv3_securityname",
+     "type",
+     "uniq"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectDHosts": {
+    "measured": false,
+    "strict": false
+   }
+  },
+  "dservice.get": {
+   "selectDHosts": {
+    "measured": false,
+    "strict": false
+   },
+   "selectDRules": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHosts": {
+    "measured": false,
+    "strict": false
+   }
+  },
+  "event.get": {
+   "selectAcknowledges": {
+    "fields": [
+     "acknowledgeid",
+     "action",
+     "clock",
+     "message",
+     "name",
+     "new_severity",
+     "old_severity",
+     "suppress_until",
+     "surname",
+     "taskid",
+     "userid",
+     "username"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectAlerts": {
+    "fields": [
+     "acknowledgeid",
+     "actionid",
+     "alertid",
+     "alerttype",
+     "clock",
+     "error",
+     "esc_step",
+     "mediatypeid",
+     "message",
+     "p_eventid",
+     "retries",
+     "sendto",
+     "status",
+     "subject",
+     "userid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectRelatedObject": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectSuppressionData": {
+    "fields": [
+     "maintenanceid",
+     "suppress_until",
+     "userid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "graph.get": {
+   "selectDiscoveryRule": {
+    "measured": false,
+    "strict": false
+   },
+   "selectGraphDiscovery": {
+    "measured": false,
+    "strict": false
+   },
+   "selectGraphItems": {
+    "fields": [
+     "calc_fnc",
+     "color",
+     "drawtype",
+     "gitemid",
+     "graphid",
+     "itemid",
+     "sortorder",
+     "type",
+     "yaxisside"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHostGroups": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTemplateGroups": {
+    "fields": [
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTemplates": {
+    "fields": [
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_psk",
+     "tls_psk_identity",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "graphitem.get": {
+   "selectGraphs": {
+    "fields": [
+     "flags",
+     "graphid",
+     "graphtype",
+     "height",
+     "name",
+     "percent_left",
+     "percent_right",
+     "show_3d",
+     "show_legend",
+     "show_triggers",
+     "show_work_period",
+     "templateid",
+     "uuid",
+     "width",
+     "yaxismax",
+     "yaxismin",
+     "ymax_itemid",
+     "ymax_type",
+     "ymin_itemid",
+     "ymin_type"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "graphprototype.get": {
+   "selectDiscoveryRule": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "flags",
+     "follow_redirects",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectGraphItems": {
+    "fields": [
+     "calc_fnc",
+     "color",
+     "drawtype",
+     "gitemid",
+     "graphid",
+     "itemid",
+     "sortorder",
+     "type",
+     "yaxisside"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHostGroups": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTemplateGroups": {
+    "fields": [
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTemplates": {
+    "fields": [
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_psk",
+     "tls_psk_identity",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "host.get": {
+   "selectDashboards": {
+    "fields": [
+     "auto_start",
+     "dashboardid",
+     "display_period",
+     "hostid",
+     "name",
+     "templateid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectDiscoveries": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "flags",
+     "follow_redirects",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectDiscoveryRule": {
+    "measured": false,
+    "strict": false
+   },
+   "selectGraphs": {
+    "fields": [
+     "flags",
+     "graphid",
+     "graphtype",
+     "height",
+     "name",
+     "percent_left",
+     "percent_right",
+     "show_3d",
+     "show_legend",
+     "show_triggers",
+     "show_work_period",
+     "templateid",
+     "uuid",
+     "width",
+     "yaxismax",
+     "yaxismin",
+     "ymax_itemid",
+     "ymax_type",
+     "ymin_itemid",
+     "ymin_type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHostDiscovery": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHostGroups": {
+    "fields": [
+     "flags",
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHttpTests": {
+    "fields": [
+     "agent",
+     "authentication",
+     "delay",
+     "headers",
+     "hostid",
+     "http_password",
+     "http_proxy",
+     "http_user",
+     "httptestid",
+     "name",
+     "retries",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "status",
+     "templateid",
+     "uuid",
+     "variables",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectInheritedTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectInterfaces": {
+    "fields": [
+     "available",
+     "details",
+     "disable_until",
+     "dns",
+     "error",
+     "errors_from",
+     "hostid",
+     "interfaceid",
+     "ip",
+     "main",
+     "port",
+     "type",
+     "useip"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectInventory": {
+    "fields": [
+     "alias",
+     "asset_tag",
+     "chassis",
+     "contact",
+     "contract_number",
+     "date_hw_decomm",
+     "date_hw_expiry",
+     "date_hw_install",
+     "date_hw_purchase",
+     "deployment_status",
+     "hardware",
+     "hardware_full",
+     "host_netmask",
+     "host_networks",
+     "host_router",
+     "hw_arch",
+     "installer_name",
+     "location",
+     "location_lat",
+     "location_lon",
+     "macaddress_a",
+     "macaddress_b",
+     "model",
+     "name",
+     "notes",
+     "oob_ip",
+     "oob_netmask",
+     "oob_router",
+     "os",
+     "os_full",
+     "os_short",
+     "poc_1_cell",
+     "poc_1_email",
+     "poc_1_name",
+     "poc_1_notes",
+     "poc_1_phone_a",
+     "poc_1_phone_b",
+     "poc_1_screen",
+     "poc_2_cell",
+     "poc_2_email",
+     "poc_2_name",
+     "poc_2_notes",
+     "poc_2_phone_a",
+     "poc_2_phone_b",
+     "poc_2_screen",
+     "serialno_a",
+     "serialno_b",
+     "site_address_a",
+     "site_address_b",
+     "site_address_c",
+     "site_city",
+     "site_country",
+     "site_notes",
+     "site_rack",
+     "site_state",
+     "site_zip",
+     "software",
+     "software_app_a",
+     "software_app_b",
+     "software_app_c",
+     "software_app_d",
+     "software_app_e",
+     "software_full",
+     "tag",
+     "type",
+     "type_full",
+     "url_a",
+     "url_b",
+     "url_c",
+     "vendor"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectMacros": {
+    "fields": [
+     "automatic",
+     "description",
+     "hostmacroid",
+     "macro",
+     "type",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectParentTemplates": {
+    "fields": [
+     "description",
+     "host",
+     "link_type",
+     "name",
+     "templateid",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTags": {
+    "fields": [
+     "automatic",
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTriggers": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectValueMaps": {
+    "fields": [
+     "mappings",
+     "name",
+     "valuemapid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "hostdashboard.get": {
+   "selectPages": {
+    "error": "Invalid parameter \"/\": the parameter \"hostids\" is missing.",
+    "measured": false
+   }
+  },
+  "hostgroup.get": {
+   "selectDiscoveryRules": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "error",
+     "follow_redirects",
+     "headers",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "master_itemid",
+     "name",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "type",
+     "url",
+     "username",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectGroupDiscoveries": {
+    "fields": [
+     "lastcheck",
+     "name",
+     "parent_group_prototypeid",
+     "status",
+     "ts_delete"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHostPrototypes": {
+    "fields": [
+     "custom_interfaces",
+     "discover",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "name",
+     "status",
+     "templateid",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHosts": {
+    "fields": [
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "name",
+     "proxyid",
+     "status",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_psk",
+     "tls_psk_identity",
+     "tls_subject"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "hostinterface.get": {
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "hostprototype.get": {
+   "selectDiscoveryRule": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "output_format",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectGroupLinks": {
+    "fields": [
+     "groupid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectGroupPrototypes": {
+    "fields": [
+     "group_prototypeid",
+     "name"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectInterfaces": {
+    "fields": [
+     "details",
+     "dns",
+     "ip",
+     "main",
+     "port",
+     "type",
+     "useip"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectMacros": {
+    "fields": [
+     "automatic",
+     "description",
+     "hostid",
+     "hostmacroid",
+     "macro",
+     "type",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectParentHost": {
+    "fields": [
+     "custom_interfaces",
+     "description",
+     "discover",
+     "flags",
+     "host",
+     "hostid",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "name_upper",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_psk",
+     "tls_psk_identity",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTemplates": {
+    "fields": [
+     "custom_interfaces",
+     "description",
+     "discover",
+     "flags",
+     "host",
+     "hostid",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "name_upper",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_psk",
+     "tls_psk_identity",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "httptest.get": {
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectSteps": {
+    "fields": [
+     "follow_redirects",
+     "headers",
+     "httpstepid",
+     "httptestid",
+     "name",
+     "no",
+     "post_type",
+     "posts",
+     "query_fields",
+     "required",
+     "retrieve_mode",
+     "status_codes",
+     "timeout",
+     "url",
+     "variables"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "iconmap.get": {
+   "selectMappings": {
+    "fields": [
+     "expression",
+     "iconid",
+     "iconmapid",
+     "iconmappingid",
+     "inventory_link",
+     "sortorder"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "image.get": {
+   "select_image": {
+    "measured": false,
+    "strict": false
+   }
+  },
+  "item.get": {
+   "selectDiscoveryRule": {
+    "measured": false,
+    "strict": false
+   },
+   "selectGraphs": {
+    "fields": [
+     "flags",
+     "graphid",
+     "graphtype",
+     "height",
+     "name",
+     "percent_left",
+     "percent_right",
+     "show_3d",
+     "show_legend",
+     "show_triggers",
+     "show_work_period",
+     "templateid",
+     "uuid",
+     "width",
+     "yaxismax",
+     "yaxismin",
+     "ymax_itemid",
+     "ymax_type",
+     "ymin_itemid",
+     "ymin_type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectInterfaces": {
+    "measured": false,
+    "strict": false
+   },
+   "selectItemDiscovery": {
+    "measured": false,
+    "strict": false
+   },
+   "selectPreprocessing": {
+    "fields": [
+     "error_handler",
+     "error_handler_params",
+     "params",
+     "type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTriggers": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectValueMap": {
+    "fields": [
+     "mappings",
+     "name",
+     "valuemapid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "itemprototype.get": {
+   "selectDiscoveryRule": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "flags",
+     "follow_redirects",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectGraphs": {
+    "fields": [
+     "discover",
+     "flags",
+     "graphid",
+     "graphtype",
+     "height",
+     "name",
+     "percent_left",
+     "percent_right",
+     "show_3d",
+     "show_legend",
+     "show_triggers",
+     "show_work_period",
+     "templateid",
+     "uuid",
+     "width",
+     "yaxismax",
+     "yaxismin",
+     "ymax_itemid",
+     "ymax_type",
+     "ymin_itemid",
+     "ymin_type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectPreprocessing": {
+    "fields": [
+     "error_handler",
+     "error_handler_params",
+     "params",
+     "type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTriggers": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "discover",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectValueMap": {
+    "fields": [
+     "mappings",
+     "name",
+     "valuemapid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "maintenance.get": {
+   "selectHostGroups": {
+    "fields": [
+     "flags",
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTags": {
+    "fields": [
+     "operator",
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTimeperiods": {
+    "fields": [
+     "day",
+     "dayofweek",
+     "every",
+     "month",
+     "period",
+     "start_date",
+     "start_time",
+     "timeperiod_type"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "map.get": {
+   "selectIconMap": {
+    "measured": false,
+    "strict": false
+   },
+   "selectLines": {
+    "fields": [
+     "line_color",
+     "line_type",
+     "line_width",
+     "sysmap_shapeid",
+     "x1",
+     "x2",
+     "y1",
+     "y2",
+     "zindex"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectLinks": {
+    "fields": [
+     "color",
+     "drawtype",
+     "label",
+     "linkid",
+     "linktriggers",
+     "permission",
+     "selementid1",
+     "selementid2",
+     "sysmapid"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectSelements": {
+    "fields": [
+     "areatype",
+     "elements",
+     "elementsubtype",
+     "elementtype",
+     "evaltype",
+     "height",
+     "iconid_disabled",
+     "iconid_maintenance",
+     "iconid_off",
+     "iconid_on",
+     "label",
+     "label_location",
+     "permission",
+     "selementid",
+     "sysmapid",
+     "tags",
+     "urls",
+     "use_iconmap",
+     "viewtype",
+     "width",
+     "x",
+     "y"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectShapes": {
+    "fields": [
+     "background_color",
+     "border_color",
+     "border_type",
+     "border_width",
+     "font",
+     "font_color",
+     "font_size",
+     "height",
+     "sysmap_shapeid",
+     "text",
+     "text_halign",
+     "text_valign",
+     "type",
+     "width",
+     "x",
+     "y",
+     "zindex"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectUrls": {
+    "measured": false,
+    "strict": false
+   },
+   "selectUserGroups": {
+    "fields": [
+     "permission",
+     "sysmapusrgrpid",
+     "usrgrpid"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectUsers": {
+    "fields": [
+     "permission",
+     "sysmapuserid",
+     "userid"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "mediatype.get": {
+   "selectActions": {
+    "fields": [
+     "actionid",
+     "esc_period",
+     "eventsource",
+     "name",
+     "notify_if_canceled",
+     "pause_suppressed",
+     "pause_symptoms",
+     "status"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectMessageTemplates": {
+    "fields": [
+     "eventsource",
+     "message",
+     "recovery",
+     "subject"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsers": {
+    "fields": [
+     "attempt_clock",
+     "attempt_failed",
+     "attempt_ip",
+     "autologin",
+     "autologout",
+     "lang",
+     "name",
+     "provisioned",
+     "refresh",
+     "roleid",
+     "rows_per_page",
+     "surname",
+     "theme",
+     "timezone",
+     "ts_provisioned",
+     "url",
+     "userdirectoryid",
+     "userid",
+     "username"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "mfa.get": {
+   "selectUsrgrps": {
+    "fields": [
+     "debug_mode",
+     "gui_access",
+     "mfa_status",
+     "name",
+     "userdirectoryid",
+     "users_status",
+     "usrgrpid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "problem.get": {
+   "selectAcknowledges": {
+    "fields": [
+     "acknowledgeid",
+     "action",
+     "clock",
+     "message",
+     "new_severity",
+     "old_severity",
+     "suppress_until",
+     "taskid",
+     "userid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectSuppressionData": {
+    "fields": [
+     "maintenanceid",
+     "suppress_until",
+     "userid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "proxy.get": {
+   "selectAssignedHosts": {
+    "fields": [
+     "active_available",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "status",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "status",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectProxyGroup": {
+    "fields": [
+     "description",
+     "failover_delay",
+     "min_online",
+     "name",
+     "state"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "proxygroup.get": {
+   "selectProxies": {
+    "fields": [
+     "address",
+     "allowed_addresses",
+     "compatibility",
+     "custom_timeouts",
+     "description",
+     "lastaccess",
+     "local_address",
+     "local_port",
+     "name",
+     "operating_mode",
+     "port",
+     "proxyid",
+     "state",
+     "timeout_browser",
+     "timeout_db_monitor",
+     "timeout_external_check",
+     "timeout_http_agent",
+     "timeout_script",
+     "timeout_simple_check",
+     "timeout_snmp_agent",
+     "timeout_ssh_agent",
+     "timeout_telnet_agent",
+     "timeout_zabbix_agent",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "version"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "regexp.get": {
+   "selectExpressions": {
+    "fields": [
+     "case_sensitive",
+     "exp_delimiter",
+     "expression",
+     "expression_type"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "report.get": {
+   "selectUserGroups": {
+    "fields": [
+     "access_userid",
+     "usrgrpid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsers": {
+    "fields": [
+     "access_userid",
+     "exclude",
+     "userid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "role.get": {
+   "selectRules": {
+    "fields": [
+     "actions",
+     "actions.default_access",
+     "api",
+     "api.access",
+     "api.mode",
+     "modules",
+     "modules.default_access",
+     "services.read.list",
+     "services.read.mode",
+     "services.read.tag",
+     "services.write.list",
+     "services.write.mode",
+     "services.write.tag",
+     "ui",
+     "ui.default_access"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsers": {
+    "fields": [
+     "attempt_clock",
+     "attempt_failed",
+     "attempt_ip",
+     "autologin",
+     "autologout",
+     "lang",
+     "name",
+     "provisioned",
+     "refresh",
+     "roleid",
+     "rows_per_page",
+     "surname",
+     "theme",
+     "timezone",
+     "ts_provisioned",
+     "url",
+     "userdirectoryid",
+     "userid",
+     "username"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "script.get": {
+   "selectActions": {
+    "fields": [
+     "actionid",
+     "esc_period",
+     "eventsource",
+     "name",
+     "notify_if_canceled",
+     "pause_suppressed",
+     "pause_symptoms",
+     "status"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHostGroups": {
+    "fields": [
+     "flags",
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectHosts": {
+    "fields": [
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "name",
+     "proxyid",
+     "status",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "service.get": {
+   "selectChildren": {
+    "fields": [
+     "algorithm",
+     "created_at",
+     "description",
+     "name",
+     "propagation_rule",
+     "propagation_value",
+     "readonly",
+     "serviceid",
+     "sortorder",
+     "status",
+     "uuid",
+     "weight"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectParents": {
+    "fields": [
+     "algorithm",
+     "created_at",
+     "description",
+     "name",
+     "propagation_rule",
+     "propagation_value",
+     "readonly",
+     "serviceid",
+     "sortorder",
+     "status",
+     "uuid",
+     "weight"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectProblemEvents": {
+    "fields": [
+     "eventid",
+     "name",
+     "severity"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectProblemTags": {
+    "fields": [
+     "operator",
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectStatusRules": {
+    "fields": [
+     "limit_status",
+     "limit_value",
+     "new_status",
+     "type"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectStatusTimeline": {
+    "error": "Invalid parameter \"/selectStatusTimeline/1\": an array is expected.",
+    "measured": false
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "sla.get": {
+   "selectExcludedDowntimes": {
+    "fields": [
+     "name",
+     "period_from",
+     "period_to"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectSchedule": {
+    "fields": [
+     "period_from",
+     "period_to"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectServiceTags": {
+    "fields": [
+     "operator",
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "template.get": {
+   "selectDashboards": {
+    "fields": [
+     "auto_start",
+     "dashboardid",
+     "display_period",
+     "name",
+     "templateid",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectDiscoveries": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "flags",
+     "follow_redirects",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectGraphs": {
+    "fields": [
+     "flags",
+     "graphid",
+     "graphtype",
+     "height",
+     "name",
+     "percent_left",
+     "percent_right",
+     "show_3d",
+     "show_legend",
+     "show_triggers",
+     "show_work_period",
+     "templateid",
+     "uuid",
+     "width",
+     "yaxismax",
+     "yaxismin",
+     "ymax_itemid",
+     "ymax_type",
+     "ymin_itemid",
+     "ymin_type"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHttpTests": {
+    "measured": false,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectMacros": {
+    "fields": [
+     "automatic",
+     "description",
+     "hostid",
+     "hostmacroid",
+     "macro",
+     "type",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectParentTemplates": {
+    "fields": [
+     "description",
+     "host",
+     "name",
+     "templateid",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTemplateGroups": {
+    "fields": [
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTemplates": {
+    "measured": false,
+    "strict": false
+   },
+   "selectTriggers": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectValueMaps": {
+    "fields": [
+     "mappings",
+     "name",
+     "uuid",
+     "valuemapid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "templatedashboard.get": {
+   "selectPages": {
+    "fields": [
+     "dashboard_pageid",
+     "display_period",
+     "name",
+     "widgets"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "templategroup.get": {
+   "selectTemplates": {
+    "fields": [
+     "description",
+     "host",
+     "name",
+     "templateid",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "trigger.get": {
+   "selectDependencies": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectDiscoveryRule": {
+    "measured": false,
+    "strict": false
+   },
+   "selectFunctions": {
+    "fields": [
+     "function",
+     "functionid",
+     "itemid",
+     "parameter",
+     "triggerid"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHostGroups": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectLastEvent": {
+    "measured": false,
+    "strict": false
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTemplateGroups": {
+    "fields": [
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTriggerDiscovery": {
+    "measured": false,
+    "strict": false
+   }
+  },
+  "triggerprototype.get": {
+   "selectDependencies": {
+    "fields": [
+     "comments",
+     "correlation_mode",
+     "correlation_tag",
+     "description",
+     "discover",
+     "error",
+     "event_name",
+     "expression",
+     "flags",
+     "lastchange",
+     "manual_close",
+     "opdata",
+     "priority",
+     "recovery_expression",
+     "recovery_mode",
+     "state",
+     "status",
+     "templateid",
+     "triggerid",
+     "type",
+     "url",
+     "url_name",
+     "uuid",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectDiscoveryRule": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "discover",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "flags",
+     "follow_redirects",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectFunctions": {
+    "fields": [
+     "function",
+     "functionid",
+     "itemid",
+     "parameter",
+     "triggerid"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectHostGroups": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHosts": {
+    "fields": [
+     "active_available",
+     "assigned_proxyid",
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "hostid",
+     "inventory_mode",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectItems": {
+    "fields": [
+     "allow_traps",
+     "authtype",
+     "delay",
+     "description",
+     "enabled_lifetime",
+     "enabled_lifetime_type",
+     "error",
+     "evaltype",
+     "flags",
+     "follow_redirects",
+     "formula",
+     "headers",
+     "history",
+     "hostid",
+     "http_proxy",
+     "interfaceid",
+     "inventory_link",
+     "ipmi_sensor",
+     "itemid",
+     "jmx_endpoint",
+     "key_",
+     "lastclock",
+     "lastns",
+     "lastvalue",
+     "lifetime",
+     "lifetime_type",
+     "logtimefmt",
+     "master_itemid",
+     "name",
+     "name_resolved",
+     "output_format",
+     "parameters",
+     "params",
+     "password",
+     "post_type",
+     "posts",
+     "prevvalue",
+     "privatekey",
+     "publickey",
+     "query_fields",
+     "request_method",
+     "retrieve_mode",
+     "snmp_oid",
+     "ssl_cert_file",
+     "ssl_key_file",
+     "ssl_key_password",
+     "state",
+     "status",
+     "status_codes",
+     "templateid",
+     "timeout",
+     "trapper_hosts",
+     "trends",
+     "type",
+     "units",
+     "url",
+     "username",
+     "uuid",
+     "value_type",
+     "valuemapid",
+     "verify_host",
+     "verify_peer"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTags": {
+    "fields": [
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTemplateGroups": {
+    "fields": [
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "user.get": {
+   "selectMedias": {
+    "fields": [
+     "active",
+     "mediaid",
+     "mediatypeid",
+     "period",
+     "provisioned",
+     "sendto",
+     "severity",
+     "userdirectory_mediaid"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectMediatypes": {
+    "fields": [
+     "attempt_interval",
+     "description",
+     "event_menu_name",
+     "event_menu_url",
+     "exec_path",
+     "gsm_modem",
+     "maxattempts",
+     "maxsessions",
+     "mediatypeid",
+     "message_format",
+     "name",
+     "parameters",
+     "passwd",
+     "process_tags",
+     "provider",
+     "script",
+     "show_event_menu",
+     "smtp_authentication",
+     "smtp_email",
+     "smtp_helo",
+     "smtp_port",
+     "smtp_security",
+     "smtp_server",
+     "smtp_verify_host",
+     "smtp_verify_peer",
+     "status",
+     "timeout",
+     "type",
+     "username"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectRole": {
+    "fields": [
+     "name",
+     "readonly",
+     "roleid",
+     "type"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsrgrps": {
+    "fields": [
+     "debug_mode",
+     "gui_access",
+     "mfa_status",
+     "mfaid",
+     "name",
+     "userdirectoryid",
+     "users_status",
+     "usrgrpid"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "userdirectory.get": {
+   "selectProvisionGroups": {
+    "fields": [
+     "name",
+     "roleid",
+     "user_groups"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectProvisionMedia": {
+    "fields": [
+     "active",
+     "attribute",
+     "mediatypeid",
+     "name",
+     "period",
+     "severity",
+     "userdirectory_mediaid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectUsrgrps": {
+    "fields": [
+     "debug_mode",
+     "gui_access",
+     "mfa_status",
+     "mfaid",
+     "name",
+     "userdirectoryid",
+     "users_status",
+     "usrgrpid"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  },
+  "usergroup.get": {
+   "selectHostGroupRights": {
+    "fields": [
+     "id",
+     "permission"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTagFilters": {
+    "fields": [
+     "groupid",
+     "tag",
+     "value"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectTemplateGroupRights": {
+    "fields": [
+     "id",
+     "permission"
+    ],
+    "measured": true,
+    "strict": false
+   },
+   "selectUsers": {
+    "fields": [
+     "attempt_clock",
+     "attempt_failed",
+     "attempt_ip",
+     "autologin",
+     "autologout",
+     "debug_mode",
+     "gui_access",
+     "lang",
+     "name",
+     "provisioned",
+     "refresh",
+     "roleid",
+     "rows_per_page",
+     "surname",
+     "theme",
+     "timezone",
+     "ts_provisioned",
+     "url",
+     "userdirectoryid",
+     "userid",
+     "username",
+     "users_status"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "usermacro.get": {
+   "selectHostGroups": {
+    "measured": false,
+    "strict": false
+   },
+   "selectHosts": {
+    "measured": false,
+    "strict": false
+   },
+   "selectTemplateGroups": {
+    "fields": [
+     "groupid",
+     "name",
+     "uuid"
+    ],
+    "measured": true,
+    "strict": true
+   },
+   "selectTemplates": {
+    "fields": [
+     "custom_interfaces",
+     "description",
+     "flags",
+     "host",
+     "ipmi_authtype",
+     "ipmi_password",
+     "ipmi_privilege",
+     "ipmi_username",
+     "maintenance_from",
+     "maintenance_status",
+     "maintenance_type",
+     "maintenanceid",
+     "monitored_by",
+     "name",
+     "proxy_groupid",
+     "proxyid",
+     "status",
+     "templateid",
+     "tls_accept",
+     "tls_connect",
+     "tls_issuer",
+     "tls_psk",
+     "tls_psk_identity",
+     "tls_subject",
+     "uuid",
+     "vendor_name",
+     "vendor_version"
+    ],
+    "measured": true,
+    "strict": false
+   }
+  },
+  "valuemap.get": {
+   "selectMappings": {
+    "fields": [
+     "newvalue",
+     "type",
+     "value"
+    ],
+    "measured": true,
+    "strict": true
+   }
+  }
+ },
+ "zabbix": "7.2.15"
+}

@@ -560,14 +560,41 @@ def validate_get_params(
     )
     for key in params:
         if key not in known_top:
+            import difflib
+            # a near miss first (selectHostgroups -> selectHostGroups): the full list is long
+            close = difflib.get_close_matches(key, sorted(known_top), n=1, cutoff=0.8) or \
+                [n for n in sorted(known_top) if n.lower() == key.lower()]
+            hint = f"Did you mean '{close[0]}'? " if close else ""
             raise GetParamError(
-                f"'{key}' is not a parameter of {method}; Zabbix would silently ignore it. "
+                f"'{key}' is not a parameter of {method}; Zabbix would silently ignore it. {hint}"
                 f"{allowed_hint} If you are sure it exists on your release, use zabbix_raw_api_call."
             )
         spec = contract.params.get(key) or contract.selects.get(key)
         if spec is not None:
             _check_spec_version(spec, "Parameter", method, version,
                                 peers=contract.selects if key in contract.selects else contract.params)
+        if key in contract.selects and isinstance(params[key], list):
+            # the fields this release takes in the list (#106): only for the selects the
+            # release checks itself, so this refuses what Zabbix would refuse, earlier
+            from zabbix_mcp.api.select_fields import fields_on, not_on
+            taken = fields_on(method, key, version)
+            elsewhere = set(not_on(method, key, version))
+            other = [str(f) for f in params[key] if str(f) in elsewhere]
+            if taken is None and other:
+                raise GetParamError(
+                    f"{key} of {method}: {', '.join(repr(o) for o in other)} "
+                    f"{'is a field' if len(other) == 1 else 'are fields'} of other Zabbix releases, "
+                    f"not of {version} (Zabbix leaves it out or fails the read on it). Leave "
+                    f"{'it' if len(other) == 1 else 'them'} out, or use \"extend\"."
+                )
+            if taken is not None:
+                bad = [str(f) for f in params[key] if str(f) not in taken]
+                if bad:
+                    raise GetParamError(
+                        f"{key} of {method}: {', '.join(repr(b) for b in bad)} cannot be asked for by "
+                        f"name on Zabbix {version} (Zabbix refuses it in the list). Fields it takes: "
+                        f"{', '.join(taken)}; \"extend\" returns everything the select has."
+                    )
 
     # A grouped count without the count. Zabbix ignores it at best (no ID
     # filter, or a method that reads it under countOutput only); next to an ID

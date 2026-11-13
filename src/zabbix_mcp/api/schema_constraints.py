@@ -132,9 +132,27 @@ def extra_param_names(contract: GetContract, tool_params: Iterable[str]) -> list
 def extra_params_schema(
     contract: GetContract, tool_params: Iterable[str], exclude: Iterable[str] = (),
 ) -> dict[str, Any]:
-    """*exclude*: keys the method has and this tool cannot work with."""
+    """*exclude*: keys the method has and this tool cannot work with.
+
+    A select whose list a release checks itself (#106, api/select_fields.json) is
+    typed: "extend" / "count", or a list of the fields it takes on some measured
+    release (the call is checked against its own release)."""
+    from zabbix_mcp.api.select_fields import any_release
     skip = set(exclude)
-    return _keys([n for n in extra_param_names(contract, tool_params) if n not in skip])
+    names = [n for n in extra_param_names(contract, tool_params) if n not in skip]
+    schema = _keys(names)
+    typed: dict[str, Any] = {}
+    for name in names:
+        if name in contract.selects:
+            fields = any_release(contract.method, name)
+            if fields:
+                typed[name] = {"anyOf": [
+                    {"type": "string", "enum": ["extend", "count"]},
+                    {"type": "array", "items": {"type": "string", "enum": fields}, "minItems": 1},
+                ]}
+    if typed:
+        schema["properties"] = typed
+    return schema
 
 
 def value_enum_schema(spec: Spec | None, param_type: str) -> dict[str, Any] | None:

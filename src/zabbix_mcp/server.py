@@ -2338,7 +2338,25 @@ def _zone_note(tz: tzinfo) -> str:
     )
 
 
-def _format_result(data: str, raw_json: bool, tz: tzinfo | None = None) -> str:
+def _left_out_note(api_method: str, params: Any, version: str | None) -> str | None:
+    """A select list with names this release neither checks nor returns (#106): Zabbix
+    leaves them out of the answer without a word, so the answer says it."""
+    if not isinstance(params, dict):
+        return None
+    from zabbix_mcp.api.select_fields import left_out
+    parts = []
+    for key, value in params.items():
+        if isinstance(key, str) and key.startswith("select") and isinstance(value, list):
+            gone = left_out(api_method, key, version, value)
+            if gone:
+                parts.append(f"{key}: {', '.join(gone)}")
+    if not parts:
+        return None
+    return ("Note: Zabbix left out names it does not return under " + "; ".join(parts)
+            + " (no such field; \"extend\" shows what there is).")
+
+
+def _format_result(data: str, raw_json: bool, tz: tzinfo | None = None, note: str | None = None) -> str:
     """Return *data* with the untrusted-data preamble prepended, unless *raw_json* is true.
 
     When *tz* is given the zone note rides on the same first line, inside the
@@ -2348,9 +2366,11 @@ def _format_result(data: str, raw_json: bool, tz: tzinfo | None = None) -> str:
     """
     if raw_json:
         return data
-    if tz is None:
+    if tz is None and not note:
         return _UNTRUSTED_PREAMBLE + data
-    return _UNTRUSTED_PREAMBLE_TEXT + " " + _zone_note(tz) + "]\n" + data
+    # the notes ride on the first line, inside the brackets, like the zone note
+    extra = " ".join(x for x in ((_zone_note(tz) if tz is not None else ""), note or "") if x)
+    return _UNTRUSTED_PREAMBLE_TEXT + " " + extra + "]\n" + data
 
 
 def _raise_if_extension_error(result: str, *, raw_json: bool = False, tz: tzinfo | None = None) -> str:
@@ -2903,7 +2923,8 @@ def _make_tool_handler(
             if linkage_note and isinstance(result, dict):
                 result = dict(result, _note=linkage_note)
             result = add_local_times(result, tz)
-            return _format_result(_truncate_result(result, max_chars=response_max_chars), raw_json, tz=tz)
+            _note = _left_out_note(method_def.api_method, params, zabbix_version) if method_def.read_only else None
+            return _format_result(_truncate_result(result, max_chars=response_max_chars), raw_json, tz=tz, note=_note)
 
         except ToolError:
             # Already shaped for the LLM - let MCPServer mark isError=True.
