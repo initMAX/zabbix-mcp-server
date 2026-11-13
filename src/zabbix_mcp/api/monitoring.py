@@ -66,8 +66,12 @@ _DASHBOARD_CREATE = MethodDef(
         "Create a new dashboard. Requires at minimum a 'name' and at least one "
         "page with widgets. Widgets reference items, graphs, maps, or other "
         "Zabbix objects. Params example: {\"name\": \"My Dashboard\", \"pages\": "
-        "[{\"widgets\": [{\"type\": \"problems\", \"x\": 0, \"y\": 0, \"width\": 12, "
-        "\"height\": 5}]}]}."
+        "[{\"widgets\": [{\"type\": \"problems\", \"x\": 0, \"y\": 0, \"width\": 36, "
+        "\"height\": 5, \"fields\": [{\"type\": 2, \"name\": \"groupids.0\", \"value\": \"<groupid>\"}]}]}]} "
+        "(a problems widget for one host group; field type 2 is a host group, 3 a host, 4 an item, "
+        "1 text, 0 a number). From Zabbix 7.0 a list field is indexed (groupids.0, groupids.1); "
+        "before 7.0 it is named groupids, one field per value. The grid is 72 columns wide from "
+        "7.0 (24 before), x and width count in columns."
     ),
     read_only=False,
     params=CREATE_PARAMS,
@@ -762,7 +766,8 @@ _SLA_CREATE = MethodDef(
     description=(
         "Create a new SLA. Required fields: 'name', 'slo' (target percentage, "
         "e.g. 99.9), 'period' (reporting period: 0=daily, 1=weekly, 2=monthly, "
-        "3=quarterly, 4=annually), 'timezone', and 'service_tags' (array of "
+        "3=quarterly, 4=annually), 'timezone' (an IANA name such as Europe/Prague), 'effective_date' (the day the SLA starts counting: Unix "
+        "time, ISO 8601 or relative), and 'service_tags' (array of "
         "tag objects that link this SLA to services). Optionally define "
         "'schedule' and 'excluded_downtimes'."
     ),
@@ -869,8 +874,8 @@ _SERVICE_CREATE = MethodDef(
     tool_name="service_create",
     description=(
         "Create a business service. Required: 'name', 'algorithm' (status calculation: "
-        "0 = set status to OK, 1 = most critical of child services, 2 = most critical if all "
-        "children have problems), 'sortorder' (0-999). Optional: 'weight', 'propagation_rule' "
+        "0 = set status to OK, 1 = most critical if all children have problems, 2 = most critical "
+        "of child services; as the frontend defines them), 'sortorder' (0-999). Optional: 'weight', 'propagation_rule' "
         "and 'propagation_value', 'description', 'parents' / 'children' ([{'serviceid': X}]), "
         "'tags' (service tags SLAs match on), 'problem_tags' (which problems affect this "
         "service), 'status_rules'. Before 6.0 the required fields were name, algorithm, "

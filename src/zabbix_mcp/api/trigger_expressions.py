@@ -157,6 +157,34 @@ def rewrite(result: Any, api_method: str, call: Callable[[str, dict], Any]) -> l
     return failed
 
 
+# Triggers a get of another object carries (template.get / host.get / item.get with
+# selectTriggers, discoveryrule.get with selectTriggers = its prototypes): the same
+# stored form, which a model copying a template sends to trigger_create as it is.
+NESTED = (("triggers", "trigger.get"), ("triggerPrototypes", "triggerprototype.get"))
+
+
+def nested_wanted(api_method: str, version: str | None) -> bool:
+    current = parse_version(version)
+    return (api_method not in METHODS and str(api_method).endswith(".get")
+            and current is not None and tuple(current[:2]) >= SINCE)
+
+
+def rewrite_nested(result: Any, call: Callable[[str, dict], Any]) -> list[str]:
+    """``rewrite`` for the triggers inside the rows of another get, in place."""
+    rows = _rows(result)
+    failed: list[str] = []
+    for key, method in NESTED:
+        nested = [t for row in rows for t in _as_list(row.get(key)) if isinstance(t, dict)]
+        if not nested:
+            continue
+        missing = rewrite(nested, method, call)
+        if missing and method == "trigger.get":
+            # discoveryrule.get selectTriggers lists prototypes under "triggers"
+            missing = rewrite([t for t in nested if str(t.get("triggerid")) in set(missing)], "triggerprototype.get", call)
+        failed.extend(missing)
+    return failed
+
+
 def _as_list(value: Any) -> Iterable[Mapping[str, Any]]:
     if isinstance(value, dict):
         value = list(value.values())

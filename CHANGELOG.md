@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.42.3 - 2026-11-13
+
+Fixes from a live webinar demo, where a model (Qwen 3.8 behind a demo chat client) could not create an SNMP host from a template, and from the everyday tasks that followed: the same demo loop on every supported release (6.0 to 8.0), and agents doing 28 everyday tasks through the MCP tools on each release (creating, changing, copying and deleting hosts, templates, items, triggers, LLD rules, web scenarios, users, actions, maintenance, dashboards, SLAs). Before: the demo loop failed 21 of 21 runs on the SNMP host; after: 21 of 21 on the first `host_create`.
+
+### Fixed
+
+- **Tool descriptions said "an array of IDs" where Zabbix wants objects.** `host_create`, `host_massadd`, `host_massupdate`, both `propagate` tools and `template_create` described `groups` / `templates` / `hosts` as lists of IDs; Zabbix wants `[{"groupid": "2"}]` and answers a list of IDs with `Invalid parameter "/1/groups/1": an array is expected`. The descriptions, the `params` schema and the server instructions now show the object form first (within the first 220 characters a client keeps of a schema description).
+- **SNMP interfaces had no contract.** `host_create` and the interface tools now show an SNMP interface with its `details` (version, bulk, community), and a write is refused before it is sent, with the field path and the right form, when an interface carries SNMP settings on a non-SNMP type, unknown `details` keys (the keys are checked per release: `max_repetitions` from 6.4, `retries` from 8.0), no `details`, a wrong SNMP version or no community. Zabbix answers all of these with `Incorrect arguments passed to function` only.
+- **Symbolic enum values that are no value of the field went to Zabbix as they were** (item `type: "web"`, answered by "an integer is expected"). The write schemas now list the values of every enum field (number and name), and an unknown name is refused with the list. Names are read case-insensitively, as before. `ZABBIX_AGENT` and `ZABBIX_AGENT_ACTIVE` are accepted as the frontend names of item types 0 and 7.
+- **A copy of a get answer sent to a create was refused one key at a time**, although the descriptions promise it can be sent as it is. `write_contracts.json` now also holds what each create refuses, measured on every release by the new `scripts/audit_create_copy_live.py` (the object's own ID, `macros[].hostmacroid` / `automatic`, an LLD rule's `lifetime` on an 8.0 item, the host fields a template echoes). Reference entries copied with their names (`{"groupid": "22", "name": ...}`) keep only the ID. In a create, a copied get answer's `hostgroups`, `parentTemplates` and `templategroups` are taken as `groups` / `templates`. An update that carries only the get name (an echo of what the object has, perhaps cut by `limitSelects`) leaves the links as they are, as before, but the answer now says it was not applied (before, `host_update` with the `hostgroups` of a `host_get` answer reported success and changed no group). A create from a host or template copy says which items, triggers, graphs or discovery rules it did not copy.
+- **`configuration_import` refused Zabbix's own export** (JSON on one line): the UUID check took the rest of the line as the uuid. It reads every uuid key by pattern now (a YAML line, a quoted JSON key, an XML element); empty values pass as before. The description explains the import rules and how to import a copy (new uuids).
+- **Trigger expressions inside other get answers** (`template_get` with `selectTriggers`) came back as `{50801}<600`; they are rebuilt like `trigger_get`'s, user macros kept.
+- **Refusals that did not say what to do:**
+  - a removed or not yet existing select names its counterpart (`selectGroups` and `selectHostGroups` / `selectTemplateGroups`), `templategroup_*` before 6.2 points to `hostgroup_*`;
+  - the list of allowed parameters in a refusal holds only what the release has;
+  - a select given as a single name (`"selectHostGroups": "name"`, answered with a wrong path or an empty response) is refused with the list form;
+  - `host_massadd` / `template_massadd` / `template_massupdate` with `tags`, and the template mass tools with hosts, are refused with the tool that does it;
+  - Zabbix's "same UUID already exists" and "valuemapid: value must be 0" get a hint.
+- **Release-dependent shapes Zabbix takes without a word**: a dashboard widget field written the 7.0 way (`groupids.0`) is refused before 7.0, where it was stored and ignored (the widget showed every group); `hostgroup_rights` before 6.2 points to `rights`.
+- **Reads**: `item_get`, `trigger_get`, `graph_get`, `discoveryrule_get` and their prototypes accept `filter: {"host": ...}` (measured; it was refused as no property); `usermacro_get` with `globalmacro` checks `output` against the global macro fields and defaults to them.
+- **Descriptions**: `host_get` says templates are found with `template_get`; `maintenance_create` shows a one-time period; `sla_create` names the required `effective_date`; `service_create` had the algorithm codes 1 and 2 swapped; `action_create`, `dashboard_create` (72-column grid from 7.0, widget fields) and `usergroup_create` (rights) have examples; delete tools name `ids` first; `usermacro_get` has a `globalmacro` switch and checks its output against the global macro fields.
+
+### Notes for operators
+
+- Large catalogues: the full tool list is about 200 000 tokens; a model with a 131 072 token context (the demo's) needs a `tools` filter or a client that loads tool schemas on demand.
+- Demo clients that cut schema descriptions (the demo cut them to 220 characters) still get the reference rule; the SNMP and copy contracts are enforced by the server whatever the client shows.
+
 ## v1.42.2 - 2026-11-06
 
 Security fixes, from a report sent privately by Victor Martins on the day v1.42 came out (source review of v1.42; nothing was tested against a live system). Five findings, and four smaller ones; all are fixed here. **Upgrade if you run the admin portal with operator accounts, OAuth, `[admin.ai]` with a server key, or tokens limited to reading.**

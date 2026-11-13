@@ -43,6 +43,8 @@ escape hatch for a parameter the catalog does not know.
 
 from __future__ import annotations
 
+import re
+
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -212,9 +214,25 @@ def output_props(contract: GetContract, version: str | None = None) -> list[Spec
     return [p for p in obj.available(version) if not p.no_output] if obj else []
 
 
+# Methods whose filter also takes the technical host name, "host", which is no
+# property of their object: measured on 6.0.49 and 7.4.16 (a host name gives that
+# host's rows, an unknown one none). hostinterface.get and usermacro.get ignore it.
+_FILTER_BY_HOST_NAME = frozenset({
+    "item.get", "itemprototype.get", "trigger.get", "triggerprototype.get",
+    "graph.get", "graphprototype.get", "discoveryrule.get",
+})
+
+
 def filter_props(contract: GetContract, version: str | None = None) -> list[Spec]:
     """Properties ``filter`` accepts: the documented restriction when the
     reference page states one, otherwise every non-text property."""
+    found = _filter_props(contract, version)
+    if contract.method in _FILTER_BY_HOST_NAME and not any(s.name == "host" for s in found):
+        found = found + [Spec(name="host", type="string")]
+    return found
+
+
+def _filter_props(contract: GetContract, version: str | None = None) -> list[Spec]:
     obj = object_for(contract)
     if contract.filter_props is not None:
         if obj is None:
@@ -481,19 +499,32 @@ def _fmt_version(version: str | None) -> str:
     return f"this server runs {version}" if version else "server version unknown"
 
 
-def _check_spec_version(spec: Spec, what: str, method: str, version: str | None) -> None:
+def _successors(spec: Spec, peers: dict[str, Spec] | None, version: str | None) -> str:
+    """What to use instead of a name this release does not have: the reference's replacement,
+    or the names of this release that end like it (selectGroups <-> selectHostGroups)."""
+    if spec.replaced_by:
+        return f" Use {spec.replaced_by}."
+    tail = re.findall(r"[A-Z][a-z0-9]*", spec.name)
+    if not peers or not tail:
+        return ""
+    found = [n for n, s in peers.items() if n != spec.name and n.endswith(tail[-1]) and s.available(version)]
+    return f" Use {' or '.join(sorted(found))}." if found else ""
+
+
+def _check_spec_version(spec: Spec, what: str, method: str, version: str | None,
+                        peers: dict[str, Spec] | None = None) -> None:
     current = parse_version(version)
     if current is None:
         return
     if spec.since and current < parse_version(spec.since):
         raise GetParamError(
             f"{what} '{spec.name}' of {method} requires Zabbix {spec.since} or later "
-            f"({_fmt_version(version)})."
+            f"({_fmt_version(version)})." + _successors(Spec(name=spec.name), peers, version)
         )
     if spec.removed and current >= parse_version(spec.removed):
         raise GetParamError(
             f"{what} '{spec.name}' of {method} was removed in Zabbix {spec.removed} "
-            f"({_fmt_version(version)})."
+            f"({_fmt_version(version)})." + _successors(spec, peers, version)
         )
 
 
@@ -520,10 +551,12 @@ def validate_get_params(
     method = contract.method
     known_top = set(typed) | contract.common | set(contract.params) | set(contract.selects)
     hidden = set(unsupported)
+    # only what this release has: a list naming selectScreens on 8.0 sent the
+    # next call into "removed in 6.0" (agent run)
     allowed_hint = (
         f"Allowed: {', '.join(sorted(contract.common - hidden))}; native: "
-        f"{', '.join(n for n in contract.params if n not in hidden) or '-'}; "
-        f"selects: {', '.join(contract.selects) or '-'}."
+        f"{', '.join(n for n, s in contract.params.items() if n not in hidden and s.available(version)) or '-'}; "
+        f"selects: {', '.join(n for n, s in contract.selects.items() if s.available(version)) or '-'}."
     )
     for key in params:
         if key not in known_top:
@@ -533,7 +566,8 @@ def validate_get_params(
             )
         spec = contract.params.get(key) or contract.selects.get(key)
         if spec is not None:
-            _check_spec_version(spec, "Parameter", method, version)
+            _check_spec_version(spec, "Parameter", method, version,
+                                peers=contract.selects if key in contract.selects else contract.params)
 
     # A grouped count without the count. Zabbix ignores it at best (no ID
     # filter, or a method that reads it under countOutput only); next to an ID
@@ -605,6 +639,17 @@ def validate_get_params(
 
     # output property names
     output = params.get("output")
+    if method == "usermacro.get" and params.get("globalmacro") and "globalmacro" in OBJECTS:
+        # usermacro.get with globalmacro returns global macros (globalmacroid, no hostid):
+        # checked against the host macro object, globalmacroid was refused (agent run)
+        obj = OBJECTS["globalmacro"]
+        if isinstance(output, list):
+            bad = [p for p in output if str(p) not in obj.props]
+            if bad:
+                raise GetParamError(
+                    f"{method} output (globalmacro): {', '.join(map(str, bad))} not a global macro property; "
+                    f"Zabbix would silently leave it out. Properties: {', '.join(obj.props)}.")
+        return
     if isinstance(output, list) and obj is not None and obj.props:
         for prop in output:
             spec = obj.props.get(str(prop))

@@ -757,6 +757,29 @@ class TestUuidValidation(unittest.TestCase):
         source = "uuid: 550e8400e29b41d4a716446655440000\n"
         _validate_import_uuids({"source": source})  # should not raise
 
+    def test_an_export_on_one_line_passes(self):
+        # configuration_export answers with JSON on a single line; the check read the
+        # whole line after its first colon as the uuid and refused Zabbix's own export
+        import json
+        source = json.dumps({"zabbix_export": {"version": "8.0", "templates": [
+            {"uuid": "9f8b7ab4437a450b9c032a460bd16fbe", "template": "Demo app",
+             "items": [{"uuid": "12b36c1ce64e4f5eaececc61546061eb", "key": "a:b"}]}]}})
+        _validate_import_uuids({"source": source, "format": "json"})
+        xml = "<zabbix_export><templates><template><uuid>9f8b7ab4437a450b9c032a460bd16fbe</uuid></template></templates></zabbix_export>"
+        _validate_import_uuids({"source": xml, "format": "xml"})
+
+    def test_empty_uuids_and_text_mentioning_uuid_pass(self):
+        # 1.42.2 let these through; the one-line reading must not refuse them (review)
+        for source in ('uuid: ""\n', '{"uuid": ""}', "<uuid></uuid>",
+                       "templates:\n  - description: 'see uuid: here'\n    uuid: 9f8b7ab4437a450b9c032a460bd16fbe\n"):
+            _validate_import_uuids({"source": source})
+
+    def test_a_bad_uuid_on_one_line_is_named(self):
+        with self.assertRaises(ValueError) as ctx:
+            _validate_import_uuids({"source": '{"templates": [{"uuid": "not-a-uuid", "name": "a:b"}]}'})
+        self.assertIn("not-a-uuid", str(ctx.exception))
+        self.assertNotIn("name", str(ctx.exception).split(".")[0])
+
 
 class TestEnumFieldNormalization(unittest.TestCase):
     # --- Item type ---

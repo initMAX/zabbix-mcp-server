@@ -86,7 +86,7 @@ class TestInstructions(unittest.TestCase):
     def test_the_writing_rules(self):
         text = _server_instructions(ALL)
         self.assertIn("replaces the whole list", text)
-        self.assertIn("or use the massadd / massremove tools", text)
+        self.assertIn("or use massadd / massremove", text)
         self.assertIn("A write is sent once.", text)
         self.assertIn("read the object back before repeating", text)
         self.assertIn("An API method without a tool: zabbix_raw_api_call.", text)

@@ -92,7 +92,13 @@ _ACTION_METHODS: list[MethodDef] = [
             "'recovery_operations' and 'update_operations'. Set 'status' to 0 "
             "(enabled) or 1 (disabled). "
             "Symbolic names accepted for 'eventsource': TRIGGER, DISCOVERY, "
-            "AUTOREGISTRATION, INTERNAL, SERVICE. " + FILTER_CONTRACT
+            "AUTOREGISTRATION, INTERNAL, SERVICE. Example, a message to a user group for problems of "
+            "severity High or above in one host group: 'filter': {'evaltype': 0, 'conditions': "
+            "[{'conditiontype': 0, 'operator': 0, 'value': '<groupid>'}, {'conditiontype': 4, 'operator': 5, "
+            "'value': '4'}]}, 'operations': [{'operationtype': 0, 'opmessage_grp': [{'usrgrpid': '<id>'}], "
+            "'opmessage': {'default_msg': 1, 'mediatypeid': '0'}}] (conditiontype 0 host group, 1 host, "
+            "2 trigger, 4 severity; operator 0 equals, 5 is greater or equal; operationtype 0 send message; "
+            "mediatypeid 0 all media). " + FILTER_CONTRACT
         ),
         read_only=False,
         params=CREATE_PARAMS,

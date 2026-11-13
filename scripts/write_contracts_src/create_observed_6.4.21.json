@@ -1,0 +1,63 @@
+{
+ "zabbix": "6.4.21",
+ "refused": {
+  "discoveryrule.create": [
+   "state",
+   "templateid"
+  ],
+  "host.create": [
+   "macros[].automatic",
+   "macros[].hostmacroid"
+  ],
+  "item.create": [
+   "error",
+   "evaltype",
+   "formula",
+   "itemid",
+   "lastclock",
+   "lastns",
+   "lastvalue",
+   "lifetime",
+   "prevvalue",
+   "state",
+   "templateid"
+  ],
+  "template.create": [
+   "auto_compress",
+   "custom_interfaces",
+   "flags",
+   "groups[].name",
+   "groups[].uuid",
+   "ipmi_authtype",
+   "ipmi_password",
+   "ipmi_privilege",
+   "ipmi_username",
+   "macros[].automatic",
+   "macros[].hostid",
+   "macros[].hostmacroid",
+   "maintenance_from",
+   "maintenance_status",
+   "maintenance_type",
+   "maintenanceid",
+   "proxy_address",
+   "proxy_hostid",
+   "status",
+   "templateid",
+   "tls_accept",
+   "tls_connect",
+   "tls_issuer",
+   "tls_psk",
+   "tls_psk_identity",
+   "tls_subject"
+  ],
+  "trigger.create": [
+   "error",
+   "flags",
+   "lastchange",
+   "state",
+   "templateid",
+   "triggerid",
+   "value"
+  ]
+ }
+}

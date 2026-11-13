@@ -275,3 +275,40 @@ class TestThroughTheTools(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTriggersInsideAnotherObject(unittest.TestCase):
+    """template_get with selectTriggers (a live session cloning a template, 8.0): the
+    triggers came back as "{50801}<600" and were sent to trigger_create that way."""
+
+    def test_nested_triggers_are_rewritten_like_trigger_get(self):
+        rows = [{"templateid": "10831", "triggers": [{"triggerid": "1", "expression": "{33791}>{$MAX}", "description": "x"}]},
+                {"templateid": "10832", "triggers": []}]
+        calls = []
+
+        def call(method, params):
+            calls.append(method)
+            return [_pieces(i) for i in params["triggerids"]]
+
+        self.assertEqual(te.rewrite_nested(rows, call), [])
+        self.assertEqual(rows[0]["triggers"][0]["expression"], "avg(/Zabbix server health/zabbix[process,poller,avg,busy],10m)>{$MAX}")
+        self.assertEqual(calls, ["trigger.get"])
+
+    def test_prototypes_listed_as_triggers_are_looked_up_as_prototypes(self):
+        rows = [{"itemid": "5", "triggers": [{"triggerid": "7", "expression": "{33792}=0"}]}]
+        calls = []
+
+        def call(method, params):
+            calls.append(method)
+            return [] if method == "trigger.get" else [_pieces(i) for i in params["triggerids"]]
+
+        self.assertEqual(te.rewrite_nested(rows, call), [])
+        self.assertTrue(rows[0]["triggers"][0]["expression"].startswith("last(/Zabbix server/"))
+        self.assertEqual(calls, ["trigger.get", "triggerprototype.get"])
+
+    def test_only_other_gets_on_a_current_release(self):
+        self.assertTrue(te.nested_wanted("template.get", "8.0.0"))
+        self.assertTrue(te.nested_wanted("host.get", "6.0.48"))
+        self.assertFalse(te.nested_wanted("trigger.get", "8.0.0"))     # rewrite() handles it
+        self.assertFalse(te.nested_wanted("template.create", "8.0.0"))
+        self.assertFalse(te.nested_wanted("template.get", "5.0.40"))

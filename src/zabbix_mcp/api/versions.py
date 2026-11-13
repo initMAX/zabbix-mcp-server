@@ -250,7 +250,11 @@ def unavailable_reason(api_method: str, version: str | None) -> str | None:
     method = api_method.lower()
     since = METHOD_SINCE.get(method)
     if since and current < parse_version(since):
-        return f"{api_method} requires Zabbix {since} or later (this server runs {version})."
+        before = ""
+        if method.startswith("templategroup.") and current < parse_version("6.2"):
+            # template groups are host groups up to 6.1 (a model sent templategroup_get on 6.0)
+            before = f" Template groups are host groups on this release: use {method.replace('templategroup.', 'hostgroup_')}."
+        return f"{api_method} requires Zabbix {since} or later (this server runs {version}).{before}"
     removed = METHOD_REMOVED.get(method)
     if removed and is_removed(version, removed[0]):
         return (

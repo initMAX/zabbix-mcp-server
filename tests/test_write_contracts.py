@@ -154,7 +154,11 @@ class TestShippedContract(unittest.TestCase):
                 if len(rule.path) == 1 and not rule.path[0].endswith("[]"):
                     spec = props.get(rule.path[0])
                     if spec is not None:
-                        self.assertTrue(spec.readonly, (method, rule.path[0]))
+                        # read-only, a key only a live server returned (an LLD rule's lifetime
+                        # on an 8.0 item), or one documented only on other releases than the
+                        # rule's (a proxy's name, documented from 7.0, dropped on 6.0)
+                        elsewhere = rule.releases and not any(spec.available(r + ".0") for r in rule.releases)
+                        self.assertTrue(spec.readonly or spec.observed or elsewhere, (method, rule.path[0]))
 
     def test_measured_facts(self):
         if not wc.WRITE_CONTRACTS:

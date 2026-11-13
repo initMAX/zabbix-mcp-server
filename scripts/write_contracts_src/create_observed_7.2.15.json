@@ -1,0 +1,82 @@
+{
+ "zabbix": "7.2.15",
+ "refused": {
+  "discoveryrule.create": [
+   "discover",
+   "error",
+   "history",
+   "inventory_link",
+   "itemid",
+   "logtimefmt",
+   "state",
+   "templateid",
+   "trends",
+   "units",
+   "value_type",
+   "valuemapid"
+  ],
+  "host.create": [
+   "groups[].flags",
+   "groups[].name",
+   "groups[].uuid",
+   "macros[].automatic",
+   "macros[].hostid",
+   "macros[].hostmacroid",
+   "tags[].automatic"
+  ],
+  "item.create": [
+   "enabled_lifetime",
+   "enabled_lifetime_type",
+   "error",
+   "evaltype",
+   "formula",
+   "itemid",
+   "lastclock",
+   "lastns",
+   "lastvalue",
+   "lifetime",
+   "lifetime_type",
+   "name_resolved",
+   "prevvalue",
+   "state",
+   "templateid"
+  ],
+  "template.create": [
+   "custom_interfaces",
+   "flags",
+   "groups[].name",
+   "groups[].uuid",
+   "ipmi_authtype",
+   "ipmi_password",
+   "ipmi_privilege",
+   "ipmi_username",
+   "macros[].automatic",
+   "macros[].hostid",
+   "macros[].hostmacroid",
+   "maintenance_from",
+   "maintenance_status",
+   "maintenance_type",
+   "maintenanceid",
+   "monitored_by",
+   "proxy_groupid",
+   "proxyid",
+   "status",
+   "templateid",
+   "tls_accept",
+   "tls_connect",
+   "tls_issuer",
+   "tls_psk",
+   "tls_psk_identity",
+   "tls_subject"
+  ],
+  "trigger.create": [
+   "error",
+   "flags",
+   "lastchange",
+   "state",
+   "templateid",
+   "triggerid",
+   "value"
+  ]
+ }
+}

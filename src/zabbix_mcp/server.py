@@ -149,7 +149,12 @@ _PREPROC_NO_ERROR_HANDLER: set[int] = {
 
 # Item / item prototype collection type (type)
 _ITEM_TYPES: dict[str, int] = {
+    # ZABBIX_AGENT / ZABBIX_AGENT_ACTIVE are the frontend's names ("Zabbix agent",
+    # "Zabbix agent (active)"): asked for "an item of the Zabbix agent", a model
+    # that saw only PASSIVE / ACTIVE picked ACTIVE
+    "ZABBIX_AGENT": 0,
     "ZABBIX_PASSIVE": 0,
+    "ZABBIX_AGENT_ACTIVE": 7,
     "TRAPPER": 2,
     "SIMPLE_CHECK": 3,
     "INTERNAL": 5,
@@ -556,6 +561,44 @@ def _normalize_timestamps(params: Any, tz: tzinfo | None = None) -> Any:
     return params
 
 
+def enum_fields_for(api_method: str) -> dict[str, dict[str, int]]:
+    """The symbolic enum fields of *api_method* (``_ENUM_FIELDS``), empty when none."""
+    for prefix, mappings in _ENUM_FIELDS.items():
+        if api_method.startswith(prefix):
+            return mappings
+    return {}
+
+
+def enum_meaning(mapping: dict[str, int]) -> str:
+    """'0 ZABBIX_AGENT / ZABBIX_PASSIVE, 2 TRAPPER, ...': each number once, with all its names."""
+    by_number: dict[int, list[str]] = {}
+    for name, n in mapping.items():
+        by_number.setdefault(n, []).append(name)
+    return ", ".join(f"{n} {' / '.join(names)}" for n, names in sorted(by_number.items()))
+
+
+def _enum_schema(mapping: dict[str, int]) -> dict[str, Any]:
+    """JSON Schema of an enum field: its numbers, or its symbolic names (also as numeric strings)."""
+    numbers = sorted(set(mapping.values()))
+    # names are read case-insensitively: both spellings, so a strict client takes "high" too
+    names = sorted(set(mapping) | {n.lower() for n in mapping}) + [str(n) for n in numbers]
+    meaning = enum_meaning(mapping)
+    return {"anyOf": [{"type": "integer", "enum": numbers}, {"type": "string", "enum": names}],
+            "description": f"{meaning} (the number or the name)"}
+
+
+def _typed_write_params(p: Any, api_method: str) -> Any:
+    """The ``params`` object of a write, with its enum fields typed: a model that sees
+    only a free dictionary wrote item type "web" (HTTP agent is 19). Every other key of
+    the API is still allowed (additionalProperties)."""
+    fields = enum_fields_for(api_method)
+    if p.name != "params" or p.param_type != "dict" or not fields:
+        return p
+    import dataclasses
+    properties = {name: _enum_schema(mapping) for name, mapping in fields.items()}
+    return dataclasses.replace(p, schema={"type": "object", "additionalProperties": True, "properties": properties})
+
+
 def _resolve_enum_value(raw: Any, mapping: dict[str, int]) -> Any:
     """Resolve a single value against a mapping.
 
@@ -767,6 +810,38 @@ def _strip_lld_filter(filt: Any) -> None:
                 cond.pop("formulaid", None)
 
 
+# What a host / template get answer carries that its create does not copy (the
+# select echoes): sent to template_create as a "copy", they were dropped and the
+# answer said nothing, so the clone looked complete (agent run, 6.2).
+_NOT_COPIED = ("items", "triggers", "graphs", "discoveries", "discoveryRules", "httpTests", "dashboards", "valuemaps")
+
+
+def _not_copied_note(api_method: str, raw: Any) -> str | None:
+    if api_method not in ("host.create", "template.create") or not isinstance(raw, (dict, list)):
+        return None
+    rows = raw if isinstance(raw, list) else [raw]
+    lost = [f"{key} ({len(row[key])})" for key in _NOT_COPIED for row in rows
+            if isinstance(row, dict) and isinstance(row.get(key), list) and row[key]]
+    if not lost:
+        return None
+    kind = api_method.split(".")[0]
+    return (f"Not copied: {', '.join(lost)}; {api_method} creates the {kind} itself only. Create them on the "
+            f"new {kind} (item_create, trigger_create, ... with its ID; a trigger expression names the new "
+            f"{kind} in /{kind}/key), or copy the whole template with configuration_export and "
+            f"configuration_import (new uuids).")
+
+
+def _get_names_note(api_method: str, raw: Any) -> str | None:
+    """An update carrying only the get name of a list (hostgroups, parentTemplates): not
+    applied, as before, but said, so that a success does not read as changed groups."""
+    from zabbix_mcp.api.write_shapes import get_names_left_out
+    left = get_names_left_out(api_method, raw)
+    if not left:
+        return None
+    return ("Not applied: " + ", ".join(f"{got} (what the get tool returns; to change it send '{write}' "
+                                          f"with the complete list)" for got, write in left) + ".")
+
+
 def _sanitize_create_params(params: dict[str, Any], api_method: str) -> None:
     """Strip read-only and unsupported fields that LLMs copy from YAML templates.
 
@@ -774,6 +849,12 @@ def _sanitize_create_params(params: dict[str, Any], api_method: str) -> None:
     them silently lets the create/update succeed without requiring the LLM
     to know which fields are read-only in each context.
     """
+    # A get answer's "hostgroups" / "parentTemplates" / "templategroups" are the lists
+    # the write calls groups / templates (api/write_shapes.rename_get_lists); renamed
+    # before the select echoes below are dropped, or host_update with the hostgroups of
+    # a host_get answer succeeded without changing a group.
+    from zabbix_mcp.api.write_shapes import rename_get_lists
+    rename_get_lists(api_method, params)
     # An empty uuid is how a get reports "this object has none" (anything
     # that lives on a host rather than on a template). 6.2 answers it with
     # ``Invalid parameter "/1/uuid": cannot be empty``; no caller can mean it.
@@ -972,6 +1053,11 @@ def _template_linkage_from_get(
         return params, None
     if "parentTemplates" not in params:
         return params, None
+    if api_method == "template.create" and not params.get("parentTemplates") and "templates" not in params:
+        # a copy whose source inherits from nothing: nothing is lost (on an update an
+        # empty list may be a wish to unlink every parent, which the note answers)
+        del params["parentTemplates"]
+        return params, None
     note = _TEMPLATE_LINKAGE_NOTE[api_method]
     if "templates" not in params:
         return params, note   # 'parentTemplates' alone: dropped as read-only by the measured contract
@@ -1067,6 +1153,10 @@ def _normalize_enum_fields(params: dict[str, Any], api_method: str) -> dict[str,
 
 
 # Regex for valid UUIDv4 format
+_UUID_VALUE_RE = re.compile(
+    r"""(?:^[ \t]*(?:-[ \t]+)?uuid[ \t]*:[ \t]*["']?|["']uuid["']\s*:\s*["']?|<uuid>)([^"'\s,}<]*)""",
+    re.IGNORECASE | re.MULTILINE,
+)
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-?[0-9a-f]{4}-?4[0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$",
     re.IGNORECASE,
@@ -1177,22 +1267,10 @@ def _validate_import_uuids(params: dict[str, Any]) -> None:
     if not isinstance(source, str) or not source:
         return
 
-    # Find uuid: lines in YAML/JSON source
-    invalid: list[str] = []
-    for line in source.splitlines():
-        stripped = line.strip()
-        # Match YAML: "uuid: <value>" or JSON: "\"uuid\": \"<value>\""
-        if stripped.startswith("uuid:"):
-            value = stripped[5:].strip().strip("'\"")
-            if value and not _UUID_RE.match(value):
-                invalid.append(value)
-        elif '"uuid"' in stripped or "'uuid'" in stripped:
-            # JSON-style: try to extract the value
-            parts = stripped.split(":", 1)
-            if len(parts) == 2:
-                value = parts[1].strip().strip(",").strip().strip("'\"")
-                if value and not _UUID_RE.match(value):
-                    invalid.append(value)
+    # Every uuid value, wherever it stands: one per YAML line, JSON on one line
+    # (an export of configuration_export is a single line, and the first colon of
+    # that line is not the uuid's), or an XML <uuid> element.
+    invalid = [m.group(1) for m in _UUID_VALUE_RE.finditer(source) if m.group(1) and not _UUID_RE.match(m.group(1))]
 
     if invalid:
         examples = ", ".join(invalid[:3])
@@ -1315,7 +1393,14 @@ def _api_error_text(api_method: str, exc: BaseException) -> str:
     hint = ""
     # Zabbix's own wording, at the start of the error data; a host that happens
     # to be named like that ('Host "No permissions to call" already exists') is not it
-    if str(data or "").lstrip().startswith('No permissions to call "'):
+    if re.search(r'/valuemapid": value must be 0', str(data or "")):
+        hint = (" Hint: a value map applies to items of value_type 0 FLOAT, 1 CHAR or 3 UNSIGNED only; "
+                "this item has another type (TEXT, LOG, ...).")
+    elif "with the same UUID already exists" in str(data or ""):
+        # an object copied from a get answer carries the original's uuid
+        hint = (" Hint: the uuid in the call is the one of the existing object. To create a copy, "
+                "leave uuid out (Zabbix gives the new object its own).")
+    elif str(data or "").lstrip().startswith('No permissions to call "'):
         # Zabbix 8.0 ships every role except Super admin with API access off
         # (ZBXNEXT-10469); the bare message does not say where to look.
         hint = (
@@ -1609,6 +1694,10 @@ def _build_zabbix_params(
             # minus the properties this release does not have yet / any more
             # (api/contracts.py); a 6.4 proxy.get must not ask for ``name``
             fields = compact_output_for(method_def.api_method, method_def.compact_fields, zabbix_version)
+            _extra = args.get("extra_params") if isinstance(args.get("extra_params"), dict) else {}
+            if method_def.api_method == "usermacro.get" and (params.get("globalmacro") or _extra.get("globalmacro")):
+                # global macros have no hostmacroid / hostid (agent run: the default was refused)
+                fields = ["globalmacroid", "macro", "value"]
             params["output"] = fields[0] if fields == ["extend"] else fields
         else:
             params["output"] = "extend"
@@ -2543,9 +2632,9 @@ def _server_instructions(
         "- 'filter' matches exact values, 'search' substrings of text properties. 'output' names the "
         "properties to return"
         + (" (a short default set when omitted, 'extend' for all)" if compact_output else "")
-        + "; 'count' returns the number of matches. Native parameters a tool does not name "
-        "(selectXxx and others) go into 'extra_params'.",
-        "- A switch such as only_true or monitored is turned on with true; false is the same as leaving it out.",
+        + "; countOutput: true counts the matches. Native parameters a tool does not name "
+        "(selectXxx, ...) go into 'extra_params'.",
+        "- A switch such as only_true or monitored is on with true; false equals leaving it out.",
     ]
     if has("problem_active_get"):
         lines.append(
@@ -2566,13 +2655,13 @@ def _server_instructions(
         lines += [
             "",
             "Writing",
+            "- References are objects, not IDs: groups [{\"groupid\": \"2\"}], templates the same.",
             "- An update takes the ID and only the properties to change."
             + (" An object from a get tool can be sent back as it is." if strip_write else "")
             + " A list property (groups, templates, tags, macros, interfaces) replaces the whole list: "
-            "read it first and send it complete"
-            + (", or use the massadd / massremove tools." if has("host_massadd") else "."),
-            "- A write is sent once. \"Outcome unknown\" after a broken connection means: read the object "
-            "back before repeating.",
+            "read it, send it complete"
+            + (", or use massadd / massremove (no tags)." if has("host_massadd") else "."),
+            "- A write is sent once. \"Outcome unknown\" (broken connection): read the object back before repeating.",
             "- A delete cannot be undone. A read-only server or token refuses writes.",
         ]
     else:
@@ -2599,6 +2688,8 @@ def _make_tool_handler(
     """Create a tool handler with a proper typed signature for MCPServer schema generation."""
 
     schema_params = specialise_params(method_def, constraints=schema_constraints)
+    if schema_constraints and not method_def.read_only:
+        schema_params = [_typed_write_params(p, method_def.api_method) for p in schema_params]
 
     # Build the actual handler that does the work
     async def handler(**kwargs: Any) -> str:
@@ -2666,6 +2757,9 @@ def _make_tool_handler(
                 method_def.api_method == "problem.get"
                 and bool(kwargs.get("monitored"))
             )
+            # what the caller sent, before _build_zabbix_params rewrites it in place
+            _sent_notes = [n for n in (_not_copied_note(method_def.api_method, kwargs.get("params")),
+                                       _get_names_note(method_def.api_method, kwargs.get("params"))) if n]
             params = _build_zabbix_params(
                 method_def, kwargs, zabbix_version,
                 allowed_import_dirs=allowed_import_dirs,
@@ -2684,12 +2778,24 @@ def _make_tool_handler(
                 _resolve_valuemap_by_name,
                 params, method_def.api_method, client_manager, server_name,
             )
-            linkage_note = None
+            linkage_note = " ".join(_sent_notes) or None
             if method_def.api_method in ("template.update", "template.create"):
-                params, linkage_note = await asyncio.to_thread(
+                params, _linkage = await asyncio.to_thread(
                     _template_linkage_from_get,
                     params, method_def.api_method, client_manager, server_name,
                 )
+                linkage_note = " ".join(n for n in (_linkage, linkage_note) if n) or None
+            if not method_def.read_only:
+                # Shapes Zabbix refuses without saying what is wrong (reference lists
+                # written as IDs, SNMP settings that are not SNMP settings): refused
+                # here with the path and the right form. Nothing is rewritten.
+                from zabbix_mcp.api.write_shapes import problems as _write_problems
+                _shape_problems = _write_problems(method_def.api_method, params, zabbix_version)
+                if _shape_problems:
+                    raise ToolError(
+                        f"{method_def.tool_name} was not sent: " + " | ".join(_shape_problems)
+                        + " Correct these fields and call again; the same call unchanged is refused again."
+                    )
             if strip_write and not method_def.read_only:
                 # What X.get returns and X.update / X.create refuse, measured
                 # per release (api/write_contracts.py); [server].strip_write_params
@@ -2697,6 +2803,15 @@ def _make_tool_handler(
                 dropped = strip_measured_readonly(method_def.api_method, params, zabbix_version)
                 if dropped:
                     logger.debug("%s: dropped read-only keys %s", method_def.api_method, ", ".join(dropped))
+                from zabbix_mcp.api.write_shapes import trim_references as _trim_references
+                trimmed = _trim_references(method_def.api_method, params)
+                if trimmed:
+                    logger.debug("%s: kept only the IDs in %s", method_def.api_method, ", ".join(trimmed))
+            if method_def.read_only:
+                from zabbix_mcp.api.write_shapes import select_problems as _select_problems
+                _shape_problems = _select_problems(params)
+                if _shape_problems:
+                    raise ToolError(f"{method_def.tool_name} was not sent: " + " | ".join(_shape_problems))
             params = await asyncio.to_thread(
                 _sanitize_action_payload,
                 params, method_def.api_method, client_manager, server_name,
@@ -2742,6 +2857,15 @@ def _make_tool_handler(
                         "%s on server '%s': the expression of %d trigger(s) could not be rebuilt from its "
                         "functions and is returned as stored (%s)", method_def.api_method, server_name,
                         len(_not_rebuilt), ", ".join(_not_rebuilt[:10]))
+            elif (isinstance(result, (list, dict)) and method_def.read_only
+                  and trigger_expressions.nested_wanted(method_def.api_method, zabbix_version)):
+                # triggers inside another object (template_get with selectTriggers): the same
+                # editable form, so a template copied through the get answer keeps working
+                await asyncio.to_thread(
+                    trigger_expressions.rewrite_nested, result,
+                    (lambda m, p: client_manager.call_with_session(server_name, m, p, auth_sessionid))
+                    if auth_sessionid else (lambda m, p: client_manager.call(server_name, m, p)),
+                )
             if _problem_monitored and isinstance(result, list):
                 from zabbix_mcp.api.extensions import _filter_active_problems
                 kept, _ = await asyncio.to_thread(
@@ -2882,6 +3006,10 @@ def _register_tools(
         tool_annotations = annotations_for(method_def.tool_name, method_def.read_only)
 
         description = method_def.description
+        if ".delete" in method_def.api_method and any(getattr(x, "name", None) == "ids" for x in method_def.params):
+            # every other write takes 'params'; a model generalising from them sent
+            # host_delete {"params": [...]} (agent runs on 6.0 to 8.0)
+            description = f'Takes "ids": ["<id>", ...] (not params). {description}'
         if strip_write and not method_def.read_only:
             # one sentence on the tools whose payload the measured write
             # contract trims (api/write_contracts.py)
@@ -3790,9 +3918,10 @@ def _register_tools(
         params: Annotated[dict, Field(description="API method parameters as JSON object")],
         server: Annotated[Optional[str], Field(description=server_desc)] = None,
     ) -> str:
-        """Prepare a write action for review before execution. Returns a preview
-        of what will happen and a confirmation token. Use action_confirm with the
-        token to actually execute it. Tokens expire after 5 minutes."""
+        """Two-step confirmation for any Zabbix write method (not about Zabbix actions:
+        those are action_create / action_update). Prepares the write for review: returns a
+        preview and a confirmation token; action_confirm with the token executes it.
+        Tokens expire after 5 minutes."""
         srv = _resolve_server_for_caller(client_manager, server or _default_server_for_caller(client_manager))
 
         # Token authorization: server + write permission
@@ -3868,8 +3997,9 @@ def _register_tools(
         *,
         confirmation_token: Annotated[str, Field(description="Token from action_prepare response")],
     ) -> str:
-        """Execute a previously prepared action. The confirmation token must match
-        an active (non-expired) prepared action and be from the same caller."""
+        """Execute a write prepared with action_prepare (the two-step confirmation, not
+        about Zabbix actions). The confirmation token must match an active (non-expired)
+        prepared write and be from the same caller."""
         # Atomic pop-then-validate: holding the lock from the lookup
         # through the pop closes the window where a concurrent second
         # confirm call could race with us.

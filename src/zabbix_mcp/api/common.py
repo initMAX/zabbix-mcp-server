@@ -95,13 +95,14 @@ SINGLETON_GET_PARAMS: list[ParamDef] = [
 CREATE_PARAMS: list[ParamDef] = [
     ParamDef(
         "params", "dict",
-        "All object properties wrapped in a single dictionary. Pass every "
-        "field the entity needs (name, type, references to parent IDs, "
-        "lists of nested objects, ...) inside this one ``params`` argument. "
+        "All object properties in one dictionary. References to other "
+        "objects are objects with their ID, not bare IDs: "
+        "``\"groups\": [{\"groupid\": \"4\"}]``, ``\"templates\": [{\"templateid\": \"7\"}]``. "
         "Example: ``{\"params\": {\"name\": \"My host group\"}}`` for "
         "hostgroup_create, or ``{\"params\": {\"host\": \"web-01\", "
         "\"groups\": [{\"groupid\": \"4\"}], \"interfaces\": [{...}]}}`` for "
-        "host_create. See Zabbix API docs for the required/optional fields "
+        "host_create. A copy of an object read with a get tool: give it a new name and leave "
+        "out its uuid. See Zabbix API docs for the required/optional fields "
         "of each entity type.",
         required=True,
     ),
