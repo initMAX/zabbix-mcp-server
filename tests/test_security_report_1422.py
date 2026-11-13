@@ -851,8 +851,8 @@ class TestToolsCheckWhatTheyReadAndWrite(unittest.TestCase):
         self.assertEqual(source.count('check_token_authorization(srv, tool_prefixes=["host", "item", "trend"])'), 2)
         self.assertIn('check_token_authorization(srv, tool_prefixes=["host", "item", "history", "trend", "event", "trigger"])',
                       source)
-        self.assertIn('if save_to_file or email_to:', source)
-        self.assertIn('_write_err = check_token_authorization(srv, tool_prefix="host", is_write=True)', source)
+        # the delivery checks moved into report_permission_error (#109, tests/test_report_permissions.py)
+        self.assertIn("_report_err = report_permission_error(srv, save_to_file=save_to_file, email_to=email_to)", source)
         self.assertIn("for i, name in enumerate(_servers_for_caller(client_manager), 1):", source)
 
 

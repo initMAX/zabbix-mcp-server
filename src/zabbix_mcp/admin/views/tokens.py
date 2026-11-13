@@ -272,6 +272,8 @@ async def token_create(request: Request) -> Response:
                 ctx["form_expires_at"] = src.expires_at or ""
                 ctx["form_read_only"] = bool(src.read_only)
                 ctx["form_allow_raw_json"] = bool(getattr(src, "allow_raw_json", False))
+                ctx["form_allow_report"] = bool(getattr(src, "allow_report", True))
+                ctx["form_allow_report_email"] = bool(getattr(src, "allow_report_email", False))
                 ctx["form_timezone"] = getattr(src, "timezone", None) or ""
                 ctx["duplicated_from_name"] = src.name
         ctx.update(_get_global_context(admin_app))
@@ -297,6 +299,8 @@ async def token_create(request: Request) -> Response:
             "form_expires_at": str(form.get("expires_at", "") or ""),
             "form_read_only": "read_only" in form,
             "form_allow_raw_json": "allow_raw_json" in form,
+            "form_allow_report": "allow_report" in form,
+            "form_allow_report_email": "allow_report_email" in form,
             "form_scopes": str(form.get("scopes", "") or ""),
             "form_allowed_servers": str(form.get("allowed_servers", "") or ""),
             "form_timezone": str(form.get("timezone", "") or ""),
@@ -333,6 +337,8 @@ async def token_create(request: Request) -> Response:
 
     read_only = "read_only" in form
     allow_raw_json = "allow_raw_json" in form
+    allow_report = "allow_report" in form
+    allow_report_email = "allow_report_email" in form
     allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
     allowed_ips = [ip.strip() for ip in allowed_ips_raw.split("\n") if ip.strip()] if allowed_ips_raw else None
     # Validate every IP / CIDR before write so a typo cannot park a
@@ -418,6 +424,11 @@ async def token_create(request: Request) -> Response:
         # stay clean and a future audit "grep allow_raw_json config.toml"
         # only finds the tokens that have actually been opted in.
         token_data["allow_raw_json"] = True
+    # reports (#109): written only when they differ from the default, like allow_raw_json
+    if not allow_report:
+        token_data["allow_report"] = False
+    if allow_report_email:
+        token_data["allow_report_email"] = True
     if timezone_name:
         token_data["timezone"] = timezone_name
 
@@ -533,6 +544,12 @@ async def token_detail(request: Request) -> Response:
         # every edit so a checkbox left unchecked clears the flag rather
         # than silently preserving it.
         updates["allow_raw_json"] = "allow_raw_json" in form
+        # reports (#109), re-confirmed on every edit like the raw_json flag; only from a
+        # form that has the two switches (a page opened before the update has not, and
+        # saving it must not turn reports off)
+        if "_report_fields" in form:
+            updates["allow_report"] = "allow_report" in form
+            updates["allow_report_email"] = "allow_report_email" in form
 
         allowed_ips_raw = str(form.get("ip_allowlist", "")).strip()
         if allowed_ips_raw:

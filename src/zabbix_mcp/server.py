@@ -1415,6 +1415,32 @@ def _api_error_text(api_method: str, exc: BaseException) -> str:
     )
 
 
+def report_permission_error(server_name: str, *, save_to_file: bool = False, email_to: Any = None) -> str | None:
+    """Why the calling token may not generate or deliver this report, or ``None`` (#109).
+
+    Generating reads with the token's own read rights (checked before) and is open to a
+    read-only token unless its ``allow_report`` is off. ``save_to_file`` writes a file on
+    the server: a write. ``email_to`` sends mail: a write too, unless the token has
+    ``allow_report_email`` on, which allows that mail (to the configured
+    allowed_recipients, checked when it is sent) and nothing else.
+    """
+    from zabbix_mcp.token_store import check_token_authorization, current_token_info
+    token = current_token_info.get()
+    if token is not None and not getattr(token, "allow_report", True):
+        return (f"Token '{token.name}' may not generate reports (an admin turns it on under Tokens, "
+                "'Allow report generation').")
+    if save_to_file:
+        err = check_token_authorization(server_name, tool_prefix="host", is_write=True)
+        if err:
+            return err + " (save_to_file writes a file on the server; without it the report is returned)"
+    if email_to and not (token is not None and getattr(token, "allow_report_email", False)):
+        err = check_token_authorization(server_name, tool_prefix="host", is_write=True)
+        if err:
+            return err + (" (email_to sends mail: it needs a token that may write, or one with 'Allow report "
+                          "email delivery' on; without it the report is returned)")
+    return None
+
+
 def _servers_for_caller(client_manager) -> list[str]:
     """The configured servers the calling token may use (all of them without a token or with a wildcard)."""
     from zabbix_mcp.token_store import current_token_info
@@ -3670,11 +3696,16 @@ def _register_tools(
                 _auth_err = check_token_authorization(srv, tool_prefixes=["host", "item", "history", "trend", "event", "trigger"])  # every source it reads
                 if _auth_err:
                     raise ToolError(_auth_err)
-                if save_to_file or email_to:
-                    # a file on the server, a mail sent: writes, not for a read-only token
-                    _write_err = check_token_authorization(srv, tool_prefix="host", is_write=True)
-                    if _write_err:
-                        raise ToolError(_write_err + " (save_to_file and email_to write; without them the report is returned)")
+                from zabbix_mcp.token_store import current_token_info as _cti_report
+                _report_token = _cti_report.get()
+                _report_err = report_permission_error(srv, save_to_file=save_to_file, email_to=email_to)
+                if _report_err:
+                    from zabbix_mcp.admin.audit_writer import write_audit as _wa
+                    _wa(action="report.refused", user=getattr(_report_token, "name", "") or "",
+                        target_type="report", target_id=str(report_type),
+                        details={"server": srv, "save_to_file": bool(save_to_file), "email_to": bool(email_to),
+                                 "reason": _report_err[:200]})
+                    raise ToolError(_report_err)
 
                 valid_types = tuple(_REPORT_TEMPLATES.keys())
                 if report_type not in valid_types:
@@ -3723,6 +3754,16 @@ def _register_tools(
                         "size_kb": round(len(pdf_bytes) / 1024, 1),
                     }
 
+                    def _audit_report(action: str, **details: Any) -> None:
+                        # who generated / mailed which report; never the report itself (#109)
+                        from zabbix_mcp.admin.audit_writer import write_audit
+                        write_audit(action=action, user=getattr(_report_token, "name", "") or "",
+                                    target_type="report", target_id=report_type,
+                                    details={"server": srv, "hostgroupid": str(hostgroupid),
+                                             "period": period or "30d", **details})
+
+                    _audit_report("report.generated", size_kb=summary["size_kb"],
+                                  delivery=[d for d, on in (("file", save_to_file), ("email", bool(recipients))) if on] or ["link"])
                     if save_to_file or recipients:
                         from zabbix_mcp.reporting import delivery as _delivery
                         filename = _delivery.build_filename(report_type, hostgroupid)
@@ -3756,7 +3797,11 @@ def _register_tools(
                                     ),
                                 )
                             except _delivery.DeliveryError as exc:
+                                _audit_report("report.email_refused", reason=str(exc)[:200])
                                 raise ToolError(str(exc))
+                            _audit_report("report.emailed", recipients=list(summary["emailed_to"] or []),
+                                          by_report_permission=bool(_report_token is not None and _report_token.read_only
+                                                                    and getattr(_report_token, "allow_report_email", False)))
                         summary["note"] = (
                             "Delivered out of band - the PDF payload is intentionally "
                             "omitted from this response to keep it small."
@@ -3871,6 +3916,8 @@ def _register_tools(
                 Two further deliveries exist when the operator enabled them:
                 `save_to_file: true` writes the PDF into the server's configured report
                 directory, and `email_to: "ops@example.com"` mails it as an attachment.
+                Both are writes: a read-only token mails a report only when its token
+                has report e-mail allowed, and never saves one.
                 Both answer with a short receipt (path / recipients / size) and are
                 refused with a clear message when not configured.
 

@@ -135,6 +135,28 @@
             </div>
         </div>
 
+        <div class="form-group">
+            <label class="toggle-label" tabindex="0" data-tooltip="report_generate reads monitoring data with this token's own read rights and returns a link to the PDF. On by default; turn it off for a token that must not produce reports.">
+                <span class="toggle">
+                    <input type="checkbox" id="allow_report" name="allow_report" value="1" {% if form_allow_report is not defined or form_allow_report %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </span>
+                Allow report generation <span class="tooltip-icon">&#x1F6C8;</span>
+            </label>
+            <div class="form-hint">The token may call report_generate. The report reads only what the token may read.</div>
+        </div>
+
+        <div class="form-group">
+            <label class="toggle-label" tabindex="0" data-tooltip="Lets this token send a generated report by e-mail (email_to), only to the addresses allowed under Settings, report e-mail. It does not give the token any other write right; a read-only token stays read-only. save_to_file still needs a token that may write. Off by default.">
+                <span class="toggle">
+                    <input type="checkbox" id="allow_report_email" name="allow_report_email" value="1" {% if form_allow_report_email %}checked{% endif %}>
+                    <span class="toggle-slider"></span>
+                </span>
+                Allow report email delivery <span class="tooltip-icon">&#x1F6C8;</span>
+            </label>
+            <div class="form-hint">Off by default. Mail goes only to the allowed recipients of the report e-mail settings; no other write is allowed by this.</div>
+        </div>
+
         <script>
         function toggleRawJsonWarning(cb) {
             var w = document.getElementById('raw-json-warning');

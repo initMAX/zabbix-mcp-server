@@ -675,6 +675,10 @@ update_check_enabled = true
 #                                  # (Claude, GPT, Cursor, ...) - the disclaimer
 #                                  # is what stops the model from following
 #                                  # operator-controlled text in Zabbix data.
+# allow_report = true              # report_generate for this token (reads with its own rights)
+# allow_report_email = false       # report_generate email_to for this token, to
+#                                  # [reporting.email].allowed_recipients only, without
+#                                  # any other write (a read-only token stays read-only)
 
 # ---------------------------------------------------------------------------
 # Zabbix servers

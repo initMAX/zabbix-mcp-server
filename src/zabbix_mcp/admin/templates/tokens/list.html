@@ -160,6 +160,16 @@
                           tabindex="0" role="button"
                           data-tooltip="Read/Write - this token can perform create / update / delete operations.">RW</span>
                     {% endif %}
+                    {% if token.allow_report_email %}
+                    <span class="badge badge-muted"
+                          tabindex="0" role="button"
+                          data-tooltip="Report e-mail - token may send generated reports to the allowed recipients, without any other write.">@</span>
+                    {% endif %}
+                    {% if not token.allow_report %}
+                    <span class="badge badge-muted"
+                          tabindex="0" role="button"
+                          data-tooltip="No reports - report_generate is turned off for this token.">no PDF</span>
+                    {% endif %}
                     {% if token.allow_raw_json %}
                     <span class="badge badge-danger"
                           tabindex="0" role="button"

@@ -839,6 +839,22 @@ Configured in the admin portal under **Settings -> Report Delivery** (or in `con
 
 Asking for a channel the operator has not configured returns a plain explanation of what is missing, not a stack trace. See `config.example.toml` for the full block.
 
+**Per token** (since 1.42.4, admin portal under **Tokens**, or in `config.toml`): `save_to_file` and `email_to` are writes, so a read-only token gets the report as a link only. Two switches decide what a token may do with reports, independently of its read-only setting:
+
+| Key | Default | What it allows |
+|---|---|---|
+| `allow_report` | `true` | `report_generate` at all (the report reads with the token's own read rights) |
+| `allow_report_email` | `false` | `email_to` to the `allowed_recipients` above, without any other write; a read-only token stays read-only, `save_to_file` still needs a token that may write |
+
+```toml
+[tokens.reports]
+name = "Monthly SLA mail"
+read_only = true
+allow_report_email = true
+```
+
+Report generation, report mail and refused deliveries are written to the audit log (who, which report, the recipients; never the report itself). An OAuth login follows the user's role: report mail needs a role that may write.
+
 ```python
 # Async PDF generation via Tasks API. Requires a client that advertises
 # tasks support in initialize() - the official `mcp` Python SDK does.

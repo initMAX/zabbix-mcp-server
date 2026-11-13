@@ -145,6 +145,12 @@ class TokenInfo:
     # LLM clients - operators must explicitly opt a token in for use by
     # programmatic / non-LLM consumers (Python scripts, n8n workflows).
     allow_raw_json: bool = False
+    # Reports (#109). report_generate reads with the token's own read rights and is
+    # open to a read-only token unless an admin turns it off here; mailing the
+    # report (to [reporting.email].allowed_recipients only) is a write that a
+    # read-only token may do only when allowed here, without any other write.
+    allow_report: bool = True
+    allow_report_email: bool = False
     # Zone this token's caller lives in (issue #75): ``<field>_local``
     # renderings and zone-less date inputs use it. Wins over the Zabbix
     # entry's and ``[server]``'s ``timezone``. None = inherit.
@@ -245,6 +251,16 @@ class TokenStore:
                 )
                 allow_raw_json_val = False
 
+            def _strict_bool(key: str, default: bool) -> bool:
+                raw = cfg.get(key, default)
+                if isinstance(raw, bool):
+                    return raw
+                logger.warning("Token '%s' has non-boolean %s=%r in config; treating as %s",
+                               token_id, key, raw, default)
+                return default
+            allow_report_val = _strict_bool("allow_report", True)
+            allow_report_email_val = _strict_bool("allow_report_email", False)
+
             # timezone: an unknown zone is ignored with a warning rather
             # than refusing the token - a typo here must not lock a
             # client out, it only falls back to the next level.
@@ -272,6 +288,8 @@ class TokenStore:
                 is_legacy=cfg.get("is_legacy", False),
                 revoked=not cfg.get("is_active", True),
                 allow_raw_json=allow_raw_json_val,
+                allow_report=allow_report_val,
+                allow_report_email=allow_report_email_val,
                 timezone=tz_val,
             )
 

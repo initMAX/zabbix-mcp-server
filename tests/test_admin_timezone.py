@@ -425,5 +425,42 @@ class TestUserForm(_Base):
         self.assertEqual((ok, role, tz), (True, "operator", "Europe/Prague"))
 
 
+class TestTokenReportSwitches(_Base):
+    """#109: the two report switches round-trip through the portal (create and edit)."""
+
+    _create = TestTokenForm._create
+    _edit = TestTokenForm._edit
+
+    def test_create_defaults_write_no_keys(self):
+        ctx = self._create(allow_report="1")
+        entry = self._token(ctx["token_id"])
+        self.assertNotIn("allow_report", entry)
+        self.assertNotIn("allow_report_email", entry)
+        token = self.app.token_store.get_token(ctx["token_id"])
+        self.assertTrue(token.allow_report)
+        self.assertFalse(token.allow_report_email)
+
+    def test_create_with_mail_and_without_generation(self):
+        ctx = self._create(allow_report_email="1")
+        entry = self._token(ctx["token_id"])
+        self.assertIs(entry["allow_report"], False)
+        self.assertIs(entry["allow_report_email"], True)
+
+    def test_edit_sets_and_clears_them(self):
+        self._edit("t1", _report_fields="1", allow_report="1", allow_report_email="1")
+        self.assertTrue(self.app.token_store.get_token("t1").allow_report_email)
+        self._edit("t1", _report_fields="1", allow_report="1")
+        self.assertFalse(self.app.token_store.get_token("t1").allow_report_email)
+        self.assertTrue(self.app.token_store.get_token("t1").allow_report)
+
+    def test_a_form_without_the_switches_leaves_them(self):
+        self._edit("t1", _report_fields="1", allow_report="1", allow_report_email="1")
+        self._edit("t1")                       # a page opened before the update
+        token = self.app.token_store.get_token("t1")
+        self.assertTrue(token.allow_report)
+        self.assertTrue(token.allow_report_email)
+
+
 if __name__ == "__main__":
     unittest.main()
+

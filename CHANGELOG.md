@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.42.4 - 2026-11-13
+
+Report mail for a read-only token, broken by v1.42.2 ([#109](https://github.com/initMAX/zabbix-mcp-server/issues/109), @metehan25).
+
+### Fixed
+
+- **A read-only token could no longer mail a report, and the only way back was a token with every write right.** v1.42.2 counted `save_to_file` and `email_to` of `report_generate` as writes (a read-only token could otherwise write files and send mail); that was meant against tokens that should not deliver reports, not against the ones that are there to do it. A token now has two switches of its own, in the admin portal under Tokens and in `config.toml`, independent of its read-only setting:
+  - `allow_report` (default `true`): `report_generate` at all. The report reads with the token's own read rights, as before; turned off, the token cannot generate reports.
+  - `allow_report_email` (default `false`): `email_to`, to `[reporting.email].allowed_recipients` only (checked on every send, as before), sent without a confirmation. It gives no other write: a read-only token stays read-only for every other tool, and `save_to_file` still needs a token that may write.
+  Both are checked server-side on every call. A token that may write delivers as before.
+- Report generation, report mail and refused deliveries are written to the audit log (`report.generated`, `report.emailed`, `report.refused`, `report.email_refused`: the token, the report type, host group, period, the recipients), never the report itself or a credential. An edit form opened before the update leaves both switches as they are.
+
 ## v1.42.3 - 2026-11-13
 
 Fixes from a live webinar demo, where a model (Qwen 3.8 behind a demo chat client) could not create an SNMP host from a template, and from the everyday tasks that followed: the same demo loop on every supported release (6.0 to 8.0), and agents doing 28 everyday tasks through the MCP tools on each release (creating, changing, copying and deleting hosts, templates, items, triggers, LLD rules, web scenarios, users, actions, maintenance, dashboards, SLAs). Before: the demo loop failed 21 of 21 runs on the SNMP host; after: 21 of 21 on the first `host_create`.
